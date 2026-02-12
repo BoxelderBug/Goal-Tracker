@@ -123,6 +123,11 @@ const graphPointsState = {
   month: {},
   year: {}
 };
+const overlayPointsState = {
+  week: {},
+  month: {},
+  year: {}
+};
 const projectionLineState = {
   week: {},
   month: {},
@@ -139,7 +144,8 @@ const graphModalState = {
   period: "",
   trackerId: "",
   avgMode: "week",
-  historyMetric: "avg"
+  historyMetric: "avg",
+  historyScope: "total"
 };
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
@@ -431,6 +437,9 @@ manageList.addEventListener("click", (event) => {
   });
   Object.keys(graphPointsState).forEach((periodName) => {
     delete graphPointsState[periodName][id];
+  });
+  Object.keys(overlayPointsState).forEach((periodName) => {
+    delete overlayPointsState[periodName][id];
   });
   Object.keys(projectionLineState).forEach((periodName) => {
     delete projectionLineState[periodName][id];
@@ -860,6 +869,13 @@ function handleGraphCardActions(event) {
     return;
   }
 
+  const historyScopeButton = event.target.closest("button[data-action='set-history-scope']");
+  if (historyScopeButton) {
+    graphModalState.historyScope = normalizeHistoryScope(historyScopeButton.dataset.scope);
+    renderGraphModal();
+    return;
+  }
+
   const toggleButton = event.target.closest("button[data-action='toggle-inline-chart']");
   if (toggleButton) {
     const period = toggleButton.dataset.period;
@@ -886,6 +902,7 @@ function handleGraphCardActions(event) {
   graphModalState.trackerId = id;
   graphModalState.avgMode = period;
   graphModalState.historyMetric = "avg";
+  graphModalState.historyScope = "total";
   renderPeriodTabs();
 }
 
@@ -895,6 +912,7 @@ function closeGraphModal() {
   graphModalState.trackerId = "";
   graphModalState.avgMode = "week";
   graphModalState.historyMetric = "avg";
+  graphModalState.historyScope = "total";
   if (graphModal) {
     graphModal.classList.add("hidden");
     graphModal.setAttribute("aria-hidden", "true");
@@ -925,8 +943,9 @@ function renderGraphModal() {
   const series = getDailySeries(index, tracker.id, chartRange);
   const compareEnabled = getGoalCompareEnabled(graphModalState.period, tracker.id);
   const overlayRange = compareEnabled ? getOverlayRange(graphModalState.period, range) : null;
-  const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, chartRange, overlayRange) : null;
-  const pointsEnabled = getGraphPointsEnabled(graphModalState.period, tracker.id);
+  const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, range, overlayRange) : null;
+  const currentPointsEnabled = getGraphPointsEnabled(graphModalState.period, tracker.id);
+  const previousPointsEnabled = getOverlayPointsEnabled(graphModalState.period, tracker.id);
   const projectionAllowed = shouldAllowProjectionLine(graphModalState.period, range, now);
   const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(graphModalState.period, tracker.id) : false;
   const projection = projectionAllowed && projectionEnabled
@@ -947,16 +966,24 @@ function renderGraphModal() {
     <div class="graph-modal-tools">
       <div class="graph-action-group">
         <label class="check-inline check-compact graph-check">
-          <input type="checkbox" data-action="toggle-points" data-period="${graphModalState.period}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
-          Show points
+          <input type="checkbox" data-action="toggle-points-current" data-period="${graphModalState.period}" data-id="${tracker.id}" ${currentPointsEnabled ? "checked" : ""} />
+          Current points
         </label>
+        ${compareEnabled ? `
+        <label class="check-inline check-compact graph-check">
+          <input type="checkbox" data-action="toggle-points-previous" data-period="${graphModalState.period}" data-id="${tracker.id}" ${previousPointsEnabled ? "checked" : ""} />
+          Previous points
+        </label>
+        ` : ""}
         ${projectionControl}
       </div>
       ${createDownloadMenuMarkup(graphModalState.period, tracker.id, "modal")}
     </div>
   `;
   graphModalBody.innerHTML += createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
-    showPoints: pointsEnabled,
+    showCurrentPoints: currentPointsEnabled,
+    showOverlayPoints: previousPointsEnabled,
+    showProjectionPoints: currentPointsEnabled,
     large: true,
     unit: tracker.unit,
     domainDays: getRangeDays(range),
@@ -969,7 +996,8 @@ function renderGraphModal() {
     series,
     index,
     normalizePeriodMode(graphModalState.avgMode || graphModalState.period),
-    normalizeHistoryMetric(graphModalState.historyMetric)
+    normalizeHistoryMetric(graphModalState.historyMetric),
+    normalizeHistoryScope(graphModalState.historyScope)
   );
   graphModalBody.innerHTML += createExpandedTargetStatusMarkup(tracker, index, normalizeDate(new Date()));
 
@@ -1066,7 +1094,7 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
   };
 }
 
-function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric) {
+function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric, historyScope) {
   const unit = normalizeGoalUnit(tracker.unit);
   const today = normalizeDate(new Date());
   const todayKey = getDateKey(today);
@@ -1085,8 +1113,9 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
 
   const selectedMode = normalizePeriodMode(averageMode || periodName);
   const selectedMetric = normalizeHistoryMetric(historyMetric);
+  const selectedScope = normalizeHistoryScope(historyScope);
   const averageRange = getCurrentRangeForMode(selectedMode, today);
-  const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric);
+  const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric, selectedScope);
   const maxMetricValue = Math.max(...history.map((item) => item.value), 1);
   const barsMarkup = history.map((item) => {
     const heightPct = Math.max(Math.round((item.value / maxMetricValue) * 100), 2);
@@ -1125,6 +1154,18 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
     >${item.label}</button>
   `).join("");
 
+  const scopeButtons = [
+    { key: "total", label: "Total" },
+    { key: "to-date", label: "To Date" }
+  ].map((item) => `
+    <button
+      type="button"
+      class="avg-mode-btn${selectedScope === item.key ? " active" : ""}"
+      data-action="set-history-scope"
+      data-scope="${item.key}"
+    >${item.label}</button>
+  `).join("");
+
   const bestDayText = bestDay
     ? `${formatAmountWithUnit(bestDay.amount, unit)} on ${formatDate(parseDateKey(bestDay.date))}`
     : "No non-zero day";
@@ -1136,6 +1177,7 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const currentMonthLabel = getPeriodRecordLabel("month", getMonthRange(today));
   const currentYearLabel = getPeriodRecordLabel("year", getYearRange(today));
   const historyTitle = selectedMetric === "sum" ? "Sum vs last 5 periods" : "Average/day vs last 5 periods";
+  const scopeText = selectedScope === "to-date" ? "To Date" : "Total";
 
   return `
     <section class="deep-dive-insights">
@@ -1164,10 +1206,13 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
           </div>
         </article>
         <article class="deep-dive-card">
-          <p class="target-status-line"><strong>${escapeHtml(historyTitle)}</strong> (${escapeHtml(unit)})</p>
+          <p class="target-status-line"><strong>${escapeHtml(historyTitle)} (${escapeHtml(scopeText)})</strong> (${escapeHtml(unit)})</p>
           <div class="avg-controls-row">
             <div class="avg-mode-toggle">${modeButtons}</div>
-            <div class="avg-mode-toggle avg-mode-toggle-right">${metricButtons}</div>
+            <div class="avg-mode-toggle avg-mode-toggle-right">
+              <div class="avg-mode-group">${metricButtons}</div>
+              <div class="avg-mode-group">${scopeButtons}</div>
+            </div>
           </div>
           <div class="avg-bars">${barsMarkup}</div>
         </article>
@@ -1188,6 +1233,13 @@ function normalizeHistoryMetric(value) {
     return "sum";
   }
   return "avg";
+}
+
+function normalizeHistoryScope(value) {
+  if (value === "to-date") {
+    return "to-date";
+  }
+  return "total";
 }
 
 function getCurrentRangeForMode(mode, date) {
@@ -1356,10 +1408,13 @@ function formatCurrentPeriodText(total, unit, label) {
   return `${formatAmountWithUnit(total, unit)} | ${label}`;
 }
 
-function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg") {
+function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg", scopeType = "total") {
   const selectedMetric = normalizeHistoryMetric(metricType);
+  const selectedScope = normalizeHistoryScope(scopeType);
   const history = [];
   const firstEntryDate = getTrackerFirstEntryDate(tracker.id);
+  const compareDate = normalizeDate(new Date());
+  const currentElapsedDays = Math.max(getElapsedDays(currentRange, compareDate), 1);
   for (let offset = 0; offset <= 5; offset += 1) {
     const range = shiftPeriodRange(periodName, currentRange, offset);
     if (offset > 0) {
@@ -1367,14 +1422,23 @@ function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, me
         break;
       }
     }
-    const total = sumTrackerRange(index, tracker.id, range);
-    const days = getRangeDays(range);
+    let compareRange = range;
+    if (selectedScope === "to-date") {
+      const cappedDays = Math.min(currentElapsedDays, getRangeDays(range));
+      compareRange = {
+        start: new Date(range.start),
+        end: addDays(range.start, cappedDays - 1)
+      };
+    }
+
+    const total = sumTrackerRange(index, tracker.id, compareRange);
+    const days = getRangeDays(compareRange);
     const value = selectedMetric === "sum" ? total : safeDivide(total, days);
     history.push({
       offset,
       value,
       label: getAverageBarLabel(periodName, offset),
-      rangeLabel: `${formatDate(range.start)} to ${formatDate(range.end)}`
+      rangeLabel: `${formatDate(compareRange.start)} to ${formatDate(compareRange.end)}`
     });
   }
   return history;
@@ -1437,14 +1501,27 @@ function handleViewControlChange(event) {
     return;
   }
 
-  const pointsInput = event.target.closest("input[data-action='toggle-points']");
-  if (pointsInput) {
-    const period = pointsInput.dataset.period;
-    const id = pointsInput.dataset.id;
+  const currentPointsInput = event.target.closest("input[data-action='toggle-points-current']");
+  if (currentPointsInput) {
+    const period = currentPointsInput.dataset.period;
+    const id = currentPointsInput.dataset.id;
     if (!period || !id || !graphPointsState[period]) {
       return;
     }
-    graphPointsState[period][id] = pointsInput.checked;
+    graphPointsState[period][id] = currentPointsInput.checked;
+    renderPeriodTabs();
+    renderGraphModal();
+    return;
+  }
+
+  const previousPointsInput = event.target.closest("input[data-action='toggle-points-previous']");
+  if (previousPointsInput) {
+    const period = previousPointsInput.dataset.period;
+    const id = previousPointsInput.dataset.id;
+    if (!period || !id || !overlayPointsState[period]) {
+      return;
+    }
+    overlayPointsState[period][id] = previousPointsInput.checked;
     renderPeriodTabs();
     renderGraphModal();
     return;
@@ -1979,7 +2056,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const projectedTracker = avg * totalDays;
       const isOnPace = projectedTracker >= target;
       const compareEnabled = getGoalCompareEnabled(periodName, tracker.id);
-      const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
+      const currentPointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
+      const previousPointsEnabled = getOverlayPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
       const compareLabel = getOverlayControlLabel(periodName);
       const projectionAllowed = shouldAllowProjectionLine(periodName, range, now);
@@ -1991,12 +2069,14 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         const chartRange = getChartDisplayRange(index, tracker.id, range, now);
         const series = getDailySeries(index, tracker.id, chartRange);
         const overlayRange = compareEnabled ? getOverlayRange(periodName, range) : null;
-        const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, chartRange, overlayRange) : null;
+        const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, range, overlayRange) : null;
         const projection = projectionAllowed && projectionEnabled
           ? getProjectionSeries(index, tracker.id, range, chartRange, series)
           : null;
         graphMarkup = createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
-          showPoints: pointsEnabled,
+          showCurrentPoints: currentPointsEnabled,
+          showOverlayPoints: previousPointsEnabled,
+          showProjectionPoints: currentPointsEnabled,
           large: false,
           unit: tracker.unit,
           domainDays: getRangeDays(range),
@@ -2036,9 +2116,15 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             ${graphMarkup}
             <div class="graph-inline-controls graph-inline-controls-bottom">
               <label class="check-inline check-compact graph-check">
-                <input type="checkbox" data-action="toggle-points" data-period="${periodName}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
-                Show points
+                <input type="checkbox" data-action="toggle-points-current" data-period="${periodName}" data-id="${tracker.id}" ${currentPointsEnabled ? "checked" : ""} />
+                Current points
               </label>
+              ${compareEnabled ? `
+              <label class="check-inline check-compact graph-check">
+                <input type="checkbox" data-action="toggle-points-previous" data-period="${periodName}" data-id="${tracker.id}" ${previousPointsEnabled ? "checked" : ""} />
+                Previous points
+              </label>
+              ` : ""}
               ${projectionAllowed ? `
               <label class="check-inline check-compact graph-check">
                 <input type="checkbox" data-action="toggle-projection" data-period="${periodName}" data-id="${tracker.id}" ${projectionEnabled ? "checked" : ""} />
@@ -2170,7 +2256,9 @@ function triggerBlobDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 function createCumulativeGraphSvg(series, target, range, overlaySeries = null, overlayRange = null, options = {}) {
-  const showPoints = Boolean(options.showPoints);
+  const showCurrentPoints = Boolean(options.showCurrentPoints);
+  const showOverlayPoints = Boolean(options.showOverlayPoints);
+  const showProjectionPoints = Boolean(options.showProjectionPoints);
   const large = Boolean(options.large);
   const unit = normalizeGoalUnit(options.unit);
   const domainDays = Math.max(Number(options.domainDays) || 0, series.length || 1, 1);
@@ -2263,7 +2351,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     `;
   }).join("");
 
-  const pointDots = showPoints
+  const pointDots = showCurrentPoints
     ? series.map((point, index) => {
         const cx = toX(index).toFixed(2);
         const cy = toY(cumulative[index]).toFixed(2);
@@ -2285,7 +2373,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       }).join("")
     : "";
 
-  const overlayDots = overlaySeries && showPoints
+  const overlayDots = overlaySeries && showOverlayPoints
     ? overlaySeries.map((point, index) => {
         const cx = toX(index).toFixed(2);
         const cy = toY(overlayCumulative[index]).toFixed(2);
@@ -2307,7 +2395,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       }).join("")
     : "";
 
-  const projectionDots = projectionPoints.length > 1 && showPoints
+  const projectionDots = projectionPoints.length > 1 && showProjectionPoints
     ? projectionPoints.slice(1).map((point) => {
         const cx = toX(point.dayIndex).toFixed(2);
         const cy = toY(point.cumulative).toFixed(2);
@@ -2431,6 +2519,16 @@ function getGraphPointsEnabled(periodName, trackerId) {
   return graphPointsState[periodName][trackerId];
 }
 
+function getOverlayPointsEnabled(periodName, trackerId) {
+  if (!overlayPointsState[periodName]) {
+    return false;
+  }
+  if (typeof overlayPointsState[periodName][trackerId] !== "boolean") {
+    overlayPointsState[periodName][trackerId] = false;
+  }
+  return overlayPointsState[periodName][trackerId];
+}
+
 function getProjectionLineEnabled(periodName, trackerId) {
   if (!projectionLineState[periodName]) {
     return false;
@@ -2467,6 +2565,13 @@ function syncGoalCompareState() {
       }
     });
   });
+  Object.keys(overlayPointsState).forEach((periodName) => {
+    Object.keys(overlayPointsState[periodName]).forEach((trackerId) => {
+      if (!trackerIds.has(trackerId)) {
+        delete overlayPointsState[periodName][trackerId];
+      }
+    });
+  });
   Object.keys(projectionLineState).forEach((periodName) => {
     Object.keys(projectionLineState[periodName]).forEach((trackerId) => {
       if (!trackerIds.has(trackerId)) {
@@ -2492,6 +2597,12 @@ function resetGoalCompareState() {
 function resetGraphPointsState() {
   Object.keys(graphPointsState).forEach((periodName) => {
     graphPointsState[periodName] = {};
+  });
+}
+
+function resetOverlayPointsState() {
+  Object.keys(overlayPointsState).forEach((periodName) => {
+    overlayPointsState[periodName] = {};
   });
 }
 
@@ -2753,6 +2864,7 @@ function resetUiStateForLogin() {
   resetGoalCompareState();
   resetScheduleTileFlips();
   resetGraphPointsState();
+  resetOverlayPointsState();
   resetProjectionLineState();
   resetInlineGraphState();
   closeGraphModal();

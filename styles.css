@@ -1080,7 +1080,7 @@ textarea {
 }
 
 .legend-target {
-  background: var(--brand-strong);
+  background: var(--muted);
 }
 
 .legend-overlay {
@@ -1088,7 +1088,10 @@ textarea {
 }
 
 .legend-projection {
-  background: #c27b00;
+  height: 0;
+  background: transparent;
+  border-top: 3px dashed var(--brand);
+  border-radius: 0;
 }
 
 .graph-frame {
@@ -1140,7 +1143,7 @@ textarea {
 }
 
 .graph-target {
-  stroke: var(--brand-strong);
+  stroke: var(--muted);
   stroke-dasharray: 6 6;
   stroke-width: 1.6;
   opacity: 0.7;
@@ -1170,7 +1173,7 @@ textarea {
 
 .graph-line-projection {
   fill: none;
-  stroke: #c27b00;
+  stroke: var(--brand);
   stroke-width: 2.2;
   stroke-dasharray: 8 6;
   opacity: 0.95;
@@ -1189,7 +1192,7 @@ textarea {
 }
 
 .graph-point-projection {
-  fill: #c27b00;
+  fill: var(--brand);
 }
 
 .graph-tooltip {
@@ -1428,6 +1431,11 @@ textarea {
 
 .avg-mode-toggle-right {
   justify-content: flex-end;
+}
+
+.avg-mode-group {
+  display: inline-flex;
+  gap: 6px;
 }
 
 .avg-mode-btn {
