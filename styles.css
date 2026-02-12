@@ -519,6 +519,11 @@ textarea {
   padding: 11px 12px;
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--brand);
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -1057,7 +1062,23 @@ textarea {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  margin: 0;
+}
+
+.graph-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
+}
+
+.graph-range-inline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  white-space: nowrap;
 }
 
 .legend-item {

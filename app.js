@@ -123,11 +123,6 @@ const graphPointsState = {
   month: {},
   year: {}
 };
-const overlayPointsState = {
-  week: {},
-  month: {},
-  year: {}
-};
 const projectionLineState = {
   week: {},
   month: {},
@@ -437,9 +432,6 @@ manageList.addEventListener("click", (event) => {
   });
   Object.keys(graphPointsState).forEach((periodName) => {
     delete graphPointsState[periodName][id];
-  });
-  Object.keys(overlayPointsState).forEach((periodName) => {
-    delete overlayPointsState[periodName][id];
   });
   Object.keys(projectionLineState).forEach((periodName) => {
     delete projectionLineState[periodName][id];
@@ -944,8 +936,7 @@ function renderGraphModal() {
   const compareEnabled = getGoalCompareEnabled(graphModalState.period, tracker.id);
   const overlayRange = compareEnabled ? getOverlayRange(graphModalState.period, range) : null;
   const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, range, overlayRange) : null;
-  const currentPointsEnabled = getGraphPointsEnabled(graphModalState.period, tracker.id);
-  const previousPointsEnabled = getOverlayPointsEnabled(graphModalState.period, tracker.id);
+  const pointsEnabled = getGraphPointsEnabled(graphModalState.period, tracker.id);
   const projectionAllowed = shouldAllowProjectionLine(graphModalState.period, range, now);
   const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(graphModalState.period, tracker.id) : false;
   const projection = projectionAllowed && projectionEnabled
@@ -966,24 +957,18 @@ function renderGraphModal() {
     <div class="graph-modal-tools">
       <div class="graph-action-group">
         <label class="check-inline check-compact graph-check">
-          <input type="checkbox" data-action="toggle-points-current" data-period="${graphModalState.period}" data-id="${tracker.id}" ${currentPointsEnabled ? "checked" : ""} />
-          Current points
+          <input type="checkbox" data-action="toggle-points" data-period="${graphModalState.period}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
+          Show points
         </label>
-        ${compareEnabled ? `
-        <label class="check-inline check-compact graph-check">
-          <input type="checkbox" data-action="toggle-points-previous" data-period="${graphModalState.period}" data-id="${tracker.id}" ${previousPointsEnabled ? "checked" : ""} />
-          Previous points
-        </label>
-        ` : ""}
         ${projectionControl}
       </div>
       ${createDownloadMenuMarkup(graphModalState.period, tracker.id, "modal")}
     </div>
   `;
   graphModalBody.innerHTML += createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
-    showCurrentPoints: currentPointsEnabled,
-    showOverlayPoints: previousPointsEnabled,
-    showProjectionPoints: currentPointsEnabled,
+    showCurrentPoints: pointsEnabled,
+    showOverlayPoints: pointsEnabled,
+    showProjectionPoints: pointsEnabled,
     large: true,
     unit: tracker.unit,
     domainDays: getRangeDays(range),
@@ -1503,27 +1488,14 @@ function handleViewControlChange(event) {
     return;
   }
 
-  const currentPointsInput = event.target.closest("input[data-action='toggle-points-current']");
-  if (currentPointsInput) {
-    const period = currentPointsInput.dataset.period;
-    const id = currentPointsInput.dataset.id;
+  const pointsInput = event.target.closest("input[data-action='toggle-points']");
+  if (pointsInput) {
+    const period = pointsInput.dataset.period;
+    const id = pointsInput.dataset.id;
     if (!period || !id || !graphPointsState[period]) {
       return;
     }
-    graphPointsState[period][id] = currentPointsInput.checked;
-    renderPeriodTabs();
-    renderGraphModal();
-    return;
-  }
-
-  const previousPointsInput = event.target.closest("input[data-action='toggle-points-previous']");
-  if (previousPointsInput) {
-    const period = previousPointsInput.dataset.period;
-    const id = previousPointsInput.dataset.id;
-    if (!period || !id || !overlayPointsState[period]) {
-      return;
-    }
-    overlayPointsState[period][id] = previousPointsInput.checked;
+    graphPointsState[period][id] = pointsInput.checked;
     renderPeriodTabs();
     renderGraphModal();
     return;
@@ -2058,8 +2030,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const projectedTracker = avg * totalDays;
       const isOnPace = projectedTracker >= target;
       const compareEnabled = getGoalCompareEnabled(periodName, tracker.id);
-      const currentPointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
-      const previousPointsEnabled = getOverlayPointsEnabled(periodName, tracker.id);
+      const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
       const compareLabel = getOverlayControlLabel(periodName);
       const projectionAllowed = shouldAllowProjectionLine(periodName, range, now);
@@ -2076,9 +2047,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           ? getProjectionSeries(index, tracker.id, range, chartRange, series)
           : null;
         graphMarkup = createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
-          showCurrentPoints: currentPointsEnabled,
-          showOverlayPoints: previousPointsEnabled,
-          showProjectionPoints: currentPointsEnabled,
+          showCurrentPoints: pointsEnabled,
+          showOverlayPoints: pointsEnabled,
+          showProjectionPoints: pointsEnabled,
           large: false,
           unit: tracker.unit,
           domainDays: getRangeDays(range),
@@ -2118,15 +2089,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             ${graphMarkup}
             <div class="graph-inline-controls graph-inline-controls-bottom">
               <label class="check-inline check-compact graph-check">
-                <input type="checkbox" data-action="toggle-points-current" data-period="${periodName}" data-id="${tracker.id}" ${currentPointsEnabled ? "checked" : ""} />
-                Current points
+                <input type="checkbox" data-action="toggle-points" data-period="${periodName}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
+                Show points
               </label>
-              ${compareEnabled ? `
-              <label class="check-inline check-compact graph-check">
-                <input type="checkbox" data-action="toggle-points-previous" data-period="${periodName}" data-id="${tracker.id}" ${previousPointsEnabled ? "checked" : ""} />
-                Previous points
-              </label>
-              ` : ""}
               ${projectionAllowed ? `
               <label class="check-inline check-compact graph-check">
                 <input type="checkbox" data-action="toggle-projection" data-period="${periodName}" data-id="${tracker.id}" ${projectionEnabled ? "checked" : ""} />
@@ -2318,10 +2283,6 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const toY = (value) => axisY - (value / maxValue) * innerHeight;
 
   const linePoints = cumulative.map((value, index) => `${toX(index).toFixed(2)},${toY(value).toFixed(2)}`).join(" ");
-  const lastActualX = cumulative.length > 0 ? toX(cumulative.length - 1).toFixed(2) : String(padLeft);
-  const areaPoints = cumulative.length > 0
-    ? `${padLeft},${axisY} ${linePoints} ${lastActualX},${axisY}`
-    : `${padLeft},${axisY} ${padLeft},${axisY}`;
   const targetY = toY(target).toFixed(2);
 
   const overlayLinePoints = overlayCumulative
@@ -2347,9 +2308,10 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     .sort((a, b) => a - b);
   const xTickMarkup = xTickIndexes.map((index) => {
     const x = toX(index).toFixed(2);
+    const tickDate = addDays(range.start, index);
     return `
       <line x1="${x}" y1="${axisY}" x2="${x}" y2="${axisY + 6}" class="graph-axis" />
-      <text x="${x}" y="${axisY + 20}" class="graph-tick graph-tick-x">${escapeHtml(`${index + 1}d`)}</text>
+      <text x="${x}" y="${axisY + 20}" class="graph-tick graph-tick-x">${escapeHtml(formatMonthDay(tickDate))}</text>
     `;
   }).join("");
 
@@ -2426,20 +2388,17 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     ? `<span class="legend-item"><span class="legend-swatch legend-projection"></span>Projection</span>`
     : "";
 
-  const overlayLabel = overlaySeries && overlayRange
-    ? ` | overlay ${formatDate(overlayRange.start)} to ${formatDate(overlayRange.end)}`
-    : "";
-  const projectionSource = projection && projection.source === "year" ? "year-to-date avg" : "period avg";
-  const projectionLabel = projectionPoints.length > 1
-    ? ` | projection ${escapeHtml(projectionSource)} (${escapeHtml(formatAmount(projection.averagePerDay || 0))} ${escapeHtml(unit)}/day)`
-    : "";
+  const rangeLabel = `${formatDate(range.start)} to ${formatDate(range.end)}`;
 
   return `
-    <div class="graph-legend">
-      <span class="legend-item"><span class="legend-swatch legend-line"></span>Current Cumulative</span>
-      ${overlayLegend}
-      ${projectionLegend}
-      <span class="legend-item"><span class="legend-swatch legend-target"></span>Target</span>
+    <div class="graph-head">
+      <div class="graph-legend">
+        <span class="legend-item"><span class="legend-swatch legend-line"></span>Current Cumulative</span>
+        ${overlayLegend}
+        ${projectionLegend}
+        <span class="legend-item"><span class="legend-swatch legend-target"></span>Target</span>
+      </div>
+      <p class="graph-range-inline">${escapeHtml(rangeLabel)}</p>
     </div>
     <div class="graph-frame">
       <svg class="graph-svg${large ? " graph-svg-large" : ""}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cumulative progress line graph">
@@ -2449,9 +2408,6 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
         <line x1="${padLeft}" y1="${axisY}" x2="${width - padRight}" y2="${axisY}" class="graph-axis" />
         <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${axisY}" class="graph-axis" />
         ${xTickMarkup}
-        <text x="${padLeft + innerWidth / 2}" y="${height - 12}" class="graph-axis-label graph-axis-label-x">Days (d)</text>
-        <text x="16" y="${padTop + innerHeight / 2}" class="graph-axis-label graph-axis-label-y" transform="rotate(-90 16 ${padTop + innerHeight / 2})">${escapeHtml(`Amount (${unit})`)}</text>
-        <polygon points="${areaPoints}" class="graph-area"></polygon>
         ${overlaySeries ? `<polyline points="${overlayLinePoints}" class="graph-line-overlay"></polyline>` : ""}
         ${projectionPoints.length > 1 ? `<polyline points="${projectionLinePoints}" class="graph-line-projection"></polyline>` : ""}
         <polyline points="${linePoints}" class="graph-line"></polyline>
@@ -2461,7 +2417,6 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       </svg>
       <div class="graph-tooltip hidden" data-tooltip></div>
     </div>
-    <p class="graph-label">${formatDate(range.start)} to ${formatDate(range.end)} | x-axis days (d), y-axis amount (${escapeHtml(unit)})${overlayLabel}${projectionLabel}</p>
   `;
 }
 
@@ -2521,16 +2476,6 @@ function getGraphPointsEnabled(periodName, trackerId) {
   return graphPointsState[periodName][trackerId];
 }
 
-function getOverlayPointsEnabled(periodName, trackerId) {
-  if (!overlayPointsState[periodName]) {
-    return false;
-  }
-  if (typeof overlayPointsState[periodName][trackerId] !== "boolean") {
-    overlayPointsState[periodName][trackerId] = false;
-  }
-  return overlayPointsState[periodName][trackerId];
-}
-
 function getProjectionLineEnabled(periodName, trackerId) {
   if (!projectionLineState[periodName]) {
     return false;
@@ -2567,13 +2512,6 @@ function syncGoalCompareState() {
       }
     });
   });
-  Object.keys(overlayPointsState).forEach((periodName) => {
-    Object.keys(overlayPointsState[periodName]).forEach((trackerId) => {
-      if (!trackerIds.has(trackerId)) {
-        delete overlayPointsState[periodName][trackerId];
-      }
-    });
-  });
   Object.keys(projectionLineState).forEach((periodName) => {
     Object.keys(projectionLineState[periodName]).forEach((trackerId) => {
       if (!trackerIds.has(trackerId)) {
@@ -2599,12 +2537,6 @@ function resetGoalCompareState() {
 function resetGraphPointsState() {
   Object.keys(graphPointsState).forEach((periodName) => {
     graphPointsState[periodName] = {};
-  });
-}
-
-function resetOverlayPointsState() {
-  Object.keys(overlayPointsState).forEach((periodName) => {
-    overlayPointsState[periodName] = {};
   });
 }
 
@@ -2866,7 +2798,6 @@ function resetUiStateForLogin() {
   resetGoalCompareState();
   resetScheduleTileFlips();
   resetGraphPointsState();
-  resetOverlayPointsState();
   resetProjectionLineState();
   resetInlineGraphState();
   closeGraphModal();
@@ -3624,6 +3555,13 @@ function formatDate(date) {
     month: "short",
     day: "numeric",
     year: "numeric"
+  });
+}
+
+function formatMonthDay(date) {
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
   });
 }
 
