@@ -71,6 +71,7 @@ const scheduleNextWeek = document.querySelector("#schedule-next-week");
 const settingsForm = document.querySelector("#settings-form");
 const weekStartSelect = document.querySelector("#week-start-select");
 const compareDefaultSelect = document.querySelector("#compare-default-select");
+const projectionAverageSelect = document.querySelector("#projection-average-select");
 const themeSelect = document.querySelector("#theme-select");
 
 const weekRangeLabel = document.querySelector("#week-range");
@@ -118,6 +119,11 @@ const goalCompareState = {
   year: {}
 };
 const graphPointsState = {
+  week: {},
+  month: {},
+  year: {}
+};
+const projectionLineState = {
   week: {},
   month: {},
   year: {}
@@ -426,6 +432,9 @@ manageList.addEventListener("click", (event) => {
   Object.keys(graphPointsState).forEach((periodName) => {
     delete graphPointsState[periodName][id];
   });
+  Object.keys(projectionLineState).forEach((periodName) => {
+    delete projectionLineState[periodName][id];
+  });
   Object.keys(inlineGraphState).forEach((periodName) => {
     delete inlineGraphState[periodName][id];
   });
@@ -454,7 +463,7 @@ entryForm.addEventListener("submit", (event) => {
   }
 
   const amount = normalizePositiveAmount(entryAmount.value, 1);
-  if (amount <= 0) {
+  if (amount < 0) {
     return;
   }
 
@@ -588,7 +597,7 @@ entryListAll.addEventListener("submit", (event) => {
   const date = String(form.elements.date.value || "");
   const amount = normalizePositiveAmount(form.elements.amount.value, entry.amount);
   const notes = String(form.elements.notes.value || "").trim();
-  if (!trackers.some((item) => item.id === trackerId) || !isDateKey(date) || amount <= 0) {
+  if (!trackers.some((item) => item.id === trackerId) || !isDateKey(date) || amount < 0) {
     return;
   }
 
@@ -664,6 +673,9 @@ settingsForm.addEventListener("submit", (event) => {
   const priorCompareDefault = settings.compareToLastDefault;
   settings.weekStart = weekStartSelect.value === "sunday" ? "sunday" : "monday";
   settings.compareToLastDefault = compareDefaultSelect.value !== "off";
+  settings.projectionAverageSource = normalizeProjectionAverageSource(
+    projectionAverageSelect ? projectionAverageSelect.value : settings.projectionAverageSource
+  );
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
   if (priorCompareDefault !== settings.compareToLastDefault) {
     resetGoalCompareState();
@@ -761,6 +773,7 @@ yearList.addEventListener("click", handleGraphCardActions);
 });
 if (graphModalBody) {
   graphModalBody.addEventListener("click", handleGraphCardActions);
+  graphModalBody.addEventListener("change", handleViewControlChange);
   graphModalBody.addEventListener("mousemove", handleGraphHover);
   graphModalBody.addEventListener("mouseleave", () => hideTooltipsInList(graphModalBody));
 }
@@ -907,23 +920,47 @@ function renderGraphModal() {
 
   const index = buildEntryIndex(entries);
   const range = periodMeta.range;
-  const series = getDailySeries(index, tracker.id, range);
+  const now = normalizeDate(new Date());
+  const chartRange = getChartDisplayRange(index, tracker.id, range, now);
+  const series = getDailySeries(index, tracker.id, chartRange);
   const compareEnabled = getGoalCompareEnabled(graphModalState.period, tracker.id);
   const overlayRange = compareEnabled ? getOverlayRange(graphModalState.period, range) : null;
-  const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, range, overlayRange) : null;
+  const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, chartRange, overlayRange) : null;
   const pointsEnabled = getGraphPointsEnabled(graphModalState.period, tracker.id);
+  const projectionAllowed = shouldAllowProjectionLine(graphModalState.period, range, now);
+  const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(graphModalState.period, tracker.id) : false;
+  const projection = projectionAllowed && projectionEnabled
+    ? getProjectionSeries(index, tracker.id, range, chartRange, series)
+    : null;
   const target = periodMeta.targetFn(tracker);
 
   graphModalTitle.textContent = `${tracker.name} | ${periodMeta.title} Chart`;
+  const projectionControl = projectionAllowed
+    ? `
+      <label class="check-inline check-compact graph-check">
+        <input type="checkbox" data-action="toggle-projection" data-period="${graphModalState.period}" data-id="${tracker.id}" ${projectionEnabled ? "checked" : ""} />
+        Projection
+      </label>
+    `
+    : "";
   graphModalBody.innerHTML = `
     <div class="graph-modal-tools">
+      <div class="graph-action-group">
+        <label class="check-inline check-compact graph-check">
+          <input type="checkbox" data-action="toggle-points" data-period="${graphModalState.period}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
+          Show points
+        </label>
+        ${projectionControl}
+      </div>
       ${createDownloadMenuMarkup(graphModalState.period, tracker.id, "modal")}
     </div>
   `;
   graphModalBody.innerHTML += createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
     showPoints: pointsEnabled,
     large: true,
-    unit: tracker.unit
+    unit: tracker.unit,
+    domainDays: getRangeDays(range),
+    projection
   });
   graphModalBody.innerHTML += createDeepDiveInsightsMarkup(
     tracker,
@@ -1197,18 +1234,19 @@ function getBestDay(dailyTotals) {
 }
 
 function getStreakStats(dailyTotals, todayKey) {
-  const positiveDates = dailyTotals
-    .filter((point) => point.amount > 0)
-    .map((point) => point.date)
-    .sort((a, b) => dateKeyToDayNumber(a) - dateKeyToDayNumber(b));
-  const positiveDays = positiveDates.map((date) => dateKeyToDayNumber(date));
-  const positiveDaySet = new Set(positiveDays);
+  const todayDay = dateKeyToDayNumber(todayKey);
+  const ordered = dailyTotals
+    .filter((point) => isDateKey(point.date) && dateKeyToDayNumber(point.date) <= todayDay)
+    .sort((a, b) => dateKeyToDayNumber(a.date) - dateKeyToDayNumber(b.date));
+
+  const positiveDays = ordered
+    .filter((point) => (Number(point.amount) || 0) > 0)
+    .map((point) => dateKeyToDayNumber(point.date));
 
   let longest = { length: 0, startDate: "", endDate: "" };
   let runLength = 0;
   let runStartDay = 0;
   let runEndDay = 0;
-
   positiveDays.forEach((dayNumber, index) => {
     if (runLength === 0) {
       runLength = 1;
@@ -1216,8 +1254,7 @@ function getStreakStats(dailyTotals, todayKey) {
       runEndDay = dayNumber;
     } else {
       const prevDay = positiveDays[index - 1];
-      const isNextDay = dayNumber === prevDay + 1;
-      if (isNextDay) {
+      if (dayNumber === prevDay + 1) {
         runLength += 1;
         runEndDay = dayNumber;
       } else {
@@ -1242,25 +1279,20 @@ function getStreakStats(dailyTotals, todayKey) {
     };
   }
 
+  // Current streak only resets on an explicit 0 entry.
   const current = { length: 0, startDate: "", endDate: "" };
-  let currentAnchorDay = null;
-  const todayDay = dateKeyToDayNumber(todayKey);
-  if (positiveDaySet.has(todayDay)) {
-    currentAnchorDay = todayDay;
-  } else {
-    const yesterdayDay = todayDay - 1;
-    if (positiveDaySet.has(yesterdayDay)) {
-      currentAnchorDay = yesterdayDay;
+  for (let index = ordered.length - 1; index >= 0; index -= 1) {
+    const point = ordered[index];
+    const amount = Number(point.amount) || 0;
+    if (amount === 0) {
+      break;
     }
-  }
-
-  if (currentAnchorDay !== null) {
-    let cursorDay = currentAnchorDay;
-    current.endDate = dayNumberToDateKey(currentAnchorDay);
-    while (positiveDaySet.has(cursorDay)) {
+    if (amount > 0) {
+      if (current.length === 0) {
+        current.endDate = point.date;
+      }
       current.length += 1;
-      current.startDate = dayNumberToDateKey(cursorDay);
-      cursorDay -= 1;
+      current.startDate = point.date;
     }
   }
 
@@ -1416,6 +1448,18 @@ function handleViewControlChange(event) {
     renderPeriodTabs();
     renderGraphModal();
     return;
+  }
+
+  const projectionInput = event.target.closest("input[data-action='toggle-projection']");
+  if (projectionInput) {
+    const period = projectionInput.dataset.period;
+    const id = projectionInput.dataset.id;
+    if (!period || !id || !projectionLineState[period]) {
+      return;
+    }
+    projectionLineState[period][id] = projectionInput.checked;
+    renderPeriodTabs();
+    renderGraphModal();
   }
 }
 
@@ -1703,7 +1747,7 @@ function renderEntryListTab() {
             </label>
             <label>
               Quantity
-              <input name="amount" type="number" min="0.01" step="0.01" value="${formatAmount(entry.amount)}" required />
+              <input name="amount" type="number" min="0" step="0.01" value="${formatAmount(entry.amount)}" required />
             </label>
           </div>
           <label>
@@ -1938,17 +1982,25 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
       const compareLabel = getOverlayControlLabel(periodName);
+      const projectionAllowed = shouldAllowProjectionLine(periodName, range, now);
+      const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(periodName, tracker.id) : false;
       const comparison = compareEnabled ? getPeriodComparison(periodName, range, elapsedDays) : null;
 
       let graphMarkup = "";
       if (graphVisible) {
-        const series = getDailySeries(index, tracker.id, range);
+        const chartRange = getChartDisplayRange(index, tracker.id, range, now);
+        const series = getDailySeries(index, tracker.id, chartRange);
         const overlayRange = compareEnabled ? getOverlayRange(periodName, range) : null;
-        const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, range, overlayRange) : null;
+        const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, chartRange, overlayRange) : null;
+        const projection = projectionAllowed && projectionEnabled
+          ? getProjectionSeries(index, tracker.id, range, chartRange, series)
+          : null;
         graphMarkup = createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
           showPoints: pointsEnabled,
           large: false,
-          unit: tracker.unit
+          unit: tracker.unit,
+          domainDays: getRangeDays(range),
+          projection
         });
       }
 
@@ -1987,6 +2039,12 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
                 <input type="checkbox" data-action="toggle-points" data-period="${periodName}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
                 Show points
               </label>
+              ${projectionAllowed ? `
+              <label class="check-inline check-compact graph-check">
+                <input type="checkbox" data-action="toggle-projection" data-period="${periodName}" data-id="${tracker.id}" ${projectionEnabled ? "checked" : ""} />
+                Projection
+              </label>
+              ` : ""}
               <div class="graph-action-group">
                 ${createDownloadMenuMarkup(periodName, tracker.id, "inline")}
               </div>
@@ -2115,6 +2173,8 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const showPoints = Boolean(options.showPoints);
   const large = Boolean(options.large);
   const unit = normalizeGoalUnit(options.unit);
+  const domainDays = Math.max(Number(options.domainDays) || 0, series.length || 1, 1);
+  const projection = options.projection && Array.isArray(options.projection.points) ? options.projection : null;
   const cumulative = [];
   let running = 0;
   series.forEach((point) => {
@@ -2131,7 +2191,17 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     });
   }
 
-  const pointCount = cumulative.length || 1;
+  const projectionPoints = projection
+    ? projection.points
+      .map((point) => ({
+        ...point,
+        dayIndex: Math.max(Math.min(Number(point.dayIndex) || 0, domainDays - 1), 0),
+        cumulative: Number(point.cumulative) || 0,
+        amount: Number(point.amount) || 0
+      }))
+      .sort((a, b) => a.dayIndex - b.dayIndex)
+    : [];
+
   const width = large ? 1080 : 760;
   const height = large ? 420 : 220;
   const padLeft = large ? 74 : 58;
@@ -2145,23 +2215,31 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     target,
     cumulative[cumulative.length - 1] || 0,
     overlayCumulative[overlayCumulative.length - 1] || 0,
+    projectionPoints[projectionPoints.length - 1] ? projectionPoints[projectionPoints.length - 1].cumulative : 0,
     1
   );
 
   const toX = (index) => {
-    if (pointCount === 1) {
+    if (domainDays === 1) {
       return padLeft + innerWidth / 2;
     }
-    return padLeft + (index / (pointCount - 1)) * innerWidth;
+    return padLeft + (index / (domainDays - 1)) * innerWidth;
   };
   const toY = (value) => axisY - (value / maxValue) * innerHeight;
 
   const linePoints = cumulative.map((value, index) => `${toX(index).toFixed(2)},${toY(value).toFixed(2)}`).join(" ");
-  const areaPoints = `${padLeft},${axisY} ${linePoints} ${width - padRight},${axisY}`;
+  const lastActualX = cumulative.length > 0 ? toX(cumulative.length - 1).toFixed(2) : String(padLeft);
+  const areaPoints = cumulative.length > 0
+    ? `${padLeft},${axisY} ${linePoints} ${lastActualX},${axisY}`
+    : `${padLeft},${axisY} ${padLeft},${axisY}`;
   const targetY = toY(target).toFixed(2);
 
   const overlayLinePoints = overlayCumulative
     .map((value, index) => `${toX(index).toFixed(2)},${toY(value).toFixed(2)}`)
+    .join(" ");
+
+  const projectionLinePoints = projectionPoints
+    .map((point) => `${toX(point.dayIndex).toFixed(2)},${toY(point.cumulative).toFixed(2)}`)
     .join(" ");
 
   const yTickCount = 4;
@@ -2174,7 +2252,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     `;
   }).join("");
 
-  const xTickIndexes = Array.from(new Set([0, Math.floor((pointCount - 1) / 2), pointCount - 1]))
+  const xTickIndexes = Array.from(new Set([0, Math.floor((domainDays - 1) / 2), domainDays - 1]))
     .filter((value) => value >= 0)
     .sort((a, b) => a - b);
   const xTickMarkup = xTickIndexes.map((index) => {
@@ -2229,18 +2307,48 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       }).join("")
     : "";
 
+  const projectionDots = projectionPoints.length > 1 && showPoints
+    ? projectionPoints.slice(1).map((point) => {
+        const cx = toX(point.dayIndex).toFixed(2);
+        const cy = toY(point.cumulative).toFixed(2);
+        const dateLabel = formatDate(parseDateKey(point.date));
+        return `
+          <circle
+            data-point="1"
+            class="graph-point graph-point-projection"
+            cx="${cx}"
+            cy="${cy}"
+            r="${large ? "3.6" : "3.2"}"
+            data-date-label="${escapeAttr(dateLabel)}"
+            data-amount="${escapeAttr(formatAmount(point.amount))}"
+            data-cumulative="${escapeAttr(formatAmount(point.cumulative))}"
+            data-series-label="Projection"
+            data-unit="${escapeAttr(unit)}"
+          ></circle>
+        `;
+      }).join("")
+    : "";
+
   const overlayLegend = overlaySeries
     ? `<span class="legend-item"><span class="legend-swatch legend-overlay"></span>Previous Period</span>`
+    : "";
+  const projectionLegend = projectionPoints.length > 1
+    ? `<span class="legend-item"><span class="legend-swatch legend-projection"></span>Projection</span>`
     : "";
 
   const overlayLabel = overlaySeries && overlayRange
     ? ` | overlay ${formatDate(overlayRange.start)} to ${formatDate(overlayRange.end)}`
+    : "";
+  const projectionSource = projection && projection.source === "year" ? "year-to-date avg" : "period avg";
+  const projectionLabel = projectionPoints.length > 1
+    ? ` | projection ${escapeHtml(projectionSource)} (${escapeHtml(formatAmount(projection.averagePerDay || 0))} ${escapeHtml(unit)}/day)`
     : "";
 
   return `
     <div class="graph-legend">
       <span class="legend-item"><span class="legend-swatch legend-line"></span>Current Cumulative</span>
       ${overlayLegend}
+      ${projectionLegend}
       <span class="legend-item"><span class="legend-swatch legend-target"></span>Target</span>
     </div>
     <div class="graph-frame">
@@ -2255,13 +2363,15 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
         <text x="16" y="${padTop + innerHeight / 2}" class="graph-axis-label graph-axis-label-y" transform="rotate(-90 16 ${padTop + innerHeight / 2})">${escapeHtml(`Amount (${unit})`)}</text>
         <polygon points="${areaPoints}" class="graph-area"></polygon>
         ${overlaySeries ? `<polyline points="${overlayLinePoints}" class="graph-line-overlay"></polyline>` : ""}
+        ${projectionPoints.length > 1 ? `<polyline points="${projectionLinePoints}" class="graph-line-projection"></polyline>` : ""}
         <polyline points="${linePoints}" class="graph-line"></polyline>
         ${overlayDots}
+        ${projectionDots}
         ${pointDots}
       </svg>
       <div class="graph-tooltip hidden" data-tooltip></div>
     </div>
-    <p class="graph-label">${formatDate(range.start)} to ${formatDate(range.end)} | x-axis days (d), y-axis amount (${escapeHtml(unit)})${overlayLabel}</p>
+    <p class="graph-label">${formatDate(range.start)} to ${formatDate(range.end)} | x-axis days (d), y-axis amount (${escapeHtml(unit)})${overlayLabel}${projectionLabel}</p>
   `;
 }
 
@@ -2321,6 +2431,16 @@ function getGraphPointsEnabled(periodName, trackerId) {
   return graphPointsState[periodName][trackerId];
 }
 
+function getProjectionLineEnabled(periodName, trackerId) {
+  if (!projectionLineState[periodName]) {
+    return false;
+  }
+  if (typeof projectionLineState[periodName][trackerId] !== "boolean") {
+    projectionLineState[periodName][trackerId] = false;
+  }
+  return projectionLineState[periodName][trackerId];
+}
+
 function getInlineGraphVisible(periodName, trackerId) {
   if (!inlineGraphState[periodName]) {
     return false;
@@ -2347,6 +2467,13 @@ function syncGoalCompareState() {
       }
     });
   });
+  Object.keys(projectionLineState).forEach((periodName) => {
+    Object.keys(projectionLineState[periodName]).forEach((trackerId) => {
+      if (!trackerIds.has(trackerId)) {
+        delete projectionLineState[periodName][trackerId];
+      }
+    });
+  });
   Object.keys(inlineGraphState).forEach((periodName) => {
     Object.keys(inlineGraphState[periodName]).forEach((trackerId) => {
       if (!trackerIds.has(trackerId)) {
@@ -2365,6 +2492,12 @@ function resetGoalCompareState() {
 function resetGraphPointsState() {
   Object.keys(graphPointsState).forEach((periodName) => {
     graphPointsState[periodName] = {};
+  });
+}
+
+function resetProjectionLineState() {
+  Object.keys(projectionLineState).forEach((periodName) => {
+    projectionLineState[periodName] = {};
   });
 }
 
@@ -2397,6 +2530,98 @@ function getDailySeries(index, trackerId, range) {
     current.setDate(current.getDate() + 1);
   }
   return series;
+}
+
+function getChartDisplayRange(index, trackerId, range, now) {
+  const start = new Date(range.start);
+  if (range.end <= now) {
+    return { start, end: new Date(range.end) };
+  }
+  if (range.start > now) {
+    return { start, end: start };
+  }
+  const cappedEnd = new Date(now);
+  const lastLoggedDateKey = getLastLoggedDateKey(index, trackerId, { start, end: cappedEnd });
+  if (!lastLoggedDateKey) {
+    return { start, end: cappedEnd };
+  }
+  return {
+    start,
+    end: parseDateKey(lastLoggedDateKey)
+  };
+}
+
+function getLastLoggedDateKey(index, trackerId, range) {
+  const startDay = dateKeyToDayNumber(getDateKey(range.start));
+  const endDay = dateKeyToDayNumber(getDateKey(range.end));
+  if (endDay < startDay) {
+    return "";
+  }
+  for (let dayNumber = endDay; dayNumber >= startDay; dayNumber -= 1) {
+    const dateKey = dayNumberToDateKey(dayNumber);
+    if (index.trackerDateTotals.has(`${trackerId}|${dateKey}`)) {
+      return dateKey;
+    }
+  }
+  return "";
+}
+
+function shouldAllowProjectionLine(periodName, range, now) {
+  return periodName === "month" && range.start <= now && now <= range.end;
+}
+
+function getProjectionSeries(index, trackerId, fullRange, chartRange, chartSeries) {
+  if (!chartSeries || chartSeries.length < 1) {
+    return null;
+  }
+  const fullStartDay = dateKeyToDayNumber(getDateKey(fullRange.start));
+  const fullEndDay = dateKeyToDayNumber(getDateKey(fullRange.end));
+  const lastActualPoint = chartSeries[chartSeries.length - 1];
+  const lastActualDay = dateKeyToDayNumber(lastActualPoint.date);
+  if (fullEndDay <= lastActualDay) {
+    return null;
+  }
+
+  const averagePerDay = getProjectionAveragePerDay(index, trackerId, fullRange, chartRange.end);
+  const projectionPoints = [];
+  let running = chartSeries.reduce((sum, point) => addAmount(sum, point.amount), 0);
+  projectionPoints.push({
+    date: lastActualPoint.date,
+    amount: Number(lastActualPoint.amount) || 0,
+    cumulative: running,
+    dayIndex: Math.max(lastActualDay - fullStartDay, 0)
+  });
+
+  for (let dayNumber = lastActualDay + 1; dayNumber <= fullEndDay; dayNumber += 1) {
+    running = addAmount(running, averagePerDay);
+    projectionPoints.push({
+      date: dayNumberToDateKey(dayNumber),
+      amount: averagePerDay,
+      cumulative: running,
+      dayIndex: Math.max(dayNumber - fullStartDay, 0)
+    });
+  }
+
+  return {
+    points: projectionPoints,
+    averagePerDay,
+    source: normalizeProjectionAverageSource(settings && settings.projectionAverageSource)
+  };
+}
+
+function getProjectionAveragePerDay(index, trackerId, fullRange, chartEndDate) {
+  const source = normalizeProjectionAverageSource(settings && settings.projectionAverageSource);
+  if (source === "year") {
+    const yearRange = getYearRange(chartEndDate);
+    const range = { start: yearRange.start, end: chartEndDate };
+    const days = getRangeDays(range);
+    const total = sumTrackerRange(index, trackerId, range);
+    return safeDivide(total, days);
+  }
+  const periodRange = { start: fullRange.start, end: chartEndDate };
+  const days = getRangeDays(periodRange);
+  const total = sumTrackerRange(index, trackerId, periodRange);
+  return safeDivide(total, days);
 }
 
 function getOverlayRange(periodName, range) {
@@ -2528,10 +2753,14 @@ function resetUiStateForLogin() {
   resetGoalCompareState();
   resetScheduleTileFlips();
   resetGraphPointsState();
+  resetProjectionLineState();
   resetInlineGraphState();
   closeGraphModal();
   weekStartSelect.value = settings.weekStart;
   compareDefaultSelect.value = settings.compareToLastDefault ? "on" : "off";
+  if (projectionAverageSelect) {
+    projectionAverageSelect.value = normalizeProjectionAverageSource(settings.projectionAverageSource);
+  }
   if (themeSelect) {
     themeSelect.value = normalizeThemeKey(settings.theme);
   }
@@ -2622,9 +2851,6 @@ function importEntriesFromCsv(text) {
 
   let inserted = 0;
   replacementValues.forEach((amount, entryKey) => {
-    if (amount <= 0) {
-      return;
-    }
     const [trackerId, date] = entryKey.split("|");
     entries.unshift({
       id: createId(),
@@ -2636,12 +2862,10 @@ function importEntriesFromCsv(text) {
     });
     inserted += 1;
   });
-
-  const cleared = replacementValues.size - inserted;
   return {
     changed: true,
     error: "",
-    message: `CSV import complete. Updated ${inserted} entries${cleared > 0 ? `, cleared ${cleared}` : ""}${skippedRows > 0 ? `, skipped ${skippedRows} invalid row(s)` : ""}${ignoredGoalColumns > 0 ? `, ignored ${ignoredGoalColumns} unmatched goal column(s)` : ""}.`
+    message: `CSV import complete. Updated ${inserted} entries${skippedRows > 0 ? `, skipped ${skippedRows} invalid row(s)` : ""}${ignoredGoalColumns > 0 ? `, ignored ${ignoredGoalColumns} unmatched goal column(s)` : ""}.`
   };
 }
 
@@ -2735,8 +2959,13 @@ function getDefaultSettings() {
   return {
     weekStart: "monday",
     compareToLastDefault: true,
+    projectionAverageSource: "period",
     theme: "teal"
   };
+}
+
+function normalizeProjectionAverageSource(value) {
+  return value === "year" ? "year" : "period";
 }
 
 function normalizeThemeKey(value) {
@@ -3044,6 +3273,7 @@ function loadSettings() {
     return {
       weekStart: parsed && parsed.weekStart === "sunday" ? "sunday" : "monday",
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
+      projectionAverageSource: normalizeProjectionAverageSource(parsed && parsed.projectionAverageSource),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
   } catch {
@@ -3121,7 +3351,7 @@ function normalizePositiveInt(value, fallback) {
 
 function normalizePositiveAmount(value, fallback) {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) {
+  if (!Number.isFinite(numeric) || numeric < 0) {
     return fallback;
   }
   return Math.round(numeric * 100) / 100;
