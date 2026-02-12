@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teal Goal Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page">
+    <section id="auth-panel" class="panel auth-panel">
+      <h2>Account Login</h2>
+      <p class="muted">Sign in to load your goal table, entries, schedules, and settings.</p>
+      <div class="auth-grid">
+        <form id="login-form" class="form-block auth-form">
+          <h3>Sign In</h3>
+          <label>
+            Username
+            <input id="login-username" type="text" maxlength="80" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="login-password" type="password" maxlength="120" autocomplete="current-password" required />
+          </label>
+          <button class="btn btn-primary" type="submit">Sign In</button>
+        </form>
+        <form id="register-form" class="form-block auth-form">
+          <h3>Create Account</h3>
+          <label>
+            Username
+            <input id="register-username" type="text" maxlength="80" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="register-password" type="password" maxlength="120" autocomplete="new-password" required />
+          </label>
+          <label>
+            Confirm Password
+            <input id="register-password-confirm" type="password" maxlength="120" autocomplete="new-password" required />
+          </label>
+          <button class="btn" type="submit">Create Account</button>
+        </form>
+      </div>
+      <p id="auth-message" class="muted"></p>
+    </section>
+
+    <div id="app-shell" hidden>
+      <header class="hero">
+        <div class="hero-top">
+          <p class="eyebrow">Goal System</p>
+          <div class="hero-actions">
+            <p id="active-user-label" class="muted small"></p>
+            <button id="logout-btn" class="btn" type="button">Logout</button>
+          </div>
+        </div>
+        <h1>Weekly + Yearly Goal Tracker</h1>
+        <p class="subtitle">Manage goals, enter daily quantities, review trend graphs, and control week boundaries in settings.</p>
+      </header>
+
+      <section class="panel tab-strip-panel">
+        <div class="nav-groups" aria-label="Tracker sections">
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="entry">Add Entry</button>
+              <button class="menu-btn" type="button" data-tab="entry-list">Entry List</button>
+              <button class="menu-btn" type="button" data-tab="csv-upload">CSV Upload</button>
+            </div>
+          </div>
+
+          <button class="btn menu-btn top-tab" type="button" data-tab="goal-schedule">Goal Schedule</button>
+
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Views</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="week">Week</button>
+              <button class="menu-btn" type="button" data-tab="month">Month</button>
+              <button class="menu-btn" type="button" data-tab="year">Year</button>
+            </div>
+          </div>
+
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn active" type="button" data-tab="manage">Manage Goals</button>
+              <button class="menu-btn" type="button" data-tab="settings">General Settings</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel tab-panel active" data-tab-panel="manage">
+        <h2>Manage Goals</h2>
+        <form id="goal-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Tracker Name
+              <input id="goal-name" type="text" maxlength="90" placeholder="Miles walked, pages read, sales calls..." required />
+            </label>
+            <label>
+              Unit
+              <input id="goal-unit" type="text" maxlength="20" placeholder="miles, pages, calls" required />
+            </label>
+          </div>
+          <div class="form-grid form-grid-3">
+            <label>
+              Weekly Goal
+              <input id="goal-weekly" type="number" min="1" max="1000000" value="5" required />
+            </label>
+            <label>
+              Monthly Goal
+              <input id="goal-monthly" type="number" min="1" max="1000000" value="22" required />
+            </label>
+            <label>
+              Yearly Goal
+              <input id="goal-yearly" type="number" min="1" max="1000000" value="260" required />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Goal</button>
+        </form>
+
+        <form id="manage-goals-form" class="form-block">
+          <div class="table-wrap">
+            <table id="manage-table" class="data-table" aria-label="Goals table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Unit</th>
+                  <th>Weekly</th>
+                  <th>Monthly</th>
+                  <th>Yearly</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="manage-list"></tbody>
+            </table>
+          </div>
+          <div class="actions">
+            <button id="manage-save-all" class="btn" type="submit">Save All Goals</button>
+          </div>
+        </form>
+        <p id="manage-empty" class="empty-state">No goals yet. Add your first goal above.</p>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="entry" hidden>
+      <h2>Add Entry</h2>
+      <p class="muted">Select date, goal, and quantity. Quantity supports hundredths (0.01).</p>
+      <form id="entry-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Goal
+            <select id="entry-tracker"></select>
+          </label>
+          <label>
+            Date
+            <input id="entry-date" type="date" required />
+          </label>
+          <label>
+            Quantity
+            <input id="entry-amount" type="number" min="0.01" step="0.01" value="1.00" required />
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="entry-notes" rows="2" maxlength="280" placeholder="Optional note for this entry"></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Add Entry</button>
+      </form>
+
+      <h3>Today's Entries</h3>
+      <ul id="today-entries-list" class="card-list compact-list"></ul>
+      <p id="today-entries-empty" class="empty-state">No entries added today yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="entry-list" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Entry List</h2>
+          <p class="muted">Every entry you have logged. Edit date, goal, quantity, and notes or delete rows.</p>
+        </div>
+        <label class="inline-control">
+          Sort
+          <select id="entry-list-sort">
+            <option value="date_desc">Newest Date</option>
+            <option value="goal_asc">Goal A-Z</option>
+          </select>
+        </label>
+      </div>
+      <ul id="entry-list-all" class="card-list"></ul>
+      <p id="entry-list-empty" class="empty-state">No entries yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="csv-upload" hidden>
+      <h2>CSV Upload</h2>
+      <p class="muted">Import entries by date and goal columns. Unmatched goal headers are ignored.</p>
+      <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
+      <form id="csv-upload-form" class="form-block">
+        <label>
+          CSV File
+          <input id="csv-upload-file" type="file" accept=".csv,text/csv" required />
+        </label>
+        <button class="btn" type="submit">Upload CSV</button>
+      </form>
+      <p id="csv-upload-status" class="muted small"></p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="goal-schedule" hidden>
+      <div class="panel-head">
+        <h2>Goal Schedule</h2>
+        <div class="panel-actions">
+          <button id="schedule-prev-week" class="btn" type="button">Prev Week</button>
+          <button id="schedule-this-week" class="btn" type="button">This Week</button>
+          <button id="schedule-next-week" class="btn" type="button">Next Week</button>
+          <p id="schedule-week-range" class="muted"></p>
+        </div>
+      </div>
+
+      <form id="schedule-form" class="form-block">
+        <div class="form-grid form-grid-4">
+          <label>
+            Goal
+            <select id="schedule-goal"></select>
+          </label>
+          <label>
+            Date
+            <input id="schedule-date" type="date" required />
+          </label>
+          <label>
+            Start Time
+            <input id="schedule-start-time" type="time" value="09:00" required />
+          </label>
+          <label>
+            End Time
+            <input id="schedule-end-time" type="time" value="10:00" required />
+          </label>
+        </div>
+        <label>
+          Notes
+          <input id="schedule-notes" type="text" maxlength="180" placeholder="Optional schedule note" />
+        </label>
+        <button class="btn btn-primary" type="submit">Add Schedule Item</button>
+      </form>
+
+      <div id="schedule-list" class="schedule-calendar" aria-live="polite"></div>
+      <p id="schedule-empty" class="empty-state">No schedule items in this week.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="week" hidden>
+      <div class="panel-head">
+        <h2>Week View</h2>
+        <div class="panel-actions">
+          <button id="week-prev" class="btn" type="button">Prev Week</button>
+          <button id="week-this" class="btn" type="button">This Week</button>
+          <button id="week-next" class="btn" type="button">Next Week</button>
+          <p id="week-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="week-summary" class="summary-grid"></div>
+      <ul id="week-list" class="card-list"></ul>
+      <p id="week-empty" class="empty-state">No goals yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="month" hidden>
+      <div class="panel-head">
+        <h2>Month View</h2>
+        <div class="panel-actions">
+          <button id="month-prev" class="btn" type="button">Prev Month</button>
+          <button id="month-this" class="btn" type="button">This Month</button>
+          <button id="month-next" class="btn" type="button">Next Month</button>
+          <p id="month-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="month-summary" class="summary-grid"></div>
+      <ul id="month-list" class="card-list"></ul>
+      <p id="month-empty" class="empty-state">No goals yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="year" hidden>
+      <div class="panel-head">
+        <h2>Year View</h2>
+        <div class="panel-actions">
+          <button id="year-prev" class="btn" type="button">Prev Year</button>
+          <button id="year-this" class="btn" type="button">This Year</button>
+          <button id="year-next" class="btn" type="button">Next Year</button>
+          <p id="year-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="year-summary" class="summary-grid"></div>
+      <ul id="year-list" class="card-list"></ul>
+      <p id="year-empty" class="empty-state">No goals yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="settings" hidden>
+      <h2>Settings</h2>
+      <form id="settings-form" class="form-block">
+        <label>
+          Week Definition
+          <select id="week-start-select">
+            <option value="monday">Mon-Sun</option>
+            <option value="sunday">Sun-Sat</option>
+          </select>
+        </label>
+        <label>
+          Default Compare To Last Period
+          <select id="compare-default-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Color Theme
+          <select id="theme-select">
+            <option value="teal">Teal</option>
+            <option value="ocean">Ocean</option>
+            <option value="forest">Forest</option>
+            <option value="sunset">Sunset</option>
+            <option value="amber">Amber</option>
+            <option value="berry">Berry</option>
+            <option value="slate">Slate</option>
+            <option value="midnight">Midnight</option>
+          </select>
+        </label>
+        <button class="btn" type="submit">Save Settings</button>
+      </form>
+      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, and your saved color theme.</p>
+      </section>
+
+      <div id="graph-modal" class="graph-modal hidden" aria-hidden="true">
+        <div class="graph-modal-backdrop" data-action="close-graph-modal"></div>
+        <section class="graph-modal-card" role="dialog" aria-modal="true" aria-labelledby="graph-modal-title">
+          <div class="graph-modal-head">
+            <h3 id="graph-modal-title">Expanded Chart</h3>
+            <button id="graph-modal-close" class="btn" type="button">Close</button>
+          </div>
+          <div id="graph-modal-body" class="graph-modal-body"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
