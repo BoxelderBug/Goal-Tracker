@@ -14,9 +14,13 @@
     <section id="auth-panel" class="panel auth-panel">
       <h2>Account Login</h2>
       <p class="muted">Sign in to load your goal table, entries, schedules, and settings.</p>
-      <div class="auth-grid">
-        <form id="login-form" class="form-block auth-form">
-          <h3>Sign In</h3>
+      <div class="auth-single">
+        <div class="auth-switch" role="tablist" aria-label="Authentication mode">
+          <button class="auth-switch-btn active" type="button" data-auth-mode="signin" aria-selected="true">Sign In</button>
+          <button class="auth-switch-btn" type="button" data-auth-mode="register" aria-selected="false">Create Account</button>
+        </div>
+
+        <form id="login-form" class="form-block auth-form auth-form-panel" data-auth-form="signin">
           <label>
             Username
             <input id="login-username" type="text" maxlength="80" autocomplete="username" required />
@@ -26,9 +30,24 @@
             <input id="login-password" type="password" maxlength="120" autocomplete="current-password" required />
           </label>
           <button class="btn btn-primary" type="submit">Sign In</button>
+          <p class="auth-form-note">Need an account? <button class="auth-link-btn" type="button" data-auth-mode-target="register">Create one</button></p>
         </form>
-        <form id="register-form" class="form-block auth-form">
-          <h3>Create Account</h3>
+
+        <form id="register-form" class="form-block auth-form auth-form-panel" data-auth-form="register" hidden>
+          <div class="form-grid form-grid-2">
+            <label>
+              First Name
+              <input id="register-first-name" type="text" maxlength="80" autocomplete="given-name" required />
+            </label>
+            <label>
+              Last Name
+              <input id="register-last-name" type="text" maxlength="80" autocomplete="family-name" required />
+            </label>
+          </div>
+          <label>
+            Email
+            <input id="register-email" type="email" maxlength="120" autocomplete="email" required />
+          </label>
           <label>
             Username
             <input id="register-username" type="text" maxlength="80" autocomplete="username" required />
@@ -42,6 +61,7 @@
             <input id="register-password-confirm" type="password" maxlength="120" autocomplete="new-password" required />
           </label>
           <button class="btn" type="submit">Create Account</button>
+          <p class="auth-form-note">Already have an account? <button class="auth-link-btn" type="button" data-auth-mode-target="signin">Sign in</button></p>
         </form>
       </div>
       <p id="auth-message" class="muted"></p>

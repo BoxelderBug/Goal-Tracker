@@ -13,10 +13,15 @@ const loginForm = document.querySelector("#login-form");
 const registerForm = document.querySelector("#register-form");
 const loginUsername = document.querySelector("#login-username");
 const loginPassword = document.querySelector("#login-password");
+const registerFirstName = document.querySelector("#register-first-name");
+const registerLastName = document.querySelector("#register-last-name");
+const registerEmail = document.querySelector("#register-email");
 const registerUsername = document.querySelector("#register-username");
 const registerPassword = document.querySelector("#register-password");
 const registerPasswordConfirm = document.querySelector("#register-password-confirm");
 const authMessage = document.querySelector("#auth-message");
+const authModeButtons = document.querySelectorAll("[data-auth-mode]");
+const authForms = document.querySelectorAll("[data-auth-form]");
 const logoutButton = document.querySelector("#logout-btn");
 const activeUserLabel = document.querySelector("#active-user-label");
 
@@ -100,6 +105,7 @@ let schedules = [];
 let settings = getDefaultSettings();
 let activeTab = "manage";
 let entryListSortMode = "date_desc";
+let authMode = "signin";
 let scheduleWeekAnchor = normalizeDate(new Date());
 let weekViewAnchor = normalizeDate(new Date());
 let monthViewAnchor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -142,6 +148,7 @@ if (csvUploadStatus) {
   csvUploadStatus.textContent = "";
 }
 initializeAuth();
+setAuthMode("signin");
 
 menuButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -159,6 +166,22 @@ menuButtons.forEach((button) => {
     }
   });
 });
+
+authModeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setAuthMode(button.dataset.authMode);
+  });
+});
+
+if (authPanel) {
+  authPanel.addEventListener("click", (event) => {
+    const modeTargetButton = event.target.closest("button[data-auth-mode-target]");
+    if (!modeTargetButton) {
+      return;
+    }
+    setAuthMode(modeTargetButton.dataset.authModeTarget);
+  });
+}
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -193,10 +216,21 @@ loginForm.addEventListener("submit", async (event) => {
 
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const firstName = normalizeProfileName(registerFirstName ? registerFirstName.value : "");
+  const lastName = normalizeProfileName(registerLastName ? registerLastName.value : "");
+  const email = normalizeEmail(registerEmail ? registerEmail.value : "");
   const username = normalizeUsername(registerUsername.value);
   const usernameKey = getUsernameKey(username);
   const password = String(registerPassword.value || "");
   const passwordConfirm = String(registerPasswordConfirm.value || "");
+  if (!firstName || !lastName) {
+    showAuthMessage("Enter first name and last name.", true);
+    return;
+  }
+  if (!isValidEmail(email)) {
+    showAuthMessage("Enter a valid email address.", true);
+    return;
+  }
   if (username.length < 3) {
     showAuthMessage("Username must be at least 3 characters.", true);
     return;
@@ -213,9 +247,16 @@ registerForm.addEventListener("submit", async (event) => {
     showAuthMessage("Username already exists.", true);
     return;
   }
+  if (users.some((item) => item.email && item.email.toLowerCase() === email.toLowerCase())) {
+    showAuthMessage("Email already exists.", true);
+    return;
+  }
 
   const newUser = {
     id: createId(),
+    firstName,
+    lastName,
+    email,
     username,
     usernameKey,
     passwordHash: await hashPassword(password),
@@ -247,6 +288,10 @@ logoutButton.addEventListener("click", () => {
   resetGraphPointsState();
   resetInlineGraphState();
   closeGraphModal();
+  setAuthMode("signin");
+  loginForm.reset();
+  registerForm.reset();
+  showAuthMessage("");
   if (csvUploadStatus) {
     csvUploadStatus.textContent = "";
   }
@@ -1457,7 +1502,8 @@ function renderAuthState() {
   const isAuthenticated = Boolean(currentUser);
   appShell.hidden = !isAuthenticated;
   authPanel.hidden = isAuthenticated;
-  activeUserLabel.textContent = isAuthenticated ? `Signed in as ${currentUser.username}` : "";
+  const displayName = isAuthenticated ? getUserDisplayName(currentUser) : "";
+  activeUserLabel.textContent = isAuthenticated ? `Signed in as ${displayName}` : "";
   if (isAuthenticated) {
     showAuthMessage("");
   } else if (graphModal) {
@@ -2470,6 +2516,7 @@ function resetUiStateForLogin() {
     themeSelect.value = normalizeThemeKey(settings.theme);
   }
   applyTheme();
+  setAuthMode("signin");
   if (goalUnit) {
     goalUnit.value = "units";
   }
@@ -2691,6 +2738,49 @@ function showAuthMessage(message, isError = false) {
   authMessage.classList.toggle("auth-error", Boolean(isError && message));
 }
 
+function normalizeAuthMode(value) {
+  if (value === "register") {
+    return "register";
+  }
+  return "signin";
+}
+
+function setAuthMode(value) {
+  authMode = normalizeAuthMode(value);
+  authModeButtons.forEach((button) => {
+    const isActive = button.dataset.authMode === authMode;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  authForms.forEach((form) => {
+    form.hidden = form.dataset.authForm !== authMode;
+  });
+  showAuthMessage("");
+}
+
+function normalizeProfileName(value) {
+  return String(value || "").trim();
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || ""));
+}
+
+function getUserDisplayName(user) {
+  if (!user) {
+    return "User";
+  }
+  const fullName = `${normalizeProfileName(user.firstName)} ${normalizeProfileName(user.lastName)}`.trim();
+  if (fullName) {
+    return `${fullName} (${user.username})`;
+  }
+  return user.username || "User";
+}
+
 function normalizeUsername(value) {
   return String(value || "").trim();
 }
@@ -2728,6 +2818,9 @@ function loadUsers() {
       .filter((item) => item && typeof item.id === "string")
       .map((item) => ({
         id: item.id,
+        firstName: normalizeProfileName(item.firstName),
+        lastName: normalizeProfileName(item.lastName),
+        email: normalizeEmail(item.email),
         username: normalizeUsername(item.username) || "User",
         usernameKey: typeof item.usernameKey === "string" && item.usernameKey ? item.usernameKey : getUsernameKey(item.username),
         passwordHash: typeof item.passwordHash === "string" ? item.passwordHash : "",

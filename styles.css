@@ -196,16 +196,38 @@ body {
 }
 
 .auth-panel {
-  max-width: 860px;
+  max-width: 560px;
   margin: 0 auto;
   width: 100%;
 }
 
-.auth-grid {
+.auth-single {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
+}
+
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.auth-switch-btn {
+  border: 1px solid #a8ddd6;
+  background: #f3fffc;
+  color: var(--muted);
+  border-radius: 12px;
+  font: inherit;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.auth-switch-btn.active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-weight: 700;
 }
 
 .auth-form {
@@ -213,6 +235,27 @@ body {
   border-radius: 14px;
   background: #f9fffe;
   padding: 12px;
+}
+
+.auth-form-panel[hidden] {
+  display: none;
+}
+
+.auth-form-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.auth-link-btn {
+  border: none;
+  background: transparent;
+  color: var(--brand-strong);
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .auth-error {
@@ -1451,7 +1494,7 @@ textarea {
     padding: 26px 14px 42px;
   }
 
-  .auth-grid {
+  .auth-switch {
     grid-template-columns: 1fr;
   }
 
