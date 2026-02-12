@@ -1179,7 +1179,7 @@ function getTrackerDailyTotals(index, trackerId) {
       amount: Number(amount) || 0
     });
   });
-  totals.sort((a, b) => a.date.localeCompare(b.date));
+  totals.sort((a, b) => dateKeyToDayNumber(a.date) - dateKeyToDayNumber(b.date));
   return totals;
 }
 
@@ -1200,47 +1200,67 @@ function getStreakStats(dailyTotals, todayKey) {
   const positiveDates = dailyTotals
     .filter((point) => point.amount > 0)
     .map((point) => point.date)
-    .sort((a, b) => a.localeCompare(b));
-  const positiveSet = new Set(positiveDates);
+    .sort((a, b) => dateKeyToDayNumber(a) - dateKeyToDayNumber(b));
+  const positiveDays = positiveDates.map((date) => dateKeyToDayNumber(date));
+  const positiveDaySet = new Set(positiveDays);
 
   let longest = { length: 0, startDate: "", endDate: "" };
   let runLength = 0;
-  let runStart = "";
-  let runEnd = "";
+  let runStartDay = 0;
+  let runEndDay = 0;
 
-  positiveDates.forEach((date, index) => {
+  positiveDays.forEach((dayNumber, index) => {
     if (runLength === 0) {
       runLength = 1;
-      runStart = date;
-      runEnd = date;
+      runStartDay = dayNumber;
+      runEndDay = dayNumber;
     } else {
-      const prevDate = positiveDates[index - 1];
-      const isNextDay = getDateKey(addDays(parseDateKey(prevDate), 1)) === date;
+      const prevDay = positiveDays[index - 1];
+      const isNextDay = dayNumber === prevDay + 1;
       if (isNextDay) {
         runLength += 1;
-        runEnd = date;
+        runEndDay = dayNumber;
       } else {
         if (runLength > longest.length) {
-          longest = { length: runLength, startDate: runStart, endDate: runEnd };
+          longest = {
+            length: runLength,
+            startDate: dayNumberToDateKey(runStartDay),
+            endDate: dayNumberToDateKey(runEndDay)
+          };
         }
         runLength = 1;
-        runStart = date;
-        runEnd = date;
+        runStartDay = dayNumber;
+        runEndDay = dayNumber;
       }
     }
   });
   if (runLength > longest.length) {
-    longest = { length: runLength, startDate: runStart, endDate: runEnd };
+    longest = {
+      length: runLength,
+      startDate: dayNumberToDateKey(runStartDay),
+      endDate: dayNumberToDateKey(runEndDay)
+    };
   }
 
   const current = { length: 0, startDate: "", endDate: "" };
-  if (positiveSet.has(todayKey)) {
-    let cursor = todayKey;
-    current.endDate = todayKey;
-    while (positiveSet.has(cursor)) {
+  let currentAnchorDay = null;
+  const todayDay = dateKeyToDayNumber(todayKey);
+  if (positiveDaySet.has(todayDay)) {
+    currentAnchorDay = todayDay;
+  } else {
+    const yesterdayDay = todayDay - 1;
+    if (positiveDaySet.has(yesterdayDay)) {
+      currentAnchorDay = yesterdayDay;
+    }
+  }
+
+  if (currentAnchorDay !== null) {
+    let cursorDay = currentAnchorDay;
+    current.endDate = dayNumberToDateKey(currentAnchorDay);
+    while (positiveDaySet.has(cursorDay)) {
       current.length += 1;
-      current.startDate = cursor;
-      cursor = getDateKey(addDays(parseDateKey(cursor), -1));
+      current.startDate = dayNumberToDateKey(cursorDay);
+      cursorDay -= 1;
     }
   }
 
@@ -3160,7 +3180,20 @@ function formatPercentChange(current, previous) {
 }
 
 function isDateKey(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(value));
+  const raw = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return false;
+  }
+  const [yearRaw, monthRaw, dayRaw] = raw.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  return (
+    utc.getUTCFullYear() === year
+    && utc.getUTCMonth() === month - 1
+    && utc.getUTCDate() === day
+  );
 }
 
 function isTimeKey(value) {
@@ -3212,6 +3245,25 @@ function getDateKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateKeyToDayNumber(value) {
+  if (!isDateKey(value)) {
+    return 0;
+  }
+  const [yearRaw, monthRaw, dayRaw] = String(value).split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  return Math.floor(Date.UTC(year, month - 1, day) / DAY_MS);
+}
+
+function dayNumberToDateKey(dayNumber) {
+  const utc = new Date(Math.floor(Number(dayNumber) || 0) * DAY_MS);
+  const year = utc.getUTCFullYear();
+  const month = String(utc.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(utc.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
