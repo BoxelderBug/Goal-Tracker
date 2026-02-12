@@ -1100,7 +1100,7 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const todayKey = getDateKey(today);
   const dailyTotals = getTrackerDailyTotals(index, tracker.id);
   const bestDay = getBestDay(dailyTotals);
-  const currentDayAmount = index.trackerDateTotals.get(`${tracker.id}|${todayKey}`) || 0;
+  const lastEnteredDay = dailyTotals.length > 0 ? dailyTotals[dailyTotals.length - 1] : null;
   const streakStats = getStreakStats(dailyTotals, todayKey);
 
   const bestWeek = getBestPeriodRecord(index, tracker.id, "week");
@@ -1169,7 +1169,9 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const bestDayText = bestDay
     ? `${formatAmountWithUnit(bestDay.amount, unit)} on ${formatDate(parseDateKey(bestDay.date))}`
     : "No non-zero day";
-  const currentDayText = `${formatAmountWithUnit(currentDayAmount, unit)} on ${formatDate(today)}`;
+  const lastEnteredDayText = lastEnteredDay
+    ? `${formatAmountWithUnit(lastEnteredDay.amount, unit)} on ${formatDate(parseDateKey(lastEnteredDay.date))}`
+    : "No entries yet";
 
   const longestStreakText = formatStreakLabel(streakStats.longest);
   const currentStreakText = formatStreakLabel(streakStats.current);
@@ -1185,7 +1187,7 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
       <div class="deep-dive-grid">
         <article class="deep-dive-card">
           <div class="best-kpi-item">
-            <p class="best-kpi-current"><strong>Current Day</strong>: ${escapeHtml(currentDayText)}</p>
+            <p class="best-kpi-current"><strong>Last Day Entered</strong>: ${escapeHtml(lastEnteredDayText)}</p>
             <p class="best-kpi-best">Best Day: ${escapeHtml(bestDayText)}</p>
           </div>
           <div class="best-kpi-item">
