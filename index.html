@@ -77,7 +77,7 @@
           </div>
         </div>
         <h1>Weekly + Yearly Goal Tracker</h1>
-        <p class="subtitle">Manage goals, enter daily quantities, review trend graphs, and control week boundaries in settings.</p>
+        <p class="subtitle">Manage goals and check-ins, log activity, review trend graphs, and control week boundaries in settings.</p>
       </header>
 
       <section class="panel tab-strip-panel">
@@ -86,12 +86,19 @@
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="entry">Add Entry</button>
+              <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
+              <button class="menu-btn" type="button" data-tab="bucket-entry">Bucket List Entry</button>
+              <button class="menu-btn" type="button" data-tab="checkin-entry">Add Check-in</button>
               <button class="menu-btn" type="button" data-tab="entry-list">Entry List</button>
-              <button class="menu-btn" type="button" data-tab="csv-upload">CSV Upload</button>
             </div>
           </div>
 
-          <button class="btn menu-btn top-tab" type="button" data-tab="goal-schedule">Goal Schedule</button>
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Goal Planning</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="goal-schedule">Goal Schedule</button>
+            </div>
+          </div>
 
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Views</button>
@@ -99,13 +106,17 @@
               <button class="menu-btn" type="button" data-tab="week">Week</button>
               <button class="menu-btn" type="button" data-tab="month">Month</button>
               <button class="menu-btn" type="button" data-tab="year">Year</button>
+              <button class="menu-btn" type="button" data-tab="bucket-list">Bucket List</button>
             </div>
           </div>
+
+          <button class="btn menu-btn top-tab" type="button" data-tab="goal-journal">Goal Journal</button>
 
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
             <div class="dropdown-menu">
               <button class="menu-btn active" type="button" data-tab="manage">Manage Goals</button>
+              <button class="menu-btn" type="button" data-tab="checkins">Manage Check-ins</button>
               <button class="menu-btn" type="button" data-tab="settings">General Settings</button>
             </div>
           </div>
@@ -117,13 +128,25 @@
         <form id="goal-form" class="form-block">
           <div class="form-grid form-grid-2">
             <label>
-              Tracker Name
+              Goal Name
               <input id="goal-name" type="text" maxlength="90" placeholder="Miles walked, pages read, sales calls..." required />
             </label>
+            <label>
+              Goal Type
+              <select id="goal-type">
+                <option value="quantity">Quantity Goal</option>
+                <option value="yesno">Yes/No Goal</option>
+                <option value="bucket">Bucket List Goal</option>
+                <option value="floating">Floating Goal</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-grid form-grid-2">
             <label>
               Unit
               <input id="goal-unit" type="text" maxlength="20" placeholder="miles, pages, calls" required />
             </label>
+            <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
           </div>
           <div class="form-grid form-grid-3">
             <label>
@@ -148,6 +171,8 @@
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Type</th>
+                  <th>Status</th>
                   <th>Unit</th>
                   <th>Weekly</th>
                   <th>Monthly</th>
@@ -167,7 +192,7 @@
 
       <section class="panel tab-panel" data-tab-panel="entry" hidden>
       <h2>Add Entry</h2>
-      <p class="muted">Select date, goal, and quantity. Quantity supports hundredths (0.01). Use 0.00 to explicitly break a streak.</p>
+      <p class="muted">Select date and goal, then log quantity, floating progress, or yes/no completion.</p>
       <form id="entry-form" class="form-block">
         <div class="form-grid form-grid-3">
           <label>
@@ -178,9 +203,16 @@
             Date
             <input id="entry-date" type="date" required />
           </label>
-          <label>
+          <label id="entry-amount-label">
             Quantity
             <input id="entry-amount" type="number" min="0" step="0.01" value="1.00" required />
+          </label>
+          <label id="entry-yesno-label" hidden>
+            Complete?
+            <select id="entry-yesno">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
           </label>
         </div>
         <label>
@@ -193,14 +225,141 @@
       <h3>Today's Entries</h3>
       <ul id="today-entries-list" class="card-list compact-list"></ul>
       <p id="today-entries-empty" class="empty-state">No entries added today yet.</p>
+
+      <h3>CSV Upload</h3>
+      <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
+      <form id="csv-upload-form" class="form-block">
+        <label>
+          CSV File
+          <input id="csv-upload-file" type="file" accept=".csv,text/csv" required />
+        </label>
+        <button class="btn" type="submit">Upload CSV</button>
+      </form>
+      <p id="csv-upload-status" class="muted small"></p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="goal-journal" hidden>
+      <h2>Goal Journal</h2>
+      <p class="muted">Capture progress notes, blockers, and reflections tied to goals.</p>
+      <form id="goal-journal-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Date
+            <input id="goal-journal-date" type="date" required />
+          </label>
+          <label>
+            Goal (Optional)
+            <select id="goal-journal-goal"></select>
+          </label>
+          <label>
+            Title
+            <input id="goal-journal-title" type="text" maxlength="120" placeholder="What changed today?" />
+          </label>
+        </div>
+        <label>
+          Journal Entry
+          <textarea id="goal-journal-content" rows="4" maxlength="1200" placeholder="Write your update, lesson, or plan..." required></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Add Journal Entry</button>
+      </form>
+      <ul id="goal-journal-list" class="card-list"></ul>
+      <p id="goal-journal-empty" class="empty-state">No journal entries yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="bucket-entry" hidden>
+      <h2>Bucket List Entry</h2>
+      <p class="muted">Close out bucket list goals when completed.</p>
+      <form id="bucket-entry-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Bucket Goal
+            <select id="bucket-entry-goal"></select>
+          </label>
+          <label>
+            Close-Out Date
+            <input id="bucket-entry-date" type="date" required />
+          </label>
+          <label>
+            Status
+            <input type="text" value="Close Out" disabled />
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="bucket-entry-notes" rows="2" maxlength="280" placeholder="Optional close-out note"></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Close Out Bucket Goal</button>
+      </form>
+
+      <h3>Recent Bucket Close-Outs</h3>
+      <ul id="recent-bucket-entries-list" class="card-list compact-list"></ul>
+      <p id="recent-bucket-entries-empty" class="empty-state">No bucket goals have been closed yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="checkin-entry" hidden>
+      <h2>Add Check-in</h2>
+      <p class="muted">Log periodic check-ins such as weekly finance review or monthly grocery planning.</p>
+      <form id="checkin-entry-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Check-in
+            <select id="checkin-entry-item"></select>
+          </label>
+          <label>
+            Date
+            <input id="checkin-entry-date" type="date" required />
+          </label>
+          <label>
+            Status
+            <select id="checkin-entry-status">
+              <option value="yes">Completed</option>
+              <option value="no">Not completed</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="checkin-entry-notes" rows="2" maxlength="280" placeholder="Optional check-in note"></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Add Check-in</button>
+      </form>
+      <h3>Recent Check-ins</h3>
+      <ul id="recent-checkin-entries-list" class="card-list compact-list"></ul>
+      <p id="recent-checkin-entries-empty" class="empty-state">No check-ins logged yet.</p>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="entry-list" hidden>
       <div class="panel-head">
         <div>
           <h2>Entry List</h2>
-          <p class="muted">Every entry you have logged. Edit date, goal, quantity, and notes or delete rows.</p>
+          <p class="muted">Every goal entry you have logged. Edit date, goal, quantity/value, and notes or delete rows.</p>
         </div>
+        <label class="inline-control">
+          Goal Type
+          <select id="entry-list-type-filter">
+            <option value="all">All Types</option>
+            <option value="quantity">Quantity</option>
+            <option value="yesno">Yes/No</option>
+            <option value="bucket">Bucket List</option>
+            <option value="floating">Floating</option>
+          </select>
+        </label>
+        <label class="inline-control">
+          Goal Status
+          <select id="entry-list-status-filter">
+            <option value="active">Active</option>
+            <option value="all">All</option>
+            <option value="archived">Archived</option>
+          </select>
+        </label>
+        <label class="inline-control">
+          Bucket Status
+          <select id="entry-list-bucket-filter">
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
         <label class="inline-control">
           Sort
           <select id="entry-list-sort">
@@ -213,27 +372,13 @@
       <p id="entry-list-empty" class="empty-state">No entries yet.</p>
     </section>
 
-      <section class="panel tab-panel" data-tab-panel="csv-upload" hidden>
-      <h2>CSV Upload</h2>
-      <p class="muted">Import entries by date and goal columns. Unmatched goal headers are ignored.</p>
-      <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
-      <form id="csv-upload-form" class="form-block">
-        <label>
-          CSV File
-          <input id="csv-upload-file" type="file" accept=".csv,text/csv" required />
-        </label>
-        <button class="btn" type="submit">Upload CSV</button>
-      </form>
-      <p id="csv-upload-status" class="muted small"></p>
-    </section>
-
       <section class="panel tab-panel" data-tab-panel="goal-schedule" hidden>
       <div class="panel-head">
         <h2>Goal Schedule</h2>
         <div class="panel-actions">
-          <button id="schedule-prev-week" class="btn" type="button">Prev Week</button>
-          <button id="schedule-this-week" class="btn" type="button">This Week</button>
-          <button id="schedule-next-week" class="btn" type="button">Next Week</button>
+          <button id="schedule-prev-week" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="schedule-this-week" class="btn btn-nav-compact" type="button">This</button>
+          <button id="schedule-next-week" class="btn btn-nav-compact" type="button">Next</button>
           <p id="schedule-week-range" class="muted"></p>
         </div>
       </div>
@@ -272,46 +417,168 @@
       <div class="panel-head">
         <h2>Week View</h2>
         <div class="panel-actions">
-          <button id="week-prev" class="btn" type="button">Prev Week</button>
-          <button id="week-this" class="btn" type="button">This Week</button>
-          <button id="week-next" class="btn" type="button">Next Week</button>
+          <button id="week-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="week-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="week-next" class="btn btn-nav-compact" type="button">Next</button>
+          <label class="inline-control">
+            Goal Type
+            <select id="week-goal-type-filter">
+              <option value="all">All Types</option>
+              <option value="quantity">Quantity</option>
+              <option value="yesno">Yes/No</option>
+              <option value="bucket">Bucket List</option>
+              <option value="floating">Floating</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Goal Status
+            <select id="week-goal-status-filter">
+              <option value="active">Active</option>
+              <option value="all">All</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
           <p id="week-range" class="muted"></p>
         </div>
       </div>
       <div id="week-summary" class="summary-grid"></div>
-      <ul id="week-list" class="card-list"></ul>
-      <p id="week-empty" class="empty-state">No goals yet.</p>
+      <div id="week-list" class="view-accordion"></div>
+      <p id="week-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="month" hidden>
       <div class="panel-head">
         <h2>Month View</h2>
         <div class="panel-actions">
-          <button id="month-prev" class="btn" type="button">Prev Month</button>
-          <button id="month-this" class="btn" type="button">This Month</button>
-          <button id="month-next" class="btn" type="button">Next Month</button>
+          <button id="month-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="month-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="month-next" class="btn btn-nav-compact" type="button">Next</button>
+          <label class="inline-control">
+            Goal Type
+            <select id="month-goal-type-filter">
+              <option value="all">All Types</option>
+              <option value="quantity">Quantity</option>
+              <option value="yesno">Yes/No</option>
+              <option value="bucket">Bucket List</option>
+              <option value="floating">Floating</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Goal Status
+            <select id="month-goal-status-filter">
+              <option value="active">Active</option>
+              <option value="all">All</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
           <p id="month-range" class="muted"></p>
         </div>
       </div>
       <div id="month-summary" class="summary-grid"></div>
-      <ul id="month-list" class="card-list"></ul>
-      <p id="month-empty" class="empty-state">No goals yet.</p>
+      <div id="month-list" class="view-accordion"></div>
+      <p id="month-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="year" hidden>
       <div class="panel-head">
         <h2>Year View</h2>
         <div class="panel-actions">
-          <button id="year-prev" class="btn" type="button">Prev Year</button>
-          <button id="year-this" class="btn" type="button">This Year</button>
-          <button id="year-next" class="btn" type="button">Next Year</button>
+          <button id="year-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="year-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="year-next" class="btn btn-nav-compact" type="button">Next</button>
+          <label class="inline-control">
+            Goal Type
+            <select id="year-goal-type-filter">
+              <option value="all">All Types</option>
+              <option value="quantity">Quantity</option>
+              <option value="yesno">Yes/No</option>
+              <option value="bucket">Bucket List</option>
+              <option value="floating">Floating</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Goal Status
+            <select id="year-goal-status-filter">
+              <option value="active">Active</option>
+              <option value="all">All</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
           <p id="year-range" class="muted"></p>
         </div>
       </div>
       <div id="year-summary" class="summary-grid"></div>
-      <ul id="year-list" class="card-list"></ul>
-      <p id="year-empty" class="empty-state">No goals yet.</p>
+      <div id="year-list" class="view-accordion"></div>
+      <p id="year-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
+
+      <section class="panel tab-panel" data-tab-panel="bucket-list" hidden>
+      <div class="panel-head">
+        <h2>Bucket List View</h2>
+        <div class="panel-actions">
+          <label class="inline-control">
+            Goal Status
+            <select id="bucket-list-goal-status-filter">
+              <option value="active">Active</option>
+              <option value="all">All</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Bucket Status
+            <select id="bucket-list-item-status-filter">
+              <option value="all">All</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="bucket-list-summary" class="summary-grid"></div>
+      <ul id="bucket-list-view-list" class="card-list"></ul>
+      <p id="bucket-list-view-empty" class="empty-state">No bucket list goals yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="checkins" hidden>
+      <h2>Manage Check-ins</h2>
+      <p class="muted">Create periodic check-ins that are tracked once per week, month, or year.</p>
+      <form id="checkin-form" class="form-block">
+        <div class="form-grid form-grid-2">
+          <label>
+            Check-in Name
+            <input id="checkin-name" type="text" maxlength="90" placeholder="Review finances, plan groceries..." required />
+          </label>
+          <label>
+            Frequency
+            <select id="checkin-cadence">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Add Check-in</button>
+      </form>
+
+      <form id="manage-checkins-form" class="form-block">
+        <div class="table-wrap">
+          <table id="checkin-table" class="data-table" aria-label="Check-ins table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Frequency</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="checkin-list"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button id="checkin-save-all" class="btn" type="submit">Save All Check-ins</button>
+        </div>
+      </form>
+      <p id="checkin-empty" class="empty-state">No check-ins yet. Add your first check-in above.</p>
+      </section>
 
       <section class="panel tab-panel" data-tab-panel="settings" hidden>
       <h2>Settings</h2>
