@@ -699,6 +699,38 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+.snapshot-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+}
+
+.snapshot-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.snapshot-panel-head h3 {
+  margin: 0;
+}
+
+.snapshot-list {
+  margin-top: 10px;
+}
+
+.snapshot-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .summary-card {
   background: linear-gradient(165deg, var(--brand-soft) 0%, #ffffff 100%);
   border: 1px solid var(--line);

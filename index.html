@@ -420,6 +420,7 @@
           <button id="week-prev" class="btn btn-nav-compact" type="button">Prev</button>
           <button id="week-this" class="btn btn-nav-compact" type="button">This</button>
           <button id="week-next" class="btn btn-nav-compact" type="button">Next</button>
+          <button id="week-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <label class="inline-control">
             Goal Type
             <select id="week-goal-type-filter">
@@ -442,6 +443,14 @@
         </div>
       </div>
       <div id="week-summary" class="summary-grid"></div>
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Week Snapshots</h3>
+          <p id="week-snapshot-current" class="muted small"></p>
+        </div>
+        <ul id="week-snapshot-list" class="card-list snapshot-list"></ul>
+        <p id="week-snapshot-empty" class="empty-state">No week snapshots saved yet.</p>
+      </section>
       <div id="week-list" class="view-accordion"></div>
       <p id="week-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
@@ -453,6 +462,7 @@
           <button id="month-prev" class="btn btn-nav-compact" type="button">Prev</button>
           <button id="month-this" class="btn btn-nav-compact" type="button">This</button>
           <button id="month-next" class="btn btn-nav-compact" type="button">Next</button>
+          <button id="month-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <label class="inline-control">
             Goal Type
             <select id="month-goal-type-filter">
@@ -475,6 +485,14 @@
         </div>
       </div>
       <div id="month-summary" class="summary-grid"></div>
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Month Snapshots</h3>
+          <p id="month-snapshot-current" class="muted small"></p>
+        </div>
+        <ul id="month-snapshot-list" class="card-list snapshot-list"></ul>
+        <p id="month-snapshot-empty" class="empty-state">No month snapshots saved yet.</p>
+      </section>
       <div id="month-list" class="view-accordion"></div>
       <p id="month-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
@@ -486,6 +504,7 @@
           <button id="year-prev" class="btn btn-nav-compact" type="button">Prev</button>
           <button id="year-this" class="btn btn-nav-compact" type="button">This</button>
           <button id="year-next" class="btn btn-nav-compact" type="button">Next</button>
+          <button id="year-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <label class="inline-control">
             Goal Type
             <select id="year-goal-type-filter">
@@ -508,6 +527,14 @@
         </div>
       </div>
       <div id="year-summary" class="summary-grid"></div>
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Year Snapshots</h3>
+          <p id="year-snapshot-current" class="muted small"></p>
+        </div>
+        <ul id="year-snapshot-list" class="card-list snapshot-list"></ul>
+        <p id="year-snapshot-empty" class="empty-state">No year snapshots saved yet.</p>
+      </section>
       <div id="year-list" class="view-accordion"></div>
       <p id="year-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
@@ -604,6 +631,20 @@
             <option value="year">Year To Date</option>
           </select>
         </label>
+        <div class="form-grid form-grid-3">
+          <label>
+            Weekly Goal Points
+            <input id="weekly-goal-points" type="number" min="0" step="1" value="1" />
+          </label>
+          <label>
+            Monthly Goal Points
+            <input id="monthly-goal-points" type="number" min="0" step="1" value="1" />
+          </label>
+          <label>
+            Yearly Goal Points
+            <input id="yearly-goal-points" type="number" min="0" step="1" value="1" />
+          </label>
+        </div>
         <label>
           Bucket List Feature
           <select id="bucket-list-enabled-select">
@@ -626,7 +667,7 @@
         </label>
         <button class="btn" type="submit">Save Settings</button>
       </form>
-      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, projection behavior, bucket list visibility, and your saved color theme.</p>
+      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, projection behavior, goal completion points, bucket list visibility, and your saved color theme.</p>
       </section>
 
       <div id="graph-modal" class="graph-modal hidden" aria-hidden="true">

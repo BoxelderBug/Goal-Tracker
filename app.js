@@ -5,6 +5,7 @@ const CHECKIN_ENTRIES_STORAGE_KEY = "goal-tracker-checkin-entries-v1";
 const GOAL_JOURNAL_STORAGE_KEY = "goal-tracker-goal-journal-v1";
 const SCHEDULE_STORAGE_KEY = "goal-tracker-schedules-v1";
 const SETTINGS_STORAGE_KEY = "goal-tracker-settings-v1";
+const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
@@ -112,6 +113,9 @@ const settingsForm = document.querySelector("#settings-form");
 const weekStartSelect = document.querySelector("#week-start-select");
 const compareDefaultSelect = document.querySelector("#compare-default-select");
 const projectionAverageSelect = document.querySelector("#projection-average-select");
+const weeklyGoalPointsInput = document.querySelector("#weekly-goal-points");
+const monthlyGoalPointsInput = document.querySelector("#monthly-goal-points");
+const yearlyGoalPointsInput = document.querySelector("#yearly-goal-points");
 const bucketListEnabledSelect = document.querySelector("#bucket-list-enabled-select");
 const themeSelect = document.querySelector("#theme-select");
 
@@ -124,18 +128,30 @@ const yearSummary = document.querySelector("#year-summary");
 const weekPrevButton = document.querySelector("#week-prev");
 const weekThisButton = document.querySelector("#week-this");
 const weekNextButton = document.querySelector("#week-next");
+const weekCloseoutButton = document.querySelector("#week-closeout");
 const monthPrevButton = document.querySelector("#month-prev");
 const monthThisButton = document.querySelector("#month-this");
 const monthNextButton = document.querySelector("#month-next");
+const monthCloseoutButton = document.querySelector("#month-closeout");
 const yearPrevButton = document.querySelector("#year-prev");
 const yearThisButton = document.querySelector("#year-this");
 const yearNextButton = document.querySelector("#year-next");
+const yearCloseoutButton = document.querySelector("#year-closeout");
 const weekList = document.querySelector("#week-list");
 const monthList = document.querySelector("#month-list");
 const yearList = document.querySelector("#year-list");
 const weekEmpty = document.querySelector("#week-empty");
 const monthEmpty = document.querySelector("#month-empty");
 const yearEmpty = document.querySelector("#year-empty");
+const weekSnapshotCurrent = document.querySelector("#week-snapshot-current");
+const monthSnapshotCurrent = document.querySelector("#month-snapshot-current");
+const yearSnapshotCurrent = document.querySelector("#year-snapshot-current");
+const weekSnapshotList = document.querySelector("#week-snapshot-list");
+const monthSnapshotList = document.querySelector("#month-snapshot-list");
+const yearSnapshotList = document.querySelector("#year-snapshot-list");
+const weekSnapshotEmpty = document.querySelector("#week-snapshot-empty");
+const monthSnapshotEmpty = document.querySelector("#month-snapshot-empty");
+const yearSnapshotEmpty = document.querySelector("#year-snapshot-empty");
 const weekGoalTypeFilterSelect = document.querySelector("#week-goal-type-filter");
 const weekGoalStatusFilterSelect = document.querySelector("#week-goal-status-filter");
 const monthGoalTypeFilterSelect = document.querySelector("#month-goal-type-filter");
@@ -158,6 +174,7 @@ let checkIns = [];
 let checkInEntries = [];
 let goalJournalEntries = [];
 let schedules = [];
+let periodSnapshots = [];
 let settings = getDefaultSettings();
 let activeTab = "manage";
 let entryListSortMode = "date_desc";
@@ -1190,6 +1207,18 @@ settingsForm.addEventListener("submit", (event) => {
   settings.projectionAverageSource = normalizeProjectionAverageSource(
     projectionAverageSelect ? projectionAverageSelect.value : settings.projectionAverageSource
   );
+  settings.weeklyGoalPoints = normalizeGoalPoints(
+    weeklyGoalPointsInput ? weeklyGoalPointsInput.value : settings.weeklyGoalPoints,
+    settings.weeklyGoalPoints
+  );
+  settings.monthlyGoalPoints = normalizeGoalPoints(
+    monthlyGoalPointsInput ? monthlyGoalPointsInput.value : settings.monthlyGoalPoints,
+    settings.monthlyGoalPoints
+  );
+  settings.yearlyGoalPoints = normalizeGoalPoints(
+    yearlyGoalPointsInput ? yearlyGoalPointsInput.value : settings.yearlyGoalPoints,
+    settings.yearlyGoalPoints
+  );
   settings.bucketListEnabled = bucketListEnabledSelect ? bucketListEnabledSelect.value !== "off" : true;
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
   if (priorCompareDefault !== settings.compareToLastDefault) {
@@ -1274,6 +1303,24 @@ yearNextButton.addEventListener("click", () => {
   yearViewAnchor = addYears(yearViewAnchor, 1);
   renderPeriodTabs();
 });
+
+if (weekCloseoutButton) {
+  weekCloseoutButton.addEventListener("click", () => {
+    closeOutPeriod("week");
+  });
+}
+
+if (monthCloseoutButton) {
+  monthCloseoutButton.addEventListener("click", () => {
+    closeOutPeriod("month");
+  });
+}
+
+if (yearCloseoutButton) {
+  yearCloseoutButton.addEventListener("click", () => {
+    closeOutPeriod("year");
+  });
+}
 
 weekList.addEventListener("click", handleGraphCardActions);
 monthList.addEventListener("click", handleGraphCardActions);
@@ -2850,6 +2897,9 @@ function renderPeriodTabs() {
   renderPeriod("week", week, now, weekSummary, weekList, weekEmpty, (tracker) => tracker.weeklyGoal, index);
   renderPeriod("month", month, now, monthSummary, monthList, monthEmpty, (tracker) => tracker.monthlyGoal, index);
   renderPeriod("year", year, now, yearSummary, yearList, yearEmpty, (tracker) => tracker.yearlyGoal, index);
+  renderPeriodSnapshots("week", week);
+  renderPeriodSnapshots("month", month);
+  renderPeriodSnapshots("year", year);
   renderGraphModal();
 }
 
@@ -2875,12 +2925,16 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   let goalsTargetTotal = 0;
   let paceProgressTotal = 0;
   let paceTargetTotal = 0;
+  let completedGoalsCount = 0;
 
   filteredTrackers.forEach((tracker) => {
     const periodProgress = sumTrackerRange(index, tracker.id, range);
     const goalTarget = targetFn(tracker);
     goalsProgressTotal = addAmount(goalsProgressTotal, periodProgress);
     goalsTargetTotal = addAmount(goalsTargetTotal, goalTarget);
+    if (goalTarget > 0 && periodProgress >= goalTarget) {
+      completedGoalsCount += 1;
+    }
     if (!isFloatingGoalType(tracker.goalType)) {
       paceProgressTotal = addAmount(paceProgressTotal, periodProgress);
       paceTargetTotal = addAmount(paceTargetTotal, goalTarget);
@@ -2905,6 +2959,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
   const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
   const onPaceClass = onPace === null ? "" : onPace ? "pace-on" : "pace-off";
+  const pointsPerGoal = getGoalPointsForPeriod(periodName);
+  const goalPointsEarned = completedGoalsCount * pointsPerGoal;
 
   summaryEl.innerHTML = `
     <article class="summary-card">
@@ -2918,6 +2974,10 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
     <article class="summary-card">
       <p>Items</p>
       <strong>${filteredTrackers.length} goals + ${dueCheckIns.length} check-ins</strong>
+    </article>
+    <article class="summary-card">
+      <p>Goal Points</p>
+      <strong>${formatAmount(goalPointsEarned)} (${completedGoalsCount} x ${formatAmount(pointsPerGoal)})</strong>
     </article>
   `;
 
@@ -3072,6 +3132,283 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
     ${createPeriodAccordionSectionMarkup(periodName, "goals", "Goals", goalCardsMarkup, "No goals configured.")}
     ${createPeriodAccordionSectionMarkup(periodName, "checkins", "Check-ins", checkInCardsMarkup, `No ${checkInPeriodLabel} check-ins configured.`)}
   `;
+}
+
+function closeOutPeriod(periodName) {
+  if (!currentUser) {
+    return;
+  }
+  const normalizedPeriod = normalizePeriodMode(periodName);
+  const range = getPeriodRange(normalizedPeriod);
+  if (!range) {
+    return;
+  }
+  const now = normalizeDate(new Date());
+  const index = buildEntryIndex(entries);
+  const snapshot = buildPeriodCloseoutSnapshot(normalizedPeriod, range, now, index);
+  if (!snapshot) {
+    alert(`No goals or check-ins to snapshot for this ${normalizedPeriod}.`);
+    return;
+  }
+
+  const existingIndex = periodSnapshots.findIndex((item) => (
+    item
+    && item.period === snapshot.period
+    && item.rangeStart === snapshot.rangeStart
+    && item.rangeEnd === snapshot.rangeEnd
+  ));
+
+  if (existingIndex >= 0) {
+    const shouldReplace = confirm(
+      `A ${normalizedPeriod} snapshot for ${formatDate(range.start)} to ${formatDate(range.end)} already exists. Replace it?`
+    );
+    if (!shouldReplace) {
+      return;
+    }
+    periodSnapshots.splice(existingIndex, 1);
+  }
+
+  periodSnapshots.unshift(snapshot);
+  periodSnapshots.sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+  savePeriodSnapshots();
+  renderPeriodTabs();
+}
+
+function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
+  const trackersForPeriod = getTrackersForPeriod(periodName);
+  const dueCheckIns = getCheckInsForPeriod(periodName);
+  if (trackersForPeriod.length < 1 && dueCheckIns.length < 1) {
+    return null;
+  }
+
+  const totalDays = getRangeDays(range);
+  const elapsedDays = getElapsedDays(range, now);
+  let goalsProgressTotal = 0;
+  let goalsTargetTotal = 0;
+  let paceProgressTotal = 0;
+  let paceTargetTotal = 0;
+  let completedGoalsCount = 0;
+
+  const goalSnapshots = trackersForPeriod.map((tracker) => {
+    const target = getTrackerTargetForPeriod(tracker, periodName);
+    const progress = sumTrackerRange(index, tracker.id, range);
+    const isFloating = isFloatingGoalType(tracker.goalType);
+    const avgPerDay = safeDivide(progress, elapsedDays);
+    const neededPerDay = safeDivide(target, totalDays);
+    const projected = avgPerDay * totalDays;
+    const onPaceLabel = isFloating ? "N/A" : projected >= target ? "Yes" : "No";
+
+    goalsProgressTotal = addAmount(goalsProgressTotal, progress);
+    goalsTargetTotal = addAmount(goalsTargetTotal, target);
+    if (target > 0 && progress >= target) {
+      completedGoalsCount += 1;
+    }
+    if (!isFloating) {
+      paceProgressTotal = addAmount(paceProgressTotal, progress);
+      paceTargetTotal = addAmount(paceTargetTotal, target);
+    }
+
+    return {
+      trackerId: tracker.id,
+      name: tracker.name,
+      goalType: normalizeGoalType(tracker.goalType),
+      archived: Boolean(tracker.archived),
+      unit: normalizeGoalUnit(tracker.unit),
+      progress,
+      target,
+      completion: percent(progress, target),
+      avgPerDay,
+      neededPerDay,
+      projected,
+      onPaceLabel
+    };
+  });
+
+  let checkInProgressTotal = 0;
+  const checkInTargetTotal = dueCheckIns.length;
+  const checkInSnapshots = dueCheckIns.map((item) => {
+    const status = getCheckInStatusForRange(item, range);
+    if (status.completed) {
+      checkInProgressTotal = addAmount(checkInProgressTotal, 1);
+    }
+    return {
+      checkInId: item.id,
+      name: item.name,
+      cadence: normalizeCheckInCadence(item.cadence),
+      completed: Boolean(status.completed),
+      latestDate: status.latestEntry && isDateKey(status.latestEntry.date) ? status.latestEntry.date : "",
+      latestNotes: status.latestEntry && status.latestEntry.notes ? String(status.latestEntry.notes) : ""
+    };
+  });
+
+  const totalProgress = addAmount(goalsProgressTotal, checkInProgressTotal);
+  const totalTarget = addAmount(goalsTargetTotal, checkInTargetTotal);
+  const completion = percent(totalProgress, totalTarget);
+  const avgPerDay = safeDivide(paceProgressTotal, elapsedDays);
+  const projectedGoals = avgPerDay * totalDays;
+  const projected = addAmount(projectedGoals, checkInProgressTotal);
+  const paceTargetWithCheckIns = addAmount(paceTargetTotal, checkInTargetTotal);
+  const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
+  const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
+  const pointsPerGoal = getGoalPointsForPeriod(periodName);
+  const goalPointsEarned = completedGoalsCount * pointsPerGoal;
+  const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active" };
+
+  return {
+    id: createId(),
+    period: periodName,
+    rangeStart: getDateKey(range.start),
+    rangeEnd: getDateKey(range.end),
+    closedAt: new Date().toISOString(),
+    filters: {
+      type: normalizeGoalTypeFilterValue(periodState.type),
+      status: normalizeGoalStatusFilterValue(periodState.status)
+    },
+    summary: {
+      completion,
+      onPaceLabel,
+      totalProgress,
+      totalTarget,
+      goalsCount: trackersForPeriod.length,
+      checkInsCount: dueCheckIns.length,
+      completedGoalsCount,
+      pointsPerGoal,
+      goalPointsEarned
+    },
+    goals: goalSnapshots,
+    checkIns: checkInSnapshots
+  };
+}
+
+function getPeriodRange(periodName) {
+  if (periodName === "month") {
+    return getMonthRange(monthViewAnchor);
+  }
+  if (periodName === "year") {
+    return getYearRange(yearViewAnchor);
+  }
+  return getWeekRange(weekViewAnchor);
+}
+
+function getTrackerTargetForPeriod(tracker, periodName) {
+  if (periodName === "month") {
+    return tracker.monthlyGoal;
+  }
+  if (periodName === "year") {
+    return tracker.yearlyGoal;
+  }
+  return tracker.weeklyGoal;
+}
+
+function getGoalPointsForPeriod(periodName) {
+  if (periodName === "month") {
+    return normalizeGoalPoints(settings && settings.monthlyGoalPoints, 1);
+  }
+  if (periodName === "year") {
+    return normalizeGoalPoints(settings && settings.yearlyGoalPoints, 1);
+  }
+  return normalizeGoalPoints(settings && settings.weeklyGoalPoints, 1);
+}
+
+function renderPeriodSnapshots(periodName, range) {
+  const elements = getPeriodSnapshotElements(periodName);
+  if (!elements.list || !elements.empty || !elements.current) {
+    return;
+  }
+  if (!currentUser) {
+    elements.current.textContent = "";
+    elements.list.innerHTML = "";
+    elements.empty.style.display = "none";
+    return;
+  }
+
+  const periodItems = periodSnapshots
+    .filter((item) => item && item.period === periodName)
+    .sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+  const currentRangeStart = getDateKey(range.start);
+  const currentRangeEnd = getDateKey(range.end);
+  const currentSnapshot = periodItems.find((item) => item.rangeStart === currentRangeStart && item.rangeEnd === currentRangeEnd);
+  elements.current.textContent = currentSnapshot
+    ? `Current range closed on ${formatSnapshotClosedAt(currentSnapshot.closedAt)}.`
+    : "Current range not closed out yet.";
+
+  if (periodItems.length < 1) {
+    elements.list.innerHTML = "";
+    elements.empty.style.display = "block";
+    return;
+  }
+
+  elements.empty.style.display = "none";
+  elements.list.innerHTML = periodItems.slice(0, 8).map((snapshot, index) => {
+    const summary = snapshot.summary || {};
+    const rangeLabel = `${formatDate(parseDateKey(snapshot.rangeStart))} to ${formatDate(parseDateKey(snapshot.rangeEnd))}`;
+    const filterType = normalizeGoalTypeFilterValue(snapshot.filters && snapshot.filters.type);
+    const filterStatus = normalizeGoalStatusFilterValue(snapshot.filters && snapshot.filters.status);
+    const filterLine = filterType === "all" && filterStatus === "active"
+      ? ""
+      : `<p class="muted small">Filters: ${escapeHtml(filterType)} | ${escapeHtml(filterStatus)}</p>`;
+
+    return `
+      <li class="entry-card" style="--stagger:${index}">
+        <div class="snapshot-item-top">
+          <strong>${escapeHtml(rangeLabel)}</strong>
+          <span class="pace-chip">${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</span>
+        </div>
+        <p class="muted small">Closed ${escapeHtml(formatSnapshotClosedAt(snapshot.closedAt))}</p>
+        <p class="metric-line">Completion ${escapeHtml(String(Math.max(Math.round(Number(summary.completion) || 0), 0)))}% | Progress ${escapeHtml(formatAmount(summary.totalProgress || 0))}/${escapeHtml(formatAmount(summary.totalTarget || 0))}</p>
+        <p class="muted small">${escapeHtml(String(Math.max(Math.floor(Number(summary.goalsCount) || 0), 0)))} goals + ${escapeHtml(String(Math.max(Math.floor(Number(summary.checkInsCount) || 0), 0)))} check-ins</p>
+        <p class="muted small">Goal points ${escapeHtml(formatAmount(summary.goalPointsEarned || 0))} (${escapeHtml(String(Math.max(Math.floor(Number(summary.completedGoalsCount) || 0), 0)))} x ${escapeHtml(formatAmount(summary.pointsPerGoal || 0))})</p>
+        ${filterLine}
+      </li>
+    `;
+  }).join("");
+}
+
+function getPeriodSnapshotElements(periodName) {
+  if (periodName === "month") {
+    return {
+      current: monthSnapshotCurrent,
+      list: monthSnapshotList,
+      empty: monthSnapshotEmpty
+    };
+  }
+  if (periodName === "year") {
+    return {
+      current: yearSnapshotCurrent,
+      list: yearSnapshotList,
+      empty: yearSnapshotEmpty
+    };
+  }
+  return {
+    current: weekSnapshotCurrent,
+    list: weekSnapshotList,
+    empty: weekSnapshotEmpty
+  };
+}
+
+function normalizeSnapshotOnPaceLabel(value) {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized === "yes") {
+    return "Yes";
+  }
+  if (normalized === "no") {
+    return "No";
+  }
+  return "N/A";
+}
+
+function formatSnapshotClosedAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+  return date.toLocaleString(undefined, {
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function getTrackersForPeriod(periodName) {
@@ -3928,6 +4265,15 @@ function resetUiStateForLogin() {
   if (projectionAverageSelect) {
     projectionAverageSelect.value = normalizeProjectionAverageSource(settings.projectionAverageSource);
   }
+  if (weeklyGoalPointsInput) {
+    weeklyGoalPointsInput.value = String(normalizeGoalPoints(settings.weeklyGoalPoints, 1));
+  }
+  if (monthlyGoalPointsInput) {
+    monthlyGoalPointsInput.value = String(normalizeGoalPoints(settings.monthlyGoalPoints, 1));
+  }
+  if (yearlyGoalPointsInput) {
+    yearlyGoalPointsInput.value = String(normalizeGoalPoints(settings.yearlyGoalPoints, 1));
+  }
   if (bucketListEnabledSelect) {
     bucketListEnabledSelect.value = isBucketListEnabled() ? "on" : "off";
   }
@@ -4198,6 +4544,9 @@ function getDefaultSettings() {
     weekStart: "monday",
     compareToLastDefault: true,
     projectionAverageSource: "period",
+    weeklyGoalPoints: 1,
+    monthlyGoalPoints: 1,
+    yearlyGoalPoints: 1,
     bucketListEnabled: true,
     theme: "teal"
   };
@@ -4205,6 +4554,14 @@ function getDefaultSettings() {
 
 function normalizeProjectionAverageSource(value) {
   return value === "year" ? "year" : "period";
+}
+
+function normalizeGoalPoints(value, fallback = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return Math.max(Math.floor(Number(fallback) || 1), 0);
+  }
+  return Math.max(Math.floor(numeric), 0);
 }
 
 function normalizeThemeKey(value) {
@@ -4383,6 +4740,7 @@ function migrateLegacyDataToUser() {
     GOAL_JOURNAL_STORAGE_KEY,
     SCHEDULE_STORAGE_KEY,
     SETTINGS_STORAGE_KEY,
+    PERIOD_SNAPSHOTS_STORAGE_KEY,
     LEGACY_TRACKERS_KEY
   ];
   keys.forEach((key) => {
@@ -4405,6 +4763,7 @@ function initializeData() {
     checkInEntries = [];
     goalJournalEntries = [];
     schedules = [];
+    periodSnapshots = [];
     settings = getDefaultSettings();
     return;
   }
@@ -4418,6 +4777,7 @@ function initializeData() {
   checkInEntries = loadCheckInEntries().filter((entry) => checkIns.some((item) => item.id === entry.checkInId));
   goalJournalEntries = loadGoalJournalEntries();
   schedules = loadSchedules().filter((item) => trackers.some((tracker) => tracker.id === item.trackerId));
+  periodSnapshots = loadPeriodSnapshots();
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
     entries = migrateLegacyLogs(loadedTrackers.legacyLogs, trackers);
@@ -4639,6 +4999,61 @@ function loadSchedules() {
   }
 }
 
+function loadPeriodSnapshots() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(PERIOD_SNAPSHOTS_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((item) => {
+        const snapshot = item && typeof item === "object" ? item : {};
+        const closedAtDate = new Date(snapshot.closedAt);
+        const normalizedClosedAt = Number.isNaN(closedAtDate.getTime())
+          ? new Date().toISOString()
+          : closedAtDate.toISOString();
+        const summaryRaw = snapshot.summary && typeof snapshot.summary === "object" ? snapshot.summary : {};
+        const filterRaw = snapshot.filters && typeof snapshot.filters === "object" ? snapshot.filters : {};
+        return {
+          id: typeof snapshot.id === "string" ? snapshot.id : createId(),
+          period: normalizePeriodMode(snapshot.period),
+          rangeStart: isDateKey(snapshot.rangeStart) ? snapshot.rangeStart : "",
+          rangeEnd: isDateKey(snapshot.rangeEnd) ? snapshot.rangeEnd : "",
+          closedAt: normalizedClosedAt,
+          filters: {
+            type: normalizeGoalTypeFilterValue(filterRaw.type),
+            status: normalizeGoalStatusFilterValue(filterRaw.status)
+          },
+          summary: {
+            completion: Math.max(Math.round(Number(summaryRaw.completion) || 0), 0),
+            onPaceLabel: normalizeSnapshotOnPaceLabel(summaryRaw.onPaceLabel),
+            totalProgress: normalizePositiveAmount(summaryRaw.totalProgress, 0),
+            totalTarget: normalizePositiveAmount(summaryRaw.totalTarget, 0),
+            goalsCount: Math.max(Math.floor(Number(summaryRaw.goalsCount) || 0), 0),
+            checkInsCount: Math.max(Math.floor(Number(summaryRaw.checkInsCount) || 0), 0),
+            completedGoalsCount: Math.max(Math.floor(Number(summaryRaw.completedGoalsCount) || 0), 0),
+            pointsPerGoal: normalizeGoalPoints(summaryRaw.pointsPerGoal, 1),
+            goalPointsEarned: normalizePositiveAmount(summaryRaw.goalPointsEarned, 0)
+          },
+          goals: Array.isArray(snapshot.goals) ? snapshot.goals : [],
+          checkIns: Array.isArray(snapshot.checkIns) ? snapshot.checkIns : []
+        };
+      })
+      .filter((item) => item.rangeStart && item.rangeEnd)
+      .sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+  } catch {
+    return [];
+  }
+}
+
 function loadSettings() {
   try {
     if (!currentUser) {
@@ -4653,6 +5068,9 @@ function loadSettings() {
       weekStart: parsed && parsed.weekStart === "sunday" ? "sunday" : "monday",
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
       projectionAverageSource: normalizeProjectionAverageSource(parsed && parsed.projectionAverageSource),
+      weeklyGoalPoints: normalizeGoalPoints(parsed && parsed.weeklyGoalPoints, 1),
+      monthlyGoalPoints: normalizeGoalPoints(parsed && parsed.monthlyGoalPoints, 1),
+      yearlyGoalPoints: normalizeGoalPoints(parsed && parsed.yearlyGoalPoints, 1),
       bucketListEnabled: !(parsed && parsed.bucketListEnabled === false),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
@@ -4729,6 +5147,13 @@ function saveSchedules() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(SCHEDULE_STORAGE_KEY), JSON.stringify(schedules));
+}
+
+function savePeriodSnapshots() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(PERIOD_SNAPSHOTS_STORAGE_KEY), JSON.stringify(periodSnapshots));
 }
 
 function saveSettings() {
