@@ -160,8 +160,12 @@
               Priority
               <input id="goal-priority" type="number" min="0" max="1000" value="0" />
             </label>
-            <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
+            <label>
+              Goal Tags
+              <input id="goal-tags" type="text" maxlength="140" placeholder="fitness, finance, health" />
+            </label>
           </div>
+          <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
           <div class="form-grid form-grid-3">
             <label>
               Weekly Goal
@@ -200,6 +204,7 @@
                 <tr>
                   <th>Name</th>
                   <th>Type</th>
+                  <th>Tags</th>
                   <th>Status</th>
                   <th>Priority</th>
                   <th>Unit</th>
@@ -223,7 +228,18 @@
 
       <section class="panel tab-panel" data-tab-panel="entry" hidden>
       <h2>Add Entry</h2>
-      <p class="muted">Select date and goal, then log quantity, floating progress, or yes/no completion.</p>
+      <p class="muted">Choose how you want to log goal updates.</p>
+      <label class="inline-control entry-mode-control">
+        Entry Mode
+        <select id="entry-mode-select">
+          <option value="solo">Solo Entry</option>
+          <option value="week">Week Update</option>
+        </select>
+      </label>
+
+      <section id="solo-entry-section">
+      <h3>Solo Entry</h3>
+      <p class="muted">Log one goal update for one day.</p>
       <form id="entry-form" class="form-block">
         <div class="form-grid form-grid-3">
           <label>
@@ -256,6 +272,36 @@
       <h3>Today's Entries</h3>
       <ul id="today-entries-list" class="card-list compact-list"></ul>
       <p id="today-entries-empty" class="empty-state">No entries added today yet.</p>
+      </section>
+
+      <section id="week-update-section" hidden>
+      <div class="panel-head week-update-head">
+        <div>
+          <h3>Week Update</h3>
+          <p class="muted">Update all goals across each day of the week in one place.</p>
+          <p class="muted small">Use "-" to clear a day. Yes/No goals use Yes/No selections automatically.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="week-entry-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="week-entry-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="week-entry-next" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="week-entry-range" class="muted"></p>
+        </div>
+      </div>
+      <form id="week-entry-form" class="form-block">
+        <div class="table-wrap">
+          <table id="week-entry-table" class="data-table" aria-label="Week update table">
+            <thead id="week-entry-head"></thead>
+            <tbody id="week-entry-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Save Week Update</button>
+        </div>
+      </form>
+      <p id="week-entry-empty" class="empty-state">Create active goals before using Week Update.</p>
+      <p id="week-entry-status" class="muted small"></p>
+      </section>
 
       <h3>CSV Upload</h3>
       <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
@@ -470,6 +516,12 @@
               <option value="archived">Archived</option>
             </select>
           </label>
+          <label class="inline-control">
+            Tag
+            <select id="week-goal-tag-filter">
+              <option value="all">All Tags</option>
+            </select>
+          </label>
           <p id="week-range" class="muted"></p>
         </div>
       </div>
@@ -512,6 +564,12 @@
               <option value="archived">Archived</option>
             </select>
           </label>
+          <label class="inline-control">
+            Tag
+            <select id="month-goal-tag-filter">
+              <option value="all">All Tags</option>
+            </select>
+          </label>
           <p id="month-range" class="muted"></p>
         </div>
       </div>
@@ -552,6 +610,12 @@
               <option value="active">Active</option>
               <option value="all">All</option>
               <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Tag
+            <select id="year-goal-tag-filter">
+              <option value="all">All Tags</option>
             </select>
           </label>
           <p id="year-range" class="muted"></p>
@@ -617,6 +681,15 @@
       <h3>Rewards</h3>
       <ul id="point-store-reward-list" class="card-list"></ul>
       <p id="point-store-reward-empty" class="empty-state">No rewards yet. Add rewards in Settings.</p>
+      <h3>Active Rewards</h3>
+      <ul id="point-store-active-list" class="card-list"></ul>
+      <p id="point-store-active-empty" class="empty-state">No active rewards yet.</p>
+      <div class="panel-actions">
+        <h3>Closed Rewards</h3>
+        <button id="point-store-clear-closed-btn" class="btn" type="button">Clear Closed</button>
+      </div>
+      <ul id="point-store-closed-list" class="card-list compact-list"></ul>
+      <p id="point-store-closed-empty" class="empty-state">No closed rewards yet.</p>
       <h3>Point Bank History</h3>
       <ul id="point-store-history-list" class="card-list compact-list"></ul>
       <p id="point-store-history-empty" class="empty-state">No point activity yet.</p>

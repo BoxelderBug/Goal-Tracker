@@ -23,6 +23,7 @@ const SCHEDULE_STORAGE_KEY = "goal-tracker-schedules-v1";
 const SETTINGS_STORAGE_KEY = "goal-tracker-settings-v1";
 const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
 const REWARDS_STORAGE_KEY = "goal-tracker-rewards-v1";
+const REWARD_PURCHASES_STORAGE_KEY = "goal-tracker-reward-purchases-v1";
 const POINT_TRANSACTIONS_STORAGE_KEY = "goal-tracker-point-transactions-v1";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
@@ -63,6 +64,7 @@ const goalName = document.querySelector("#goal-name");
 const goalType = document.querySelector("#goal-type");
 const goalUnit = document.querySelector("#goal-unit");
 const goalPriority = document.querySelector("#goal-priority");
+const goalTags = document.querySelector("#goal-tags");
 const goalWeekly = document.querySelector("#goal-weekly");
 const goalMonthly = document.querySelector("#goal-monthly");
 const goalYearly = document.querySelector("#goal-yearly");
@@ -76,6 +78,9 @@ const manageTable = document.querySelector("#manage-table");
 const manageGoalsForm = document.querySelector("#manage-goals-form");
 
 const entryForm = document.querySelector("#entry-form");
+const entryModeSelect = document.querySelector("#entry-mode-select");
+const soloEntrySection = document.querySelector("#solo-entry-section");
+const weekUpdateSection = document.querySelector("#week-update-section");
 const entryTracker = document.querySelector("#entry-tracker");
 const entryDate = document.querySelector("#entry-date");
 const entryAmountLabel = document.querySelector("#entry-amount-label");
@@ -85,6 +90,15 @@ const entryYesNo = document.querySelector("#entry-yesno");
 const entryNotes = document.querySelector("#entry-notes");
 const todayEntriesList = document.querySelector("#today-entries-list");
 const todayEntriesEmpty = document.querySelector("#today-entries-empty");
+const weekEntryForm = document.querySelector("#week-entry-form");
+const weekEntryHead = document.querySelector("#week-entry-head");
+const weekEntryBody = document.querySelector("#week-entry-body");
+const weekEntryEmpty = document.querySelector("#week-entry-empty");
+const weekEntryStatus = document.querySelector("#week-entry-status");
+const weekEntryRange = document.querySelector("#week-entry-range");
+const weekEntryPrevButton = document.querySelector("#week-entry-prev");
+const weekEntryThisButton = document.querySelector("#week-entry-this");
+const weekEntryNextButton = document.querySelector("#week-entry-next");
 
 const bucketEntryForm = document.querySelector("#bucket-entry-form");
 const bucketEntryGoal = document.querySelector("#bucket-entry-goal");
@@ -159,6 +173,11 @@ const pointBankEarned = document.querySelector("#point-bank-earned");
 const pointBankSpent = document.querySelector("#point-bank-spent");
 const pointStoreRewardList = document.querySelector("#point-store-reward-list");
 const pointStoreRewardEmpty = document.querySelector("#point-store-reward-empty");
+const pointStoreActiveList = document.querySelector("#point-store-active-list");
+const pointStoreActiveEmpty = document.querySelector("#point-store-active-empty");
+const pointStoreClosedList = document.querySelector("#point-store-closed-list");
+const pointStoreClosedEmpty = document.querySelector("#point-store-closed-empty");
+const pointStoreClearClosedButton = document.querySelector("#point-store-clear-closed-btn");
 const pointStoreHistoryList = document.querySelector("#point-store-history-list");
 const pointStoreHistoryEmpty = document.querySelector("#point-store-history-empty");
 
@@ -197,10 +216,13 @@ const monthSnapshotEmpty = document.querySelector("#month-snapshot-empty");
 const yearSnapshotEmpty = document.querySelector("#year-snapshot-empty");
 const weekGoalTypeFilterSelect = document.querySelector("#week-goal-type-filter");
 const weekGoalStatusFilterSelect = document.querySelector("#week-goal-status-filter");
+const weekGoalTagFilterSelect = document.querySelector("#week-goal-tag-filter");
 const monthGoalTypeFilterSelect = document.querySelector("#month-goal-type-filter");
 const monthGoalStatusFilterSelect = document.querySelector("#month-goal-status-filter");
+const monthGoalTagFilterSelect = document.querySelector("#month-goal-tag-filter");
 const yearGoalTypeFilterSelect = document.querySelector("#year-goal-type-filter");
 const yearGoalStatusFilterSelect = document.querySelector("#year-goal-status-filter");
+const yearGoalTagFilterSelect = document.querySelector("#year-goal-tag-filter");
 const bucketListSummary = document.querySelector("#bucket-list-summary");
 const bucketListViewList = document.querySelector("#bucket-list-view-list");
 const bucketListViewEmpty = document.querySelector("#bucket-list-view-empty");
@@ -219,22 +241,26 @@ let goalJournalEntries = [];
 let schedules = [];
 let periodSnapshots = [];
 let rewards = [];
+let rewardPurchases = [];
 let pointTransactions = [];
 let settings = getDefaultSettings();
 let activeTab = "manage";
+let entryMode = "solo";
 let entryListSortMode = "date_desc";
 let entryListTypeFilter = "all";
 let entryListStatusFilter = "active";
 let entryListBucketFilter = "all";
 let authMode = "signin";
 let scheduleWeekAnchor = normalizeDate(new Date());
+let weekEntryAnchor = normalizeDate(new Date());
+let weekEntryStatusMessage = "";
 let weekViewAnchor = normalizeDate(new Date());
 let monthViewAnchor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let yearViewAnchor = new Date(new Date().getFullYear(), 0, 1);
 const periodGoalFilterState = {
-  week: { type: "all", status: "active" },
-  month: { type: "all", status: "active" },
-  year: { type: "all", status: "active" }
+  week: { type: "all", status: "active", tag: "all" },
+  month: { type: "all", status: "active", tag: "all" },
+  year: { type: "all", status: "active", tag: "all" }
 };
 let bucketListGoalStatusFilter = "active";
 let bucketListItemStatusFilter = "all";
@@ -307,11 +333,17 @@ if (entryListStatusFilterSelect) {
 if (entryListBucketFilterSelect) {
   entryListBucketFilterSelect.value = entryListBucketFilter;
 }
+if (entryModeSelect) {
+  entryModeSelect.value = entryMode;
+}
 if (weekGoalTypeFilterSelect) {
   weekGoalTypeFilterSelect.value = periodGoalFilterState.week.type;
 }
 if (weekGoalStatusFilterSelect) {
   weekGoalStatusFilterSelect.value = periodGoalFilterState.week.status;
+}
+if (weekGoalTagFilterSelect) {
+  weekGoalTagFilterSelect.value = periodGoalFilterState.week.tag;
 }
 if (monthGoalTypeFilterSelect) {
   monthGoalTypeFilterSelect.value = periodGoalFilterState.month.type;
@@ -319,11 +351,17 @@ if (monthGoalTypeFilterSelect) {
 if (monthGoalStatusFilterSelect) {
   monthGoalStatusFilterSelect.value = periodGoalFilterState.month.status;
 }
+if (monthGoalTagFilterSelect) {
+  monthGoalTagFilterSelect.value = periodGoalFilterState.month.tag;
+}
 if (yearGoalTypeFilterSelect) {
   yearGoalTypeFilterSelect.value = periodGoalFilterState.year.type;
 }
 if (yearGoalStatusFilterSelect) {
   yearGoalStatusFilterSelect.value = periodGoalFilterState.year.status;
+}
+if (yearGoalTagFilterSelect) {
+  yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
 }
 if (bucketListGoalStatusFilterSelect) {
   bucketListGoalStatusFilterSelect.value = bucketListGoalStatusFilter;
@@ -462,6 +500,38 @@ authModeButtons.forEach((button) => {
 if (entryTracker) {
   entryTracker.addEventListener("change", () => {
     updateEntryFormMode();
+  });
+}
+
+if (entryModeSelect) {
+  entryModeSelect.addEventListener("change", () => {
+    entryMode = normalizeEntryMode(entryModeSelect.value);
+    weekEntryStatusMessage = "";
+    renderEntryTab();
+  });
+}
+
+if (weekEntryPrevButton) {
+  weekEntryPrevButton.addEventListener("click", () => {
+    weekEntryAnchor = addDays(weekEntryAnchor, -7);
+    weekEntryStatusMessage = "";
+    renderEntryTab();
+  });
+}
+
+if (weekEntryThisButton) {
+  weekEntryThisButton.addEventListener("click", () => {
+    weekEntryAnchor = normalizeDate(new Date());
+    weekEntryStatusMessage = "";
+    renderEntryTab();
+  });
+}
+
+if (weekEntryNextButton) {
+  weekEntryNextButton.addEventListener("click", () => {
+    weekEntryAnchor = addDays(weekEntryAnchor, 7);
+    weekEntryStatusMessage = "";
+    renderEntryTab();
   });
 }
 
@@ -620,6 +690,7 @@ goalForm.addEventListener("submit", (event) => {
   const lockedUnit = getLockedUnitForGoalType(normalizedGoalType);
   const unit = lockedUnit || normalizeGoalUnit(goalUnit.value);
   const priority = normalizeGoalPriority(goalPriority ? goalPriority.value : 0, 0);
+  const tags = normalizeGoalTags(goalTags ? goalTags.value : "");
   const weeklyGoal = normalizePositiveInt(goalWeekly.value, 1);
   const monthlyGoal = normalizePositiveInt(goalMonthly.value, 1);
   const yearlyGoal = normalizePositiveInt(goalYearly.value, 1);
@@ -636,6 +707,7 @@ goalForm.addEventListener("submit", (event) => {
     goalType: normalizedGoalType,
     archived: false,
     priority,
+    tags,
     unit,
     weeklyGoal,
     monthlyGoal,
@@ -653,6 +725,12 @@ goalForm.addEventListener("submit", (event) => {
   goalUnit.value = "units";
   if (goalPriority) {
     goalPriority.value = "0";
+  }
+  if (goalTags) {
+    goalTags.value = "";
+  }
+  if (goalTags) {
+    goalTags.value = "";
   }
   goalWeekly.value = "5";
   goalMonthly.value = "22";
@@ -700,6 +778,7 @@ if (manageGoalsForm) {
       const goalTypeInput = row.querySelector("select[data-field='goalType']");
       const archivedInput = row.querySelector("select[data-field='archived']");
       const priorityInput = row.querySelector("input[data-field='priority']");
+      const tagsInput = row.querySelector("input[data-field='tags']");
       const unitInput = row.querySelector("input[data-field='unit']");
       const weeklyInput = row.querySelector("input[data-field='weeklyGoal']");
       const monthlyInput = row.querySelector("input[data-field='monthlyGoal']");
@@ -739,6 +818,7 @@ if (manageGoalsForm) {
         goalType: goalTypeValue,
         archived: statusValue === "archived",
         priority: normalizeGoalPriority(priorityInput ? priorityInput.value : tracker.priority, tracker.priority),
+        tags: normalizeGoalTags(tagsInput ? tagsInput.value : tracker.tags),
         unit: unitValue,
         weeklyGoal: normalizePositiveInt(weeklyInput.value, tracker.weeklyGoal),
         monthlyGoal: normalizePositiveInt(monthlyInput.value, tracker.monthlyGoal),
@@ -1085,8 +1165,99 @@ entryForm.addEventListener("submit", (event) => {
   }
   entryNotes.value = "";
   entryDate.value = getDateKey(normalizeDate(new Date()));
+  weekEntryStatusMessage = "";
   render();
 });
+
+if (weekEntryForm) {
+  weekEntryForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser) {
+      return;
+    }
+
+    const standardTrackers = getStandardEntryTrackers();
+    if (standardTrackers.length < 1) {
+      return;
+    }
+
+    const trackerById = new Map(standardTrackers.map((tracker) => [tracker.id, tracker]));
+    const validTrackerIds = new Set(standardTrackers.map((tracker) => tracker.id));
+    const weekRange = getWeekRange(weekEntryAnchor);
+    const weekDateKeys = [];
+    for (let offset = 0; offset < 7; offset += 1) {
+      weekDateKeys.push(getDateKey(addDays(weekRange.start, offset)));
+    }
+    const validDateKeys = new Set(weekDateKeys);
+    const keysToReplace = new Set();
+    validTrackerIds.forEach((trackerId) => {
+      weekDateKeys.forEach((dateKey) => {
+        keysToReplace.add(`${trackerId}|${dateKey}`);
+      });
+    });
+
+    const latestNotesByKey = new Map();
+    entries.forEach((entry) => {
+      const key = `${entry.trackerId}|${entry.date}`;
+      if (!latestNotesByKey.has(key)) {
+        latestNotesByKey.set(key, String(entry.notes || "").trim());
+      }
+    });
+
+    const controls = Array.from(weekEntryForm.querySelectorAll("[data-week-entry='1']"));
+    const replacementValues = new Map();
+    const invalidCells = [];
+    controls.forEach((control) => {
+      const trackerId = String(control.dataset.trackerId || "");
+      const date = String(control.dataset.date || "");
+      if (!validTrackerIds.has(trackerId) || !validDateKeys.has(date)) {
+        return;
+      }
+      const tracker = trackerById.get(trackerId);
+      if (!tracker) {
+        return;
+      }
+      const parsed = parseWeekEntryInputValue(control.value, tracker);
+      if (!parsed.valid) {
+        invalidCells.push(`${tracker.name} (${formatDate(parseDateKey(date))})`);
+        return;
+      }
+      replacementValues.set(`${trackerId}|${date}`, parsed.amount);
+    });
+
+    if (invalidCells.length > 0) {
+      alert(`Fix invalid week update values: ${invalidCells.slice(0, 4).join(", ")}${invalidCells.length > 4 ? "..." : ""}`);
+      return;
+    }
+
+    const removedCount = entries.reduce((count, entry) => (
+      keysToReplace.has(`${entry.trackerId}|${entry.date}`) ? count + 1 : count
+    ), 0);
+
+    entries = entries.filter((entry) => !keysToReplace.has(`${entry.trackerId}|${entry.date}`));
+
+    let insertedCount = 0;
+    replacementValues.forEach((amount, key) => {
+      if (amount === null) {
+        return;
+      }
+      const [trackerId, date] = key.split("|");
+      entries.unshift({
+        id: createId(),
+        trackerId,
+        date,
+        amount,
+        notes: latestNotesByKey.get(key) || "Week Update",
+        createdAt: new Date().toISOString()
+      });
+      insertedCount += 1;
+    });
+
+    weekEntryStatusMessage = `Week update saved. ${insertedCount} value${insertedCount === 1 ? "" : "s"} set, ${removedCount} prior row${removedCount === 1 ? "" : "s"} replaced.`;
+    saveEntries();
+    render();
+  });
+}
 
 scheduleForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -1141,8 +1312,19 @@ scheduleList.addEventListener("click", (event) => {
   if (flipButton) {
     const dateKey = String(flipButton.dataset.date || "");
     if (isDateKey(dateKey)) {
-      flippedScheduleDays[dateKey] = !Boolean(flippedScheduleDays[dateKey]);
-      renderGoalScheduleTab();
+      const scheduleDay = flipButton.closest(".schedule-day");
+      const nextFlipped = scheduleDay
+        ? !scheduleDay.classList.contains("is-flipped")
+        : !Boolean(flippedScheduleDays[dateKey]);
+      flippedScheduleDays[dateKey] = nextFlipped;
+      if (scheduleDay) {
+        scheduleDay.classList.toggle("is-flipped", nextFlipped);
+        scheduleDay.querySelectorAll("button[data-action='toggle-day-flip']").forEach((button) => {
+          button.setAttribute("aria-pressed", nextFlipped ? "true" : "false");
+        });
+      } else {
+        renderGoalScheduleTab();
+      }
     }
     return;
   }
@@ -1256,9 +1438,9 @@ if (entryListBucketFilterSelect) {
   });
 }
 
-bindPeriodGoalFilters("week", weekGoalTypeFilterSelect, weekGoalStatusFilterSelect);
-bindPeriodGoalFilters("month", monthGoalTypeFilterSelect, monthGoalStatusFilterSelect);
-bindPeriodGoalFilters("year", yearGoalTypeFilterSelect, yearGoalStatusFilterSelect);
+bindPeriodGoalFilters("week", weekGoalTypeFilterSelect, weekGoalStatusFilterSelect, weekGoalTagFilterSelect);
+bindPeriodGoalFilters("month", monthGoalTypeFilterSelect, monthGoalStatusFilterSelect, monthGoalTagFilterSelect);
+bindPeriodGoalFilters("year", yearGoalTypeFilterSelect, yearGoalStatusFilterSelect, yearGoalTagFilterSelect);
 
 if (bucketListGoalStatusFilterSelect) {
   bucketListGoalStatusFilterSelect.addEventListener("change", () => {
@@ -1470,6 +1652,58 @@ if (pointStoreRewardList) {
       renderRewardsSettings();
       renderAuthState();
     }
+  });
+}
+
+if (pointStoreActiveList) {
+  pointStoreActiveList.addEventListener("click", (event) => {
+    if (!currentUser || !isRewardPointsEnabled()) {
+      return;
+    }
+    const closeButton = event.target.closest("button[data-action='close-active-reward']");
+    if (closeButton) {
+      const purchaseId = String(closeButton.dataset.id || "");
+      const result = closeRewardPurchase(purchaseId);
+      if (!result.success && result.message) {
+        alert(result.message);
+      }
+      if (result.success) {
+        renderPointStoreTab();
+      }
+      return;
+    }
+
+    const refundButton = event.target.closest("button[data-action='refund-active-reward']");
+    if (!refundButton) {
+      return;
+    }
+    const purchaseId = String(refundButton.dataset.id || "");
+    const result = refundRewardPurchase(purchaseId);
+    if (!result.success && result.message) {
+      alert(result.message);
+    }
+    if (result.success) {
+      renderPointStoreTab();
+      renderAuthState();
+    }
+  });
+}
+
+if (pointStoreClearClosedButton) {
+  pointStoreClearClosedButton.addEventListener("click", () => {
+    if (!currentUser || !isRewardPointsEnabled()) {
+      return;
+    }
+    const closedCount = rewardPurchases.filter((item) => item && item.status !== "active").length;
+    if (closedCount < 1) {
+      return;
+    }
+    const confirmed = confirm(`Clear ${closedCount} closed reward${closedCount === 1 ? "" : "s"}?`);
+    if (!confirmed) {
+      return;
+    }
+    clearClosedRewardPurchases();
+    renderPointStoreTab();
   });
 }
 
@@ -1780,6 +2014,8 @@ function renderGraphModal() {
     ? getProjectionSeries(index, tracker.id, range, chartRange, series)
     : null;
   const target = periodMeta.targetFn(tracker);
+  const periodProgress = sumTrackerRange(index, tracker.id, range);
+  const goalHit = target > 0 && periodProgress >= target;
 
   graphModalTitle.textContent = `${tracker.name} | ${periodMeta.title} Chart`;
   const projectionControl = projectionAllowed
@@ -1809,7 +2045,8 @@ function renderGraphModal() {
     large: true,
     unit: tracker.unit,
     domainDays: getRangeDays(range),
-    projection
+    projection,
+    goalHit
   });
   graphModalBody.innerHTML += createDeepDiveInsightsMarkup(
     tracker,
@@ -2497,6 +2734,9 @@ function renderManageGoals() {
           </select>
         </td>
         <td>
+          <input data-field="tags" type="text" maxlength="140" value="${escapeHtml(formatGoalTags(tracker.tags))}" placeholder="fitness, finance" />
+        </td>
+        <td>
           <select data-field="archived">
             <option value="active" ${tracker.archived ? "" : "selected"}>Active</option>
             <option value="archived" ${tracker.archived ? "selected" : ""}>Archive</option>
@@ -2588,11 +2828,31 @@ function renderCheckinsTab() {
 }
 
 function renderEntryTab() {
+  if (!entryTracker || !entryDate || !todayEntriesList || !todayEntriesEmpty) {
+    return;
+  }
+
   if (!isDateKey(entryDate.value)) {
     entryDate.value = getDateKey(normalizeDate(new Date()));
   }
 
-  const standardTrackers = trackers.filter((tracker) => normalizeGoalType(tracker.goalType) !== "bucket" && !tracker.archived);
+  entryMode = normalizeEntryMode(entryMode);
+  if (entryModeSelect) {
+    entryModeSelect.value = entryMode;
+  }
+  if (soloEntrySection) {
+    soloEntrySection.hidden = entryMode !== "solo";
+  }
+  if (weekUpdateSection) {
+    weekUpdateSection.hidden = entryMode !== "week";
+  }
+
+  const standardTrackers = getStandardEntryTrackers();
+  renderSoloEntrySection(standardTrackers);
+  renderWeekEntrySection(standardTrackers);
+}
+
+function renderSoloEntrySection(standardTrackers) {
   if (standardTrackers.length < 1) {
     entryTracker.innerHTML = "<option value=''>No goals</option>";
     entryTracker.disabled = true;
@@ -2611,7 +2871,7 @@ function renderEntryTab() {
       const suffix = trackerType === "floating"
         ? `${escapeHtml(tracker.unit || "items")} | Floating`
         : isBinaryGoalType(trackerType)
-        ? (trackerType === "bucket" ? "Bucket List" : "Yes/No")
+        ? "Yes/No"
         : escapeHtml(tracker.unit || "units");
       return `<option value="${tracker.id}">${escapeHtml(tracker.name)} (${suffix})</option>`;
     })
@@ -2659,6 +2919,101 @@ function renderEntryTab() {
     })
     .join("");
   updateEntryFormMode();
+}
+
+function renderWeekEntrySection(standardTrackers) {
+  if (!weekEntryForm || !weekEntryHead || !weekEntryBody || !weekEntryEmpty || !weekEntryRange) {
+    return;
+  }
+
+  const weekRange = getWeekRange(weekEntryAnchor);
+  weekEntryRange.textContent = `${formatDate(weekRange.start)} to ${formatDate(weekRange.end)}`;
+  if (weekEntryStatus) {
+    weekEntryStatus.textContent = weekEntryStatusMessage;
+  }
+
+  if (standardTrackers.length < 1) {
+    weekEntryForm.style.display = "none";
+    weekEntryHead.innerHTML = "";
+    weekEntryBody.innerHTML = "";
+    weekEntryEmpty.style.display = "block";
+    weekEntryEmpty.textContent = "Create active quantity/yes-no/floating goals before using Week Update.";
+    if (weekEntryStatus) {
+      weekEntryStatus.textContent = "";
+    }
+    return;
+  }
+
+  weekEntryForm.style.display = "block";
+  weekEntryEmpty.style.display = "none";
+  const weekDates = Array.from({ length: 7 }, (_, index) => addDays(weekRange.start, index));
+  const weekDateKeys = weekDates.map((date) => getDateKey(date));
+  const existingValues = buildWeekEntryValuesMap(standardTrackers, weekDateKeys);
+
+  weekEntryHead.innerHTML = `
+    <tr>
+      <th>Goal</th>
+      ${weekDates.map((date) => (
+        `<th class="week-entry-date-head">${escapeHtml(formatWeekday(date))}<span class="muted">${escapeHtml(formatDate(date))}</span></th>`
+      )).join("")}
+    </tr>
+  `;
+
+  weekEntryBody.innerHTML = standardTrackers
+    .map((tracker, trackerIndex) => {
+      const type = normalizeGoalType(tracker.goalType);
+      const binary = isBinaryGoalType(type);
+      const goalTypeLabel = type === "floating"
+        ? "Floating"
+        : type === "yesno"
+        ? "Yes/No"
+        : "Quantity";
+      const rowCells = weekDateKeys.map((dateKey) => {
+        const key = `${tracker.id}|${dateKey}`;
+        const cell = existingValues.get(key);
+        if (binary) {
+          const value = !cell || !cell.hasEntry ? "" : (cell.amount > 0 ? "yes" : "no");
+          return `
+            <td>
+              <select
+                class="week-entry-value week-entry-value-select"
+                data-week-entry="1"
+                data-tracker-id="${tracker.id}"
+                data-date="${dateKey}"
+              >
+                <option value="" ${value === "" ? "selected" : ""}>-</option>
+                <option value="yes" ${value === "yes" ? "selected" : ""}>Yes</option>
+                <option value="no" ${value === "no" ? "selected" : ""}>No</option>
+              </select>
+            </td>
+          `;
+        }
+        return `
+          <td>
+            <input
+              class="week-entry-value"
+              type="number"
+              min="0"
+              step="0.01"
+              value="${cell && cell.hasEntry ? escapeAttr(formatEditableAmount(cell.amount)) : ""}"
+              data-week-entry="1"
+              data-tracker-id="${tracker.id}"
+              data-date="${dateKey}"
+            />
+          </td>
+        `;
+      }).join("");
+      return `
+        <tr class="goal-row" style="--stagger:${trackerIndex}">
+          <td class="week-entry-goal-cell">
+            <strong>${escapeHtml(tracker.name)}</strong>
+            <span class="muted small">${escapeHtml(normalizeGoalUnit(tracker.unit))} | ${goalTypeLabel}</span>
+          </td>
+          ${rowCells}
+        </tr>
+      `;
+    })
+    .join("");
 }
 
 function renderGoalJournalTab() {
@@ -3154,10 +3509,13 @@ function renderPeriodTabs() {
 
   periodGoalFilterState.week.type = normalizeGoalTypeFilterValue(periodGoalFilterState.week.type);
   periodGoalFilterState.week.status = normalizeGoalStatusFilterValue(periodGoalFilterState.week.status);
+  periodGoalFilterState.week.tag = normalizeGoalTagFilterValue(periodGoalFilterState.week.tag);
   periodGoalFilterState.month.type = normalizeGoalTypeFilterValue(periodGoalFilterState.month.type);
   periodGoalFilterState.month.status = normalizeGoalStatusFilterValue(periodGoalFilterState.month.status);
+  periodGoalFilterState.month.tag = normalizeGoalTagFilterValue(periodGoalFilterState.month.tag);
   periodGoalFilterState.year.type = normalizeGoalTypeFilterValue(periodGoalFilterState.year.type);
   periodGoalFilterState.year.status = normalizeGoalStatusFilterValue(periodGoalFilterState.year.status);
+  periodGoalFilterState.year.tag = normalizeGoalTagFilterValue(periodGoalFilterState.year.tag);
 
   if (weekGoalTypeFilterSelect) {
     weekGoalTypeFilterSelect.value = periodGoalFilterState.week.type;
@@ -3165,17 +3523,29 @@ function renderPeriodTabs() {
   if (weekGoalStatusFilterSelect) {
     weekGoalStatusFilterSelect.value = periodGoalFilterState.week.status;
   }
+  if (weekGoalTagFilterSelect) {
+    syncPeriodTagFilterOptions("week", weekGoalTagFilterSelect);
+    weekGoalTagFilterSelect.value = periodGoalFilterState.week.tag;
+  }
   if (monthGoalTypeFilterSelect) {
     monthGoalTypeFilterSelect.value = periodGoalFilterState.month.type;
   }
   if (monthGoalStatusFilterSelect) {
     monthGoalStatusFilterSelect.value = periodGoalFilterState.month.status;
   }
+  if (monthGoalTagFilterSelect) {
+    syncPeriodTagFilterOptions("month", monthGoalTagFilterSelect);
+    monthGoalTagFilterSelect.value = periodGoalFilterState.month.tag;
+  }
   if (yearGoalTypeFilterSelect) {
     yearGoalTypeFilterSelect.value = periodGoalFilterState.year.type;
   }
   if (yearGoalStatusFilterSelect) {
     yearGoalStatusFilterSelect.value = periodGoalFilterState.year.status;
+  }
+  if (yearGoalTagFilterSelect) {
+    syncPeriodTagFilterOptions("year", yearGoalTagFilterSelect);
+    yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
   }
 
   const index = buildEntryIndex(entries);
@@ -3202,10 +3572,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   emptyEl.style.display = "none";
   const totalDays = getRangeDays(range);
   const elapsedDays = getElapsedDays(range, now);
-  const toDateRange = {
-    start: new Date(range.start),
-    end: addDays(range.start, elapsedDays - 1)
-  };
 
   let goalsProgressTotal = 0;
   let goalsTargetTotal = 0;
@@ -3253,8 +3619,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   const goalPointsCard = rewardPointsEnabled
     ? `
     <article class="summary-card">
-      <p>Goal Points</p>
-      <strong>${formatAmount(goalPointsEarned)} (${completedGoalsCount} completed)</strong>
+      <p>Close-Out Points</p>
+      <strong>${formatAmount(goalPointsEarned)} pending (${completedGoalsCount} completed)</strong>
     </article>
   `
     : "";
@@ -3280,18 +3646,24 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const isFloating = isFloatingGoalType(tracker.goalType);
       const progress = sumTrackerRange(index, tracker.id, range);
       const target = targetFn(tracker);
+      const goalHit = target > 0 && progress >= target;
       const pct = percent(progress, target);
       const avg = safeDivide(progress, elapsedDays);
       const needed = safeDivide(target, totalDays);
       const projectedTracker = avg * totalDays;
       const isOnPace = projectedTracker >= target;
+      const isPastPeriod = range.end < now;
+      const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
+      const useFinalPaceLabel = isPastPeriod && hasAllEntriesLogged;
+      const paceLabel = useFinalPaceLabel
+        ? (isOnPace ? "Hit" : "Missed")
+        : (isOnPace ? "On pace" : "Off pace");
       const compareEnabled = isFloating ? false : getGoalCompareEnabled(periodName, tracker.id);
       const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
       const compareLabel = getOverlayControlLabel(periodName);
       const projectionAllowed = !isFloating && shouldAllowProjectionLine(periodName, range, now);
       const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(periodName, tracker.id) : false;
-      const comparison = !isFloating && compareEnabled ? getPeriodComparison(periodName, range, elapsedDays) : null;
 
       let graphMarkup = "";
       if (graphVisible) {
@@ -3309,31 +3681,21 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           large: false,
           unit: tracker.unit,
           domainDays: getRangeDays(range),
-          projection
+          projection,
+          goalHit
         });
       }
 
-      const comparisonLine = comparison
-        ? (() => {
-            const currentToDate = sumTrackerRange(index, tracker.id, toDateRange);
-            const previousToDate = sumTrackerRange(index, tracker.id, comparison.previousRange);
-            const delta = currentToDate - previousToDate;
-            return `<p class="metric-line">${comparison.shortLabel}: ${formatSignedAmountWithUnit(delta, tracker.unit)} ${formatPercentChange(currentToDate, previousToDate)}</p>`;
-          })()
-        : "";
       const paceDetailLine = isFloating
-        ? `<p class="metric-line">Floating goal: progress is flexible and not pace-tracked.</p>`
-        : `<p class="metric-line">Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Needed/day ${formatAmountWithUnit(needed, tracker.unit)}</p>`;
-      const paceChipLine = isFloating
-        ? ""
+        ? `<p class="metric-line">Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} | Floating goal</p>`
+        : `<p class="metric-line">Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Needed/day ${formatAmountWithUnit(needed, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)}</p>`;
+      const paceStatusChip = isFloating
+        ? `<span class="pace-chip">Floating</span>`
         : `
-          <p class="pace-line">
-            <span class="pace-chip ${isOnPace ? "pace-on" : "pace-off"}">${isOnPace ? "On pace" : "Off pace"}</span>
-            Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)}
-          </p>
+            <span class="pace-chip ${isOnPace ? "pace-on" : "pace-off"}">${paceLabel}</span>
         `;
       const trackerControlMarkup = isFloating
-        ? `<span class="pace-chip">Floating</span>`
+        ? ""
         : `
               <label class="check-inline check-compact compare-control">
                 <input type="checkbox" data-action="toggle-compare" data-period="${periodName}" data-id="${tracker.id}" ${compareEnabled ? "checked" : ""} />
@@ -3350,10 +3712,24 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             </div>
           </div>
           <p class="metric-line">${formatAmountWithUnit(progress, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)} (${pct}%)</p>
-          <div class="progress"><span style="width:${Math.min(pct, 100)}%"></span></div>
+          <div class="progress"><span class="${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span></div>
           ${paceDetailLine}
-          ${comparisonLine}
-          ${paceChipLine}
+          <div class="pace-line">
+            ${paceStatusChip}
+            <span class="pace-actions">
+              <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}">Deep Dive</button>
+              <button
+                type="button"
+                class="btn btn-icon"
+                data-action="toggle-inline-chart"
+                data-period="${periodName}"
+                data-id="${tracker.id}"
+                aria-expanded="${graphVisible ? "true" : "false"}"
+                aria-label="${graphVisible ? "Hide chart" : "Show chart"}"
+                title="${graphVisible ? "Hide chart" : "Show chart"}"
+              >${graphVisible ? "-" : "+"}</button>
+            </span>
+          </div>
           <div class="graph-wrap ${graphVisible ? "" : "hidden"}">
             ${graphMarkup}
             <div class="graph-inline-controls graph-inline-controls-bottom">
@@ -3371,19 +3747,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
                 ${createDownloadMenuMarkup(periodName, tracker.id, "inline")}
               </div>
             </div>
-          </div>
-          <div class="metric-footer-actions">
-            <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}">Deep Dive</button>
-            <button
-              type="button"
-              class="btn btn-icon"
-              data-action="toggle-inline-chart"
-              data-period="${periodName}"
-              data-id="${tracker.id}"
-              aria-expanded="${graphVisible ? "true" : "false"}"
-              aria-label="${graphVisible ? "Hide chart" : "Show chart"}"
-              title="${graphVisible ? "Hide chart" : "Show chart"}"
-            >${graphVisible ? "-" : "+"}</button>
           </div>
         </li>
       `;
@@ -3553,7 +3916,7 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   const paceTargetWithCheckIns = addAmount(paceTargetTotal, checkInTargetTotal);
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
   const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
-  const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active" };
+  const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active", tag: "all" };
 
   return {
     id: createId(),
@@ -3563,7 +3926,8 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
     closedAt: new Date().toISOString(),
     filters: {
       type: normalizeGoalTypeFilterValue(periodState.type),
-      status: normalizeGoalStatusFilterValue(periodState.status)
+      status: normalizeGoalStatusFilterValue(periodState.status),
+      tag: normalizeGoalTagFilterValue(periodState.tag)
     },
     summary: {
       completion,
@@ -3663,9 +4027,10 @@ function renderPeriodSnapshots(periodName, range) {
     const rangeLabel = `${formatDate(parseDateKey(snapshot.rangeStart))} to ${formatDate(parseDateKey(snapshot.rangeEnd))}`;
     const filterType = normalizeGoalTypeFilterValue(snapshot.filters && snapshot.filters.type);
     const filterStatus = normalizeGoalStatusFilterValue(snapshot.filters && snapshot.filters.status);
-    const filterLine = filterType === "all" && filterStatus === "active"
+    const filterTag = normalizeGoalTagFilterValue(snapshot.filters && snapshot.filters.tag);
+    const filterLine = filterType === "all" && filterStatus === "active" && filterTag === "all"
       ? ""
-      : `<p class="muted small">Filters: ${escapeHtml(filterType)} | ${escapeHtml(filterStatus)}</p>`;
+      : `<p class="muted small">Filters: ${escapeHtml(filterType)} | ${escapeHtml(filterStatus)} | ${escapeHtml(filterTag === "all" ? "all tags" : filterTag)}</p>`;
 
     return `
       <li class="entry-card" style="--stagger:${index}">
@@ -3836,6 +4201,11 @@ function renderPointStoreTab() {
     || !pointBankSpent
     || !pointStoreRewardList
     || !pointStoreRewardEmpty
+    || !pointStoreActiveList
+    || !pointStoreActiveEmpty
+    || !pointStoreClosedList
+    || !pointStoreClosedEmpty
+    || !pointStoreClearClosedButton
     || !pointStoreHistoryList
     || !pointStoreHistoryEmpty
   ) {
@@ -3847,8 +4217,13 @@ function renderPointStoreTab() {
     pointBankEarned.textContent = "0";
     pointBankSpent.textContent = "0";
     pointStoreRewardList.innerHTML = "";
+    pointStoreActiveList.innerHTML = "";
+    pointStoreClosedList.innerHTML = "";
     pointStoreHistoryList.innerHTML = "";
     pointStoreRewardEmpty.style.display = "none";
+    pointStoreActiveEmpty.style.display = "none";
+    pointStoreClosedEmpty.style.display = "none";
+    pointStoreClearClosedButton.hidden = true;
     pointStoreHistoryEmpty.style.display = "none";
     return;
   }
@@ -3879,6 +4254,64 @@ function renderPointStoreTab() {
                 ${canRedeem ? "Redeem" : "Not enough points"}
               </button>
             </div>
+          </li>
+        `;
+      })
+      .join("");
+  }
+
+  const activePurchases = rewardPurchases
+    .filter((item) => item && item.status === "active")
+    .sort((a, b) => String(b.purchasedAt || "").localeCompare(String(a.purchasedAt || "")));
+  if (activePurchases.length < 1) {
+    pointStoreActiveList.innerHTML = "";
+    pointStoreActiveEmpty.style.display = "block";
+  } else {
+    pointStoreActiveEmpty.style.display = "none";
+    pointStoreActiveList.innerHTML = activePurchases
+      .map((item, index) => `
+        <li class="metric-card" style="--stagger:${index}">
+          <div class="metric-top">
+            <h3>${escapeHtml(item.rewardName || "Reward")}</h3>
+            <span class="pace-chip">${formatAmount(normalizePositiveInt(item.cost, 1))} pts</span>
+          </div>
+          <p class="muted small">Purchased ${escapeHtml(formatSnapshotClosedAt(item.purchasedAt))}</p>
+          <p class="metric-line">${escapeHtml(item.notes || "No notes")}</p>
+          <div class="metric-footer-actions">
+            <button class="btn" type="button" data-action="close-active-reward" data-id="${item.id}">Close</button>
+            <button class="btn btn-danger" type="button" data-action="refund-active-reward" data-id="${item.id}">Refund</button>
+          </div>
+        </li>
+      `)
+      .join("");
+  }
+
+  const closedPurchases = rewardPurchases
+    .filter((item) => item && item.status !== "active")
+    .sort((a, b) => {
+      const dateA = String(a.refundedAt || a.closedAt || a.purchasedAt || "");
+      const dateB = String(b.refundedAt || b.closedAt || b.purchasedAt || "");
+      return dateB.localeCompare(dateA);
+    });
+  pointStoreClearClosedButton.hidden = closedPurchases.length < 1;
+  if (closedPurchases.length < 1) {
+    pointStoreClosedList.innerHTML = "";
+    pointStoreClosedEmpty.style.display = "block";
+  } else {
+    pointStoreClosedEmpty.style.display = "none";
+    pointStoreClosedList.innerHTML = closedPurchases
+      .map((item, index) => {
+        const isRefunded = item.status === "refunded";
+        const statusLabel = isRefunded ? "Refunded" : "Closed";
+        const statusClass = isRefunded ? "pace-on" : "";
+        const when = isRefunded ? item.refundedAt : item.closedAt;
+        return `
+          <li class="quick-item" style="--stagger:${index}">
+            <div class="metric-top">
+              <strong>${escapeHtml(item.rewardName || "Reward")}</strong>
+              <span class="pace-chip ${statusClass}">${statusLabel}</span>
+            </div>
+            <p class="muted small">${escapeHtml(formatSnapshotClosedAt(when || item.purchasedAt))}</p>
           </li>
         `;
       })
@@ -3937,20 +4370,105 @@ function redeemReward(rewardId) {
     note: `Redeemed: ${reward.name}`,
     rewardId: reward.id
   });
+  rewardPurchases.unshift({
+    id: createId(),
+    rewardId: reward.id,
+    rewardName: reward.name,
+    cost,
+    notes: reward.notes || "",
+    status: "active",
+    purchasedAt: new Date().toISOString(),
+    closedAt: "",
+    refundedAt: ""
+  });
+  saveRewardPurchases();
   savePointTransactions();
   return { success: true, message: "" };
 }
 
+function closeRewardPurchase(purchaseId) {
+  if (!currentUser) {
+    return { success: false, message: "Sign in before closing rewards." };
+  }
+  if (!isRewardPointsEnabled()) {
+    return { success: false, message: "Reward points are turned off in Settings." };
+  }
+  const purchase = rewardPurchases.find((item) => item && item.id === purchaseId);
+  if (!purchase || purchase.status !== "active") {
+    return { success: false, message: "Select an active reward." };
+  }
+  purchase.status = "closed";
+  purchase.closedAt = new Date().toISOString();
+  saveRewardPurchases();
+  return { success: true, message: "" };
+}
+
+function refundRewardPurchase(purchaseId) {
+  if (!currentUser) {
+    return { success: false, message: "Sign in before refunding rewards." };
+  }
+  if (!isRewardPointsEnabled()) {
+    return { success: false, message: "Reward points are turned off in Settings." };
+  }
+  const purchase = rewardPurchases.find((item) => item && item.id === purchaseId);
+  if (!purchase || purchase.status !== "active") {
+    return { success: false, message: "Select an active reward to refund." };
+  }
+  const amount = normalizePositiveInt(purchase.cost, 1);
+  purchase.status = "refunded";
+  purchase.refundedAt = new Date().toISOString();
+  purchase.closedAt = purchase.refundedAt;
+  pointTransactions.unshift({
+    id: createId(),
+    type: "refund-reward",
+    amount,
+    createdAt: purchase.refundedAt,
+    note: `Refunded: ${purchase.rewardName || "Reward"}`,
+    rewardId: purchase.rewardId || ""
+  });
+  saveRewardPurchases();
+  savePointTransactions();
+  return { success: true, message: "" };
+}
+
+function clearClosedRewardPurchases() {
+  rewardPurchases = rewardPurchases.filter((item) => item && item.status === "active");
+  saveRewardPurchases();
+}
+
 function getTrackersForPeriod(periodName) {
-  const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active" };
+  const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active", tag: "all" };
   const typeFilter = normalizeGoalTypeFilterValue(periodState.type);
   const statusFilter = normalizeGoalStatusFilterValue(periodState.status);
+  const tagFilter = normalizeGoalTagFilterValue(periodState.tag);
 
   if (periodGoalFilterState[periodName]) {
     periodGoalFilterState[periodName].type = typeFilter;
     periodGoalFilterState[periodName].status = statusFilter;
+    periodGoalFilterState[periodName].tag = tagFilter;
   }
 
+  return trackers.filter((tracker) => {
+    const trackerType = normalizeGoalType(tracker.goalType);
+    const trackerStatus = tracker.archived ? "archived" : "active";
+    const trackerTags = normalizeGoalTags(tracker.tags);
+    if (typeFilter !== "all" && trackerType !== typeFilter) {
+      return false;
+    }
+    if (statusFilter !== "all" && trackerStatus !== statusFilter) {
+      return false;
+    }
+    if (tagFilter !== "all" && !trackerTags.some((tag) => getGoalTagKey(tag) === tagFilter)) {
+      return false;
+    }
+    return true;
+  }).sort(compareTrackersByPriority);
+}
+
+function getTrackersMatchingTypeStatusFilters(periodName) {
+  const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active" };
+  const typeFilter = normalizeGoalTypeFilterValue(periodState.type);
+  const statusFilter = normalizeGoalStatusFilterValue(periodState.status);
   return trackers.filter((tracker) => {
     const trackerType = normalizeGoalType(tracker.goalType);
     const trackerStatus = tracker.archived ? "archived" : "active";
@@ -3961,7 +4479,41 @@ function getTrackersForPeriod(periodName) {
       return false;
     }
     return true;
-  }).sort(compareTrackersByPriority);
+  });
+}
+
+function getSortedGoalTagOptions(trackersList) {
+  const tagMap = new Map();
+  trackersList.forEach((tracker) => {
+    normalizeGoalTags(tracker && tracker.tags).forEach((tag) => {
+      const key = getGoalTagKey(tag);
+      if (!key || tagMap.has(key)) {
+        return;
+      }
+      tagMap.set(key, tag);
+    });
+  });
+  return Array.from(tagMap.entries())
+    .sort((a, b) => a[1].localeCompare(b[1], undefined, { sensitivity: "base" }));
+}
+
+function syncPeriodTagFilterOptions(periodName, selectElement) {
+  if (!selectElement) {
+    return;
+  }
+  const currentValue = normalizeGoalTagFilterValue(periodGoalFilterState[periodName] ? periodGoalFilterState[periodName].tag : "all");
+  const options = getSortedGoalTagOptions(getTrackersMatchingTypeStatusFilters(periodName));
+  selectElement.innerHTML = `
+    <option value="all">All Tags</option>
+    ${options.map(([key, label]) => `<option value="${escapeAttr(key)}">${escapeHtml(label)}</option>`).join("")}
+  `;
+  const hasCurrentOption = currentValue === "all" || options.some(([key]) => key === currentValue);
+  if (periodGoalFilterState[periodName]) {
+    periodGoalFilterState[periodName].tag = hasCurrentOption ? currentValue : "all";
+    selectElement.value = periodGoalFilterState[periodName].tag;
+  } else {
+    selectElement.value = hasCurrentOption ? currentValue : "all";
+  }
 }
 
 function renderBucketListViewTab() {
@@ -4194,6 +4746,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const showOverlayPoints = Boolean(options.showOverlayPoints);
   const showProjectionPoints = Boolean(options.showProjectionPoints);
   const large = Boolean(options.large);
+  const goalHit = Boolean(options.goalHit);
   const unit = normalizeGoalUnit(options.unit);
   const domainDays = Math.max(Number(options.domainDays) || 0, series.length || 1, 1);
   const projection = options.projection && Array.isArray(options.projection.points) ? options.projection : null;
@@ -4233,13 +4786,14 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const innerWidth = width - padLeft - padRight;
   const innerHeight = height - padTop - padBottom;
   const axisY = height - padBottom;
-  const maxValue = Math.max(
+  const maxDataValue = Math.max(
     target,
     cumulative[cumulative.length - 1] || 0,
     overlayCumulative[overlayCumulative.length - 1] || 0,
     projectionPoints[projectionPoints.length - 1] ? projectionPoints[projectionPoints.length - 1].cumulative : 0,
     1
   );
+  const maxValue = addAmount(maxDataValue, Math.max(maxDataValue * 0.08, 0.5));
 
   const toX = (index) => {
     if (domainDays === 1) {
@@ -4290,7 +4844,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
         return `
           <circle
             data-point="1"
-            class="graph-point"
+            class="graph-point${goalHit ? " graph-point-hit" : ""}"
             cx="${cx}"
             cy="${cy}"
             r="${large ? "3.8" : "3.4"}"
@@ -4334,7 +4888,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
         return `
           <circle
             data-point="1"
-            class="graph-point graph-point-projection"
+            class="graph-point graph-point-projection${goalHit ? " graph-point-hit" : ""}"
             cx="${cx}"
             cy="${cy}"
             r="${large ? "3.6" : "3.2"}"
@@ -4352,7 +4906,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     ? `<span class="legend-item"><span class="legend-swatch legend-overlay"></span>Previous Period</span>`
     : "";
   const projectionLegend = projectionPoints.length > 1
-    ? `<span class="legend-item"><span class="legend-swatch legend-projection"></span>Projection</span>`
+    ? `<span class="legend-item"><span class="legend-swatch legend-projection${goalHit ? " legend-projection-hit" : ""}"></span>Projection</span>`
     : "";
 
   const rangeLabel = `${formatDate(range.start)} to ${formatDate(range.end)}`;
@@ -4360,7 +4914,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   return `
     <div class="graph-head">
       <div class="graph-legend">
-        <span class="legend-item"><span class="legend-swatch legend-line"></span>Current Cumulative</span>
+        <span class="legend-item"><span class="legend-swatch legend-line${goalHit ? " legend-line-hit" : ""}"></span>Current Cumulative</span>
         ${overlayLegend}
         ${projectionLegend}
         <span class="legend-item"><span class="legend-swatch legend-target"></span>Target</span>
@@ -4376,8 +4930,8 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
         <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${axisY}" class="graph-axis" />
         ${xTickMarkup}
         ${overlaySeries ? `<polyline points="${overlayLinePoints}" class="graph-line-overlay"></polyline>` : ""}
-        ${projectionPoints.length > 1 ? `<polyline points="${projectionLinePoints}" class="graph-line-projection"></polyline>` : ""}
-        <polyline points="${linePoints}" class="graph-line"></polyline>
+        ${projectionPoints.length > 1 ? `<polyline points="${projectionLinePoints}" class="graph-line-projection${goalHit ? " graph-line-projection-hit" : ""}"></polyline>` : ""}
+        <polyline points="${linePoints}" class="graph-line${goalHit ? " graph-line-hit" : ""}"></polyline>
         ${overlayDots}
         ${projectionDots}
         ${pointDots}
@@ -4448,7 +5002,7 @@ function getProjectionLineEnabled(periodName, trackerId) {
     return false;
   }
   if (typeof projectionLineState[periodName][trackerId] !== "boolean") {
-    projectionLineState[periodName][trackerId] = false;
+    projectionLineState[periodName][trackerId] = true;
   }
   return projectionLineState[periodName][trackerId];
 }
@@ -4588,7 +5142,9 @@ function getLastLoggedDateKey(index, trackerId, range) {
 }
 
 function shouldAllowProjectionLine(periodName, range, now) {
-  return periodName === "month" && range.start <= now && now <= range.end;
+  return (periodName === "week" || periodName === "month" || periodName === "year")
+    && range.start <= now
+    && now <= range.end;
 }
 
 function getProjectionSeries(index, trackerId, fullRange, chartRange, chartSeries) {
@@ -4691,6 +5247,18 @@ function sumTrackerRange(index, trackerId, range) {
     current.setDate(current.getDate() + 1);
   }
   return total;
+}
+
+function hasTrackerEntriesForEveryDay(index, trackerId, range) {
+  const current = new Date(range.start);
+  while (current <= range.end) {
+    const key = `${trackerId}|${getDateKey(current)}`;
+    if (!index.trackerDateTotals.has(key)) {
+      return false;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return true;
 }
 
 function getWeekRange(date) {
@@ -4809,6 +5377,7 @@ function buildCloudPayload() {
     schedules,
     periodSnapshots,
     rewards,
+    rewardPurchases,
     pointTransactions,
     settings
   };
@@ -4861,8 +5430,9 @@ function isLocalDataEmpty() {
   const hasSchedules = Array.isArray(schedules) && schedules.length > 0;
   const hasSnapshots = Array.isArray(periodSnapshots) && periodSnapshots.length > 0;
   const hasRewards = Array.isArray(rewards) && rewards.length > 0;
+  const hasRewardPurchases = Array.isArray(rewardPurchases) && rewardPurchases.length > 0;
   const hasTransactions = Array.isArray(pointTransactions) && pointTransactions.length > 0;
-  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasSnapshots || hasRewards || hasTransactions);
+  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
 }
 
 function writeCloudPayloadToLocal(payload) {
@@ -4878,6 +5448,7 @@ function writeCloudPayloadToLocal(payload) {
     [SCHEDULE_STORAGE_KEY, Array.isArray(payload.schedules) ? payload.schedules : []],
     [PERIOD_SNAPSHOTS_STORAGE_KEY, Array.isArray(payload.periodSnapshots) ? payload.periodSnapshots : []],
     [REWARDS_STORAGE_KEY, Array.isArray(payload.rewards) ? payload.rewards : []],
+    [REWARD_PURCHASES_STORAGE_KEY, Array.isArray(payload.rewardPurchases) ? payload.rewardPurchases : []],
     [POINT_TRANSACTIONS_STORAGE_KEY, Array.isArray(payload.pointTransactions) ? payload.pointTransactions : []],
     [SETTINGS_STORAGE_KEY, payload.settings && typeof payload.settings === "object" ? payload.settings : getDefaultSettings()]
   ];
@@ -4998,22 +5569,29 @@ function resetStateForSignedOutUser() {
   schedules = [];
   periodSnapshots = [];
   rewards = [];
+  rewardPurchases = [];
   pointTransactions = [];
   settings = getDefaultSettings();
   activeTab = "manage";
+  entryMode = "solo";
   entryListSortMode = "date_desc";
   entryListTypeFilter = "all";
   entryListStatusFilter = "active";
   entryListBucketFilter = "all";
   periodGoalFilterState.week.type = "all";
   periodGoalFilterState.week.status = "active";
+  periodGoalFilterState.week.tag = "all";
   periodGoalFilterState.month.type = "all";
   periodGoalFilterState.month.status = "active";
+  periodGoalFilterState.month.tag = "all";
   periodGoalFilterState.year.type = "all";
   periodGoalFilterState.year.status = "active";
+  periodGoalFilterState.year.tag = "all";
   bucketListGoalStatusFilter = "active";
   bucketListItemStatusFilter = "all";
   scheduleWeekAnchor = normalizeDate(new Date());
+  weekEntryAnchor = normalizeDate(new Date());
+  weekEntryStatusMessage = "";
   resetViewAnchors();
   resetGoalCompareState();
   resetScheduleTileFlips();
@@ -5037,6 +5615,18 @@ function resetStateForSignedOutUser() {
   );
   if (csvUploadStatus) {
     csvUploadStatus.textContent = "";
+  }
+  if (entryModeSelect) {
+    entryModeSelect.value = entryMode;
+  }
+  if (weekGoalTagFilterSelect) {
+    weekGoalTagFilterSelect.value = periodGoalFilterState.week.tag;
+  }
+  if (monthGoalTagFilterSelect) {
+    monthGoalTagFilterSelect.value = periodGoalFilterState.month.tag;
+  }
+  if (yearGoalTagFilterSelect) {
+    yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
   }
 }
 
@@ -5073,17 +5663,23 @@ function initializeAuth() {
 
 function resetUiStateForLogin() {
   activeTab = "manage";
+  entryMode = "solo";
   scheduleWeekAnchor = normalizeDate(new Date());
+  weekEntryAnchor = normalizeDate(new Date());
+  weekEntryStatusMessage = "";
   entryListSortMode = "date_desc";
   entryListTypeFilter = "all";
   entryListStatusFilter = "active";
   entryListBucketFilter = "all";
   periodGoalFilterState.week.type = "all";
   periodGoalFilterState.week.status = "active";
+  periodGoalFilterState.week.tag = "all";
   periodGoalFilterState.month.type = "all";
   periodGoalFilterState.month.status = "active";
+  periodGoalFilterState.month.tag = "all";
   periodGoalFilterState.year.type = "all";
   periodGoalFilterState.year.status = "active";
+  periodGoalFilterState.year.tag = "all";
   bucketListGoalStatusFilter = "active";
   bucketListItemStatusFilter = "all";
   resetViewAnchors();
@@ -5167,11 +5763,17 @@ function resetUiStateForLogin() {
   if (entryListBucketFilterSelect) {
     entryListBucketFilterSelect.value = entryListBucketFilter;
   }
+  if (entryModeSelect) {
+    entryModeSelect.value = entryMode;
+  }
   if (weekGoalTypeFilterSelect) {
     weekGoalTypeFilterSelect.value = periodGoalFilterState.week.type;
   }
   if (weekGoalStatusFilterSelect) {
     weekGoalStatusFilterSelect.value = periodGoalFilterState.week.status;
+  }
+  if (weekGoalTagFilterSelect) {
+    weekGoalTagFilterSelect.value = periodGoalFilterState.week.tag;
   }
   if (monthGoalTypeFilterSelect) {
     monthGoalTypeFilterSelect.value = periodGoalFilterState.month.type;
@@ -5179,11 +5781,17 @@ function resetUiStateForLogin() {
   if (monthGoalStatusFilterSelect) {
     monthGoalStatusFilterSelect.value = periodGoalFilterState.month.status;
   }
+  if (monthGoalTagFilterSelect) {
+    monthGoalTagFilterSelect.value = periodGoalFilterState.month.tag;
+  }
   if (yearGoalTypeFilterSelect) {
     yearGoalTypeFilterSelect.value = periodGoalFilterState.year.type;
   }
   if (yearGoalStatusFilterSelect) {
     yearGoalStatusFilterSelect.value = periodGoalFilterState.year.status;
+  }
+  if (yearGoalTagFilterSelect) {
+    yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
   }
   if (bucketListGoalStatusFilterSelect) {
     bucketListGoalStatusFilterSelect.value = bucketListGoalStatusFilter;
@@ -5203,6 +5811,7 @@ function resetViewAnchors() {
   weekViewAnchor = normalizeDate(now);
   monthViewAnchor = new Date(now.getFullYear(), now.getMonth(), 1);
   yearViewAnchor = new Date(now.getFullYear(), 0, 1);
+  weekEntryAnchor = normalizeDate(now);
 }
 
 function importEntriesFromCsv(text) {
@@ -5691,6 +6300,7 @@ function migrateLegacyDataToUser() {
     SETTINGS_STORAGE_KEY,
     PERIOD_SNAPSHOTS_STORAGE_KEY,
     REWARDS_STORAGE_KEY,
+    REWARD_PURCHASES_STORAGE_KEY,
     POINT_TRANSACTIONS_STORAGE_KEY,
     LEGACY_TRACKERS_KEY
   ];
@@ -5716,6 +6326,7 @@ function initializeData() {
     schedules = [];
     periodSnapshots = [];
     rewards = [];
+    rewardPurchases = [];
     pointTransactions = [];
     settings = getDefaultSettings();
     return;
@@ -5732,6 +6343,7 @@ function initializeData() {
   schedules = loadSchedules().filter((item) => trackers.some((tracker) => tracker.id === item.trackerId));
   periodSnapshots = loadPeriodSnapshots();
   rewards = loadRewards();
+  rewardPurchases = loadRewardPurchases();
   pointTransactions = loadPointTransactions();
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
@@ -5790,6 +6402,7 @@ function loadTrackers() {
         goalType: trackerGoalType,
         archived: item.archived === true || item.archived === "true" || item.archived === 1,
         priority: normalizeGoalPriority(item.priority, 0),
+        tags: normalizeGoalTags(item.tags),
         unit: loadedUnit,
         weeklyGoal: normalizePositiveInt(item.weeklyGoal, defaultWeeklyGoal),
         monthlyGoal,
@@ -5991,7 +6604,8 @@ function loadPeriodSnapshots() {
           closedAt: normalizedClosedAt,
           filters: {
             type: normalizeGoalTypeFilterValue(filterRaw.type),
-            status: normalizeGoalStatusFilterValue(filterRaw.status)
+            status: normalizeGoalStatusFilterValue(filterRaw.status),
+            tag: normalizeGoalTagFilterValue(filterRaw.tag)
           },
           summary: {
             completion: Math.max(Math.round(Number(summaryRaw.completion) || 0), 0),
@@ -6036,6 +6650,42 @@ function loadRewards() {
         notes: typeof item.notes === "string" ? item.notes.trim() : "",
         createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
       }));
+  } catch {
+    return [];
+  }
+}
+
+function loadRewardPurchases() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(REWARD_PURCHASES_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => {
+        const statusRaw = String(item.status || "").toLowerCase();
+        const status = statusRaw === "closed" || statusRaw === "refunded" ? statusRaw : "active";
+        return {
+          id: item.id,
+          rewardId: typeof item.rewardId === "string" ? item.rewardId : "",
+          rewardName: typeof item.rewardName === "string" && item.rewardName.trim() ? item.rewardName.trim() : "Reward",
+          cost: normalizePositiveInt(item.cost, 1),
+          notes: typeof item.notes === "string" ? item.notes.trim() : "",
+          status,
+          purchasedAt: typeof item.purchasedAt === "string" ? item.purchasedAt : new Date().toISOString(),
+          closedAt: typeof item.closedAt === "string" ? item.closedAt : "",
+          refundedAt: typeof item.refundedAt === "string" ? item.refundedAt : ""
+        };
+      })
+      .sort((a, b) => String(b.purchasedAt || "").localeCompare(String(a.purchasedAt || "")));
   } catch {
     return [];
   }
@@ -6194,6 +6844,15 @@ function saveRewards() {
   queueCloudSync();
 }
 
+function saveRewardPurchases() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(REWARD_PURCHASES_STORAGE_KEY), JSON.stringify(rewardPurchases));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
+}
+
 function savePointTransactions() {
   if (!currentUser) {
     return;
@@ -6299,6 +6958,46 @@ function normalizeGoalStatusFilterValue(value) {
   return "active";
 }
 
+function getGoalTagKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeGoalTags(value) {
+  const parts = Array.isArray(value)
+    ? value
+    : String(value || "").split(/[,\n;|]/g);
+  const normalized = [];
+  const seen = new Set();
+  parts.forEach((part) => {
+    const trimmed = String(part || "").trim().replace(/\s+/g, " ");
+    if (!trimmed) {
+      return;
+    }
+    const key = getGoalTagKey(trimmed);
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    normalized.push(trimmed.slice(0, 30));
+  });
+  return normalized.slice(0, 12);
+}
+
+function formatGoalTags(value) {
+  return normalizeGoalTags(value).join(", ");
+}
+
+function normalizeGoalTagFilterValue(value) {
+  if (value === "all") {
+    return "all";
+  }
+  const key = getGoalTagKey(value);
+  return key || "all";
+}
+
 function normalizeBucketStatusFilterValue(value) {
   if (value === "closed") {
     return "closed";
@@ -6309,7 +7008,7 @@ function normalizeBucketStatusFilterValue(value) {
   return "all";
 }
 
-function bindPeriodGoalFilters(periodName, typeSelect, statusSelect) {
+function bindPeriodGoalFilters(periodName, typeSelect, statusSelect, tagSelect) {
   if (!periodGoalFilterState[periodName]) {
     return;
   }
@@ -6322,6 +7021,12 @@ function bindPeriodGoalFilters(periodName, typeSelect, statusSelect) {
   if (statusSelect) {
     statusSelect.addEventListener("change", () => {
       periodGoalFilterState[periodName].status = normalizeGoalStatusFilterValue(statusSelect.value);
+      renderPeriodTabs();
+    });
+  }
+  if (tagSelect) {
+    tagSelect.addEventListener("change", () => {
+      periodGoalFilterState[periodName].tag = normalizeGoalTagFilterValue(tagSelect.value);
       renderPeriodTabs();
     });
   }
@@ -6385,6 +7090,69 @@ function formatCheckInCadence(value) {
 function normalizeGoalUnit(value) {
   const unit = String(value || "").trim();
   return unit || "units";
+}
+
+function normalizeEntryMode(value) {
+  return value === "week" ? "week" : "solo";
+}
+
+function getStandardEntryTrackers() {
+  return trackers.filter((tracker) => normalizeGoalType(tracker.goalType) !== "bucket" && !tracker.archived);
+}
+
+function formatEditableAmount(value) {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  if (!Number.isFinite(rounded)) {
+    return "";
+  }
+  return String(rounded);
+}
+
+function buildWeekEntryValuesMap(standardTrackers, weekDateKeys) {
+  const values = new Map();
+  const trackerIds = new Set(standardTrackers.map((tracker) => tracker.id));
+  const dateKeys = new Set(weekDateKeys);
+
+  entries.forEach((entry) => {
+    if (!entry || !trackerIds.has(entry.trackerId) || !dateKeys.has(entry.date)) {
+      return;
+    }
+    const key = `${entry.trackerId}|${entry.date}`;
+    const prior = values.get(key) || { amount: 0, hasEntry: false };
+    values.set(key, {
+      amount: addAmount(prior.amount, Number(entry.amount || 0)),
+      hasEntry: true
+    });
+  });
+
+  return values;
+}
+
+function parseWeekEntryInputValue(rawValue, tracker) {
+  const type = normalizeGoalType(tracker && tracker.goalType);
+  if (isBinaryGoalType(type)) {
+    const normalized = String(rawValue || "").toLowerCase();
+    if (!normalized) {
+      return { valid: true, amount: null };
+    }
+    if (normalized === "yes") {
+      return { valid: true, amount: 1 };
+    }
+    if (normalized === "no") {
+      return { valid: true, amount: 0 };
+    }
+    return { valid: false, amount: null };
+  }
+
+  const raw = String(rawValue || "").trim();
+  if (!raw) {
+    return { valid: true, amount: null };
+  }
+  const normalized = normalizePositiveAmount(raw, -1);
+  if (normalized < 0) {
+    return { valid: false, amount: null };
+  }
+  return { valid: true, amount: normalized };
 }
 
 function updateGoalTypeFields() {
