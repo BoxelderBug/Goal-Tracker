@@ -884,7 +884,7 @@ textarea {
 }
 
 #manage-table {
-  min-width: 980px;
+  min-width: 1060px;
 }
 
 #checkin-table {
@@ -1884,7 +1884,9 @@ strong.pace-off,
 }
 
 .empty-state::before {
-  content: "No data yet";
+  content: "No data yet:";
+  display: inline-block;
+  margin-right: 6px;
   font-family: "Sora", sans-serif;
   font-size: 0.85rem;
   letter-spacing: 0.04em;
@@ -2062,7 +2064,7 @@ strong.pace-off,
   }
 
   #manage-table {
-    min-width: 840px;
+    min-width: 920px;
   }
 
   #checkin-table {

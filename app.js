@@ -62,6 +62,7 @@ const goalForm = document.querySelector("#goal-form");
 const goalName = document.querySelector("#goal-name");
 const goalType = document.querySelector("#goal-type");
 const goalUnit = document.querySelector("#goal-unit");
+const goalPriority = document.querySelector("#goal-priority");
 const goalWeekly = document.querySelector("#goal-weekly");
 const goalMonthly = document.querySelector("#goal-monthly");
 const goalYearly = document.querySelector("#goal-yearly");
@@ -618,6 +619,7 @@ goalForm.addEventListener("submit", (event) => {
   const name = goalName.value.trim();
   const lockedUnit = getLockedUnitForGoalType(normalizedGoalType);
   const unit = lockedUnit || normalizeGoalUnit(goalUnit.value);
+  const priority = normalizeGoalPriority(goalPriority ? goalPriority.value : 0, 0);
   const weeklyGoal = normalizePositiveInt(goalWeekly.value, 1);
   const monthlyGoal = normalizePositiveInt(goalMonthly.value, 1);
   const yearlyGoal = normalizePositiveInt(goalYearly.value, 1);
@@ -633,6 +635,7 @@ goalForm.addEventListener("submit", (event) => {
     name,
     goalType: normalizedGoalType,
     archived: false,
+    priority,
     unit,
     weeklyGoal,
     monthlyGoal,
@@ -648,6 +651,9 @@ goalForm.addEventListener("submit", (event) => {
     goalType.value = "quantity";
   }
   goalUnit.value = "units";
+  if (goalPriority) {
+    goalPriority.value = "0";
+  }
   goalWeekly.value = "5";
   goalMonthly.value = "22";
   goalYearly.value = "260";
@@ -693,6 +699,7 @@ if (manageGoalsForm) {
       const nameInput = row.querySelector("input[data-field='name']");
       const goalTypeInput = row.querySelector("select[data-field='goalType']");
       const archivedInput = row.querySelector("select[data-field='archived']");
+      const priorityInput = row.querySelector("input[data-field='priority']");
       const unitInput = row.querySelector("input[data-field='unit']");
       const weeklyInput = row.querySelector("input[data-field='weeklyGoal']");
       const monthlyInput = row.querySelector("input[data-field='monthlyGoal']");
@@ -731,6 +738,7 @@ if (manageGoalsForm) {
         name: nameValue,
         goalType: goalTypeValue,
         archived: statusValue === "archived",
+        priority: normalizeGoalPriority(priorityInput ? priorityInput.value : tracker.priority, tracker.priority),
         unit: unitValue,
         weeklyGoal: normalizePositiveInt(weeklyInput.value, tracker.weeklyGoal),
         monthlyGoal: normalizePositiveInt(monthlyInput.value, tracker.monthlyGoal),
@@ -803,42 +811,6 @@ function removeGoalWithRelatedData(id) {
     closeGraphModal();
   }
 }
-
-manageList.addEventListener("click", (event) => {
-  if (!currentUser) {
-    return;
-  }
-  const archiveButton = event.target.closest("button[data-action='toggle-archive-goal']");
-  if (archiveButton) {
-    const id = String(archiveButton.dataset.id || "");
-    const tracker = trackers.find((item) => item.id === id);
-    if (!tracker) {
-      return;
-    }
-    tracker.archived = !Boolean(tracker.archived);
-    saveTrackers();
-    render();
-    return;
-  }
-  const button = event.target.closest("button[data-action='delete-goal']");
-  if (!button) {
-    return;
-  }
-  const id = button.dataset.id;
-  const tracker = trackers.find((item) => item.id === id);
-  if (!tracker) {
-    return;
-  }
-  const confirmed = confirm(`Delete goal "${tracker.name}"? This also removes related entries and schedule items.`);
-  if (!confirmed) {
-    return;
-  }
-  removeGoalWithRelatedData(id);
-  saveTrackers();
-  saveEntries();
-  saveSchedules();
-  render();
-});
 
 if (manageList) {
   manageList.addEventListener("change", (event) => {
@@ -2507,7 +2479,8 @@ function renderManageGoals() {
   document.querySelectorAll(".goal-points-col").forEach((cell) => {
     cell.hidden = !rewardPointsEnabled;
   });
-  manageList.innerHTML = trackers
+  manageList.innerHTML = [...trackers]
+    .sort(compareTrackersByPriority)
     .map((tracker, index) => `
       <tr class="goal-row" style="--stagger:${index}" data-id="${tracker.id}">
         <td>
@@ -2529,6 +2502,9 @@ function renderManageGoals() {
             <option value="archived" ${tracker.archived ? "selected" : ""}>Archive</option>
             <option value="delete">Delete</option>
           </select>
+        </td>
+        <td>
+          <input data-field="priority" type="number" min="0" max="1000" value="${normalizeGoalPriority(tracker.priority, 0)}" />
         </td>
         <td>
           <input data-field="unit" type="text" maxlength="20" value="${escapeHtml(tracker.unit || "units")}" ${getLockedUnitForGoalType(tracker.goalType) ? "disabled" : ""} required />
@@ -3985,7 +3961,7 @@ function getTrackersForPeriod(periodName) {
       return false;
     }
     return true;
-  });
+  }).sort(compareTrackersByPriority);
 }
 
 function renderBucketListViewTab() {
@@ -5140,6 +5116,9 @@ function resetUiStateForLogin() {
   if (goalUnit) {
     goalUnit.value = "units";
   }
+  if (goalPriority) {
+    goalPriority.value = "0";
+  }
   if (goalRewardWeeklyPoints) {
     goalRewardWeeklyPoints.value = "1";
   }
@@ -5421,6 +5400,25 @@ function normalizeGoalPoints(value, fallback = 1) {
     return Math.max(Math.floor(Number(fallback) || 1), 0);
   }
   return Math.max(Math.floor(numeric), 0);
+}
+
+function normalizeGoalPriority(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return Math.max(Math.floor(Number(fallback) || 0), 0);
+  }
+  return Math.max(Math.min(Math.floor(numeric), 1000), 0);
+}
+
+function compareTrackersByPriority(a, b) {
+  const priorityA = normalizeGoalPriority(a && a.priority, 0);
+  const priorityB = normalizeGoalPriority(b && b.priority, 0);
+  if (priorityA !== priorityB) {
+    return priorityB - priorityA;
+  }
+  const nameA = String(a && a.name || "");
+  const nameB = String(b && b.name || "");
+  return nameA.localeCompare(nameB);
 }
 
 function normalizeThemeKey(value) {
@@ -5791,6 +5789,7 @@ function loadTrackers() {
         name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Untitled goal",
         goalType: trackerGoalType,
         archived: item.archived === true || item.archived === "true" || item.archived === 1,
+        priority: normalizeGoalPriority(item.priority, 0),
         unit: loadedUnit,
         weeklyGoal: normalizePositiveInt(item.weeklyGoal, defaultWeeklyGoal),
         monthlyGoal,
@@ -6473,7 +6472,7 @@ function getBucketTrackers(goalStatusFilter = "active") {
       return true;
     }
     return normalizedStatusFilter === "archived" ? Boolean(tracker.archived) : !Boolean(tracker.archived);
-  });
+  }).sort(compareTrackersByPriority);
 }
 
 function getBucketStatusMap(bucketTrackers = getBucketTrackers("all")) {

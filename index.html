@@ -151,10 +151,14 @@
               </select>
             </label>
           </div>
-          <div class="form-grid form-grid-2">
+          <div class="form-grid form-grid-3">
             <label>
               Unit
               <input id="goal-unit" type="text" maxlength="20" placeholder="miles, pages, calls" required />
+            </label>
+            <label>
+              Priority
+              <input id="goal-priority" type="number" min="0" max="1000" value="0" />
             </label>
             <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
           </div>
@@ -197,6 +201,7 @@
                   <th>Name</th>
                   <th>Type</th>
                   <th>Status</th>
+                  <th>Priority</th>
                   <th>Unit</th>
                   <th>Weekly</th>
                   <th>Monthly</th>
