@@ -404,7 +404,7 @@ loginForm.addEventListener("submit", async (event) => {
     loginForm.reset();
     showAuthMessage("");
   } catch (error) {
-    const code = String(error && error.code || "");
+    const code = getFirebaseErrorCode(error);
     if (code === "auth/invalid-credential" || code === "auth/user-not-found" || code === "auth/wrong-password") {
       showAuthMessage("Invalid email or password.", true);
       return;
@@ -413,7 +413,7 @@ loginForm.addEventListener("submit", async (event) => {
       showAuthMessage("Too many attempts. Try again in a bit.", true);
       return;
     }
-    showAuthMessage("Unable to sign in right now.", true);
+    showAuthMessage(getFirebaseAuthErrorMessage(error, "Unable to sign in right now."), true);
   }
 });
 
@@ -450,8 +450,14 @@ registerForm.addEventListener("submit", async (event) => {
     showAuthMessage("Passwords do not match.", true);
     return;
   }
+  let credential = null;
   try {
-    const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+    credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+  } catch (error) {
+    showAuthMessage(getFirebaseAuthErrorMessage(error, "Unable to create account right now."), true);
+    return;
+  }
+  try {
     const profileDocRef = doc(firebaseDb, CLOUD_PROFILE_COLLECTION, credential.user.uid);
     await setDoc(profileDocRef, {
       firstName,
@@ -464,16 +470,9 @@ registerForm.addEventListener("submit", async (event) => {
     registerForm.reset();
     showAuthMessage("");
   } catch (error) {
-    const code = String(error && error.code || "");
-    if (code === "auth/email-already-in-use") {
-      showAuthMessage("Email already exists.", true);
-      return;
-    }
-    if (code === "auth/weak-password") {
-      showAuthMessage("Password must be at least 6 characters.", true);
-      return;
-    }
-    showAuthMessage("Unable to create account right now.", true);
+    // Account was created, but Firestore profile sync failed.
+    const code = getFirebaseErrorCode(error);
+    showAuthMessage(code ? `Account created, but profile sync failed (${code}).` : "Account created, but profile sync failed.", true);
   }
 });
 
@@ -4830,37 +4829,43 @@ async function loadCurrentUserProfile(authUser) {
   if (!authUser) {
     return null;
   }
+  const fallbackUsername = getEmailUsernameFallback(authUser.email);
+  const fallbackProfile = {
+    id: authUser.uid,
+    firstName: "",
+    lastName: "",
+    email: normalizeEmail(authUser.email),
+    username: fallbackUsername,
+    usernameKey: getUsernameKey(fallbackUsername),
+    createdAt: new Date().toISOString()
+  };
   if (!firebaseConfigured || !firebaseDb) {
-    return {
-      id: authUser.uid,
-      firstName: "",
-      lastName: "",
-      email: normalizeEmail(authUser.email),
-      username: normalizeUsername(authUser.email ? authUser.email.split("@")[0] : "User"),
-      usernameKey: getUsernameKey(authUser.email ? authUser.email.split("@")[0] : "User"),
-      createdAt: new Date().toISOString()
-    };
+    return fallbackProfile;
   }
   const profileRef = getCloudProfileRef(authUser.uid);
   if (!profileRef) {
-    return null;
+    return fallbackProfile;
   }
-  const snapshot = await getDoc(profileRef);
-  const raw = snapshot.exists() ? (snapshot.data() || {}) : {};
-  const username = normalizeUsername(raw.username) || normalizeUsername(authUser.email ? authUser.email.split("@")[0] : "User");
-  const profile = {
-    id: authUser.uid,
-    firstName: normalizeProfileName(raw.firstName),
-    lastName: normalizeProfileName(raw.lastName),
-    email: normalizeEmail(raw.email || authUser.email || ""),
-    username,
-    usernameKey: getUsernameKey(username),
-    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString()
-  };
-  if (!snapshot.exists()) {
-    await setDoc(profileRef, profile, { merge: true });
+  try {
+    const snapshot = await getDoc(profileRef);
+    const raw = snapshot.exists() ? (snapshot.data() || {}) : {};
+    const username = normalizeUsername(raw.username) || fallbackUsername;
+    const profile = {
+      id: authUser.uid,
+      firstName: normalizeProfileName(raw.firstName),
+      lastName: normalizeProfileName(raw.lastName),
+      email: normalizeEmail(raw.email || authUser.email || ""),
+      username,
+      usernameKey: getUsernameKey(username),
+      createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString()
+    };
+    if (!snapshot.exists()) {
+      await setDoc(profileRef, profile, { merge: true });
+    }
+    return profile;
+  } catch {
+    return fallbackProfile;
   }
-  return profile;
 }
 
 function resetStateForSignedOutUser() {
@@ -5410,6 +5415,42 @@ function getUserDisplayName(user) {
 
 function normalizeUsername(value) {
   return String(value || "").trim();
+}
+
+function getEmailUsernameFallback(emailValue) {
+  const email = normalizeEmail(emailValue);
+  if (!email || !email.includes("@")) {
+    return "User";
+  }
+  const localPart = String(email.split("@")[0] || "").trim();
+  return normalizeUsername(localPart) || "User";
+}
+
+function getFirebaseErrorCode(error) {
+  return String(error && error.code || "").trim();
+}
+
+function getFirebaseAuthErrorMessage(error, fallbackMessage) {
+  const code = getFirebaseErrorCode(error);
+  if (code === "auth/email-already-in-use") {
+    return "Email already exists.";
+  }
+  if (code === "auth/weak-password") {
+    return "Password must be at least 6 characters.";
+  }
+  if (code === "auth/operation-not-allowed") {
+    return "Email/Password auth is not enabled in Firebase Authentication.";
+  }
+  if (code === "auth/invalid-api-key") {
+    return "Invalid Firebase API key. Check firebase-config.js.";
+  }
+  if (code === "auth/network-request-failed") {
+    return "Network error connecting to Firebase. Try again.";
+  }
+  if (code) {
+    return `${fallbackMessage} (${code})`;
+  }
+  return fallbackMessage;
 }
 
 function getUsernameKey(username) {
