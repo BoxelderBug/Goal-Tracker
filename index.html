@@ -22,8 +22,8 @@
 
         <form id="login-form" class="form-block auth-form auth-form-panel" data-auth-form="signin">
           <label>
-            Username
-            <input id="login-username" type="text" maxlength="80" autocomplete="username" required />
+            Email
+            <input id="login-username" type="email" maxlength="120" autocomplete="email" required />
           </label>
           <label>
             Password
@@ -745,6 +745,7 @@
     </div>
   </main>
 
-  <script src="app.js"></script>
+  <script src="firebase-config.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

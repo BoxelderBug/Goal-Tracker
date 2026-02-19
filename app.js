@@ -1,3 +1,19 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
 const TRACKERS_STORAGE_KEY = "goal-tracker-trackers-v3";
 const ENTRIES_STORAGE_KEY = "goal-tracker-entries-v1";
 const CHECKINS_STORAGE_KEY = "goal-tracker-checkins-v1";
@@ -12,6 +28,9 @@ const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CLOUD_LOCAL_UPDATED_AT_KEY = "goal-tracker-cloud-local-updated-v1";
+const CLOUD_PROFILE_COLLECTION = "goalTrackerProfiles";
+const CLOUD_DATA_COLLECTION = "goalTrackerData";
 
 const appShell = document.querySelector("#app-shell");
 const authPanel = document.querySelector("#auth-panel");
@@ -216,6 +235,13 @@ let bucketListGoalStatusFilter = "active";
 let bucketListItemStatusFilter = "all";
 let users = [];
 let currentUser = null;
+let firebaseApp = null;
+let firebaseAuth = null;
+let firebaseDb = null;
+let cloudSyncTimer = null;
+let cloudSyncInFlight = false;
+let suppressCloudSync = false;
+let firebaseConfigured = false;
 const goalCompareState = {
   week: {},
   month: {},
@@ -304,8 +330,13 @@ if (csvUploadStatus) {
   csvUploadStatus.textContent = "";
 }
 updateGoalTypeFields();
-initializeAuth();
 setAuthMode("signin");
+initializeAuth();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    flushCloudSync();
+  }
+});
 
 menuButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -358,37 +389,40 @@ if (authPanel) {
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const username = normalizeUsername(loginUsername.value);
+  const email = normalizeEmail(loginUsername.value);
   const password = String(loginPassword.value || "");
-  if (!username || !password) {
-    showAuthMessage("Enter username and password.", true);
+  if (!firebaseConfigured || !firebaseAuth) {
+    showAuthMessage("Firebase is not configured yet. Add your config in firebase-config.js.", true);
     return;
   }
-
-  const user = users.find((item) => item.usernameKey === getUsernameKey(username));
-  if (!user) {
-    showAuthMessage("Account not found.", true);
+  if (!email || !password) {
+    showAuthMessage("Enter email and password.", true);
     return;
   }
-
-  const passwordHash = await hashPassword(password);
-  if (passwordHash !== user.passwordHash) {
-    showAuthMessage("Invalid password.", true);
-    return;
+  try {
+    await signInWithEmailAndPassword(firebaseAuth, email, password);
+    loginForm.reset();
+    showAuthMessage("");
+  } catch (error) {
+    const code = String(error && error.code || "");
+    if (code === "auth/invalid-credential" || code === "auth/user-not-found" || code === "auth/wrong-password") {
+      showAuthMessage("Invalid email or password.", true);
+      return;
+    }
+    if (code === "auth/too-many-requests") {
+      showAuthMessage("Too many attempts. Try again in a bit.", true);
+      return;
+    }
+    showAuthMessage("Unable to sign in right now.", true);
   }
-
-  currentUser = user;
-  saveSessionUserId(currentUser.id);
-  migrateLegacyDataToUser();
-  initializeData();
-  resetUiStateForLogin();
-  loginForm.reset();
-  showAuthMessage("");
-  render();
 });
 
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!firebaseConfigured || !firebaseAuth || !firebaseDb) {
+    showAuthMessage("Firebase is not configured yet. Add your config in firebase-config.js.", true);
+    return;
+  }
   const firstName = normalizeProfileName(registerFirstName ? registerFirstName.value : "");
   const lastName = normalizeProfileName(registerLastName ? registerLastName.value : "");
   const email = normalizeEmail(registerEmail ? registerEmail.value : "");
@@ -416,78 +450,43 @@ registerForm.addEventListener("submit", async (event) => {
     showAuthMessage("Passwords do not match.", true);
     return;
   }
-  if (users.some((item) => item.usernameKey === usernameKey)) {
-    showAuthMessage("Username already exists.", true);
-    return;
+  try {
+    const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+    const profileDocRef = doc(firebaseDb, CLOUD_PROFILE_COLLECTION, credential.user.uid);
+    await setDoc(profileDocRef, {
+      firstName,
+      lastName,
+      email,
+      username,
+      usernameKey,
+      createdAt: new Date().toISOString()
+    }, { merge: true });
+    registerForm.reset();
+    showAuthMessage("");
+  } catch (error) {
+    const code = String(error && error.code || "");
+    if (code === "auth/email-already-in-use") {
+      showAuthMessage("Email already exists.", true);
+      return;
+    }
+    if (code === "auth/weak-password") {
+      showAuthMessage("Password must be at least 6 characters.", true);
+      return;
+    }
+    showAuthMessage("Unable to create account right now.", true);
   }
-  if (users.some((item) => item.email && item.email.toLowerCase() === email.toLowerCase())) {
-    showAuthMessage("Email already exists.", true);
-    return;
-  }
-
-  const newUser = {
-    id: createId(),
-    firstName,
-    lastName,
-    email,
-    username,
-    usernameKey,
-    passwordHash: await hashPassword(password),
-    createdAt: new Date().toISOString()
-  };
-  users.unshift(newUser);
-  saveUsers();
-  currentUser = newUser;
-  saveSessionUserId(currentUser.id);
-  initializeData();
-  resetUiStateForLogin();
-  registerForm.reset();
-  showAuthMessage("");
-  render();
 });
 
-logoutButton.addEventListener("click", () => {
-  currentUser = null;
-  clearSessionUserId();
-  trackers = [];
-  entries = [];
-  checkIns = [];
-  checkInEntries = [];
-  goalJournalEntries = [];
-  schedules = [];
-  periodSnapshots = [];
-  rewards = [];
-  pointTransactions = [];
-  settings = getDefaultSettings();
-  activeTab = "manage";
-  entryListSortMode = "date_desc";
-  entryListTypeFilter = "all";
-  entryListStatusFilter = "active";
-  entryListBucketFilter = "all";
-  periodGoalFilterState.week.type = "all";
-  periodGoalFilterState.week.status = "active";
-  periodGoalFilterState.month.type = "all";
-  periodGoalFilterState.month.status = "active";
-  periodGoalFilterState.year.type = "all";
-  periodGoalFilterState.year.status = "active";
-  bucketListGoalStatusFilter = "active";
-  bucketListItemStatusFilter = "all";
-  scheduleWeekAnchor = normalizeDate(new Date());
-  resetViewAnchors();
-  resetGoalCompareState();
-  resetScheduleTileFlips();
-  resetGraphPointsState();
-  resetProjectionLineState();
-  resetPeriodAccordionState();
-  resetInlineGraphState();
-  closeGraphModal();
-  setAuthMode("signin");
-  loginForm.reset();
-  registerForm.reset();
-  showAuthMessage("");
-  if (csvUploadStatus) {
-    csvUploadStatus.textContent = "";
+logoutButton.addEventListener("click", async () => {
+  if (firebaseConfigured && firebaseAuth) {
+    try {
+      await signOut(firebaseAuth);
+      return;
+    } catch {
+      // Fall through and reset local state even if sign-out request fails.
+    }
   }
+  resetStateForSignedOutUser();
   render();
 });
 
@@ -4636,23 +4635,319 @@ function normalizeDate(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+function hasFirebaseConfig(config) {
+  if (!config || typeof config !== "object") {
+    return false;
+  }
+  const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
+  return requiredKeys.every((key) => String(config[key] || "").trim().length > 0);
+}
+
+function initializeFirebaseServices() {
+  const config = window.GOAL_TRACKER_FIREBASE_CONFIG;
+  firebaseConfigured = hasFirebaseConfig(config);
+  if (!firebaseConfigured) {
+    return false;
+  }
+  firebaseApp = initializeApp(config);
+  firebaseAuth = getAuth(firebaseApp);
+  firebaseDb = getFirestore(firebaseApp);
+  return true;
+}
+
+function getCloudProfileRef(userId) {
+  if (!firebaseDb || !userId) {
+    return null;
+  }
+  return doc(firebaseDb, CLOUD_PROFILE_COLLECTION, userId);
+}
+
+function getCloudDataRef(userId) {
+  if (!firebaseDb || !userId) {
+    return null;
+  }
+  return doc(firebaseDb, CLOUD_DATA_COLLECTION, userId);
+}
+
+function loadLocalDataUpdatedAt() {
+  if (!currentUser) {
+    return "";
+  }
+  return String(localStorage.getItem(getScopedStorageKey(CLOUD_LOCAL_UPDATED_AT_KEY)) || "");
+}
+
+function markLocalDataUpdatedAt(timestamp = "") {
+  if (!currentUser || suppressCloudSync) {
+    return;
+  }
+  const value = String(timestamp || new Date().toISOString());
+  localStorage.setItem(getScopedStorageKey(CLOUD_LOCAL_UPDATED_AT_KEY), value);
+}
+
+function buildCloudPayload() {
+  return {
+    schemaVersion: 1,
+    updatedAt: new Date().toISOString(),
+    trackers,
+    entries,
+    checkIns,
+    checkInEntries,
+    goalJournalEntries,
+    schedules,
+    periodSnapshots,
+    rewards,
+    pointTransactions,
+    settings
+  };
+}
+
+function queueCloudSync() {
+  if (!firebaseConfigured || !currentUser || !firebaseDb || suppressCloudSync) {
+    return;
+  }
+  if (cloudSyncTimer) {
+    clearTimeout(cloudSyncTimer);
+  }
+  cloudSyncTimer = setTimeout(() => {
+    flushCloudSync();
+  }, 800);
+}
+
+async function flushCloudSync() {
+  if (!firebaseConfigured || !currentUser || !firebaseDb || suppressCloudSync) {
+    return;
+  }
+  if (cloudSyncInFlight) {
+    queueCloudSync();
+    return;
+  }
+  const dataRef = getCloudDataRef(currentUser.id);
+  if (!dataRef) {
+    return;
+  }
+  cloudSyncInFlight = true;
+  try {
+    const payload = buildCloudPayload();
+    await setDoc(dataRef, {
+      ...payload,
+      serverUpdatedAt: serverTimestamp()
+    }, { merge: true });
+    markLocalDataUpdatedAt(payload.updatedAt);
+  } catch {
+    // Keep local data and retry on next save.
+  } finally {
+    cloudSyncInFlight = false;
+  }
+}
+
+function isLocalDataEmpty() {
+  const hasGoals = Array.isArray(trackers) && trackers.length > 0;
+  const hasEntries = Array.isArray(entries) && entries.length > 0;
+  const hasCheckIns = Array.isArray(checkIns) && checkIns.length > 0;
+  const hasJournal = Array.isArray(goalJournalEntries) && goalJournalEntries.length > 0;
+  const hasSchedules = Array.isArray(schedules) && schedules.length > 0;
+  const hasSnapshots = Array.isArray(periodSnapshots) && periodSnapshots.length > 0;
+  const hasRewards = Array.isArray(rewards) && rewards.length > 0;
+  const hasTransactions = Array.isArray(pointTransactions) && pointTransactions.length > 0;
+  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasSnapshots || hasRewards || hasTransactions);
+}
+
+function writeCloudPayloadToLocal(payload) {
+  if (!currentUser || !payload || typeof payload !== "object") {
+    return;
+  }
+  const keysToWrite = [
+    [TRACKERS_STORAGE_KEY, Array.isArray(payload.trackers) ? payload.trackers : []],
+    [ENTRIES_STORAGE_KEY, Array.isArray(payload.entries) ? payload.entries : []],
+    [CHECKINS_STORAGE_KEY, Array.isArray(payload.checkIns) ? payload.checkIns : []],
+    [CHECKIN_ENTRIES_STORAGE_KEY, Array.isArray(payload.checkInEntries) ? payload.checkInEntries : []],
+    [GOAL_JOURNAL_STORAGE_KEY, Array.isArray(payload.goalJournalEntries) ? payload.goalJournalEntries : []],
+    [SCHEDULE_STORAGE_KEY, Array.isArray(payload.schedules) ? payload.schedules : []],
+    [PERIOD_SNAPSHOTS_STORAGE_KEY, Array.isArray(payload.periodSnapshots) ? payload.periodSnapshots : []],
+    [REWARDS_STORAGE_KEY, Array.isArray(payload.rewards) ? payload.rewards : []],
+    [POINT_TRANSACTIONS_STORAGE_KEY, Array.isArray(payload.pointTransactions) ? payload.pointTransactions : []],
+    [SETTINGS_STORAGE_KEY, payload.settings && typeof payload.settings === "object" ? payload.settings : getDefaultSettings()]
+  ];
+  keysToWrite.forEach(([key, value]) => {
+    localStorage.setItem(getScopedStorageKey(key), JSON.stringify(value));
+  });
+  if (payload.updatedAt) {
+    markLocalDataUpdatedAt(String(payload.updatedAt));
+  }
+}
+
+function normalizeCloudTimestamp(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toISOString();
+}
+
+async function syncCloudDataOnLogin() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return;
+  }
+  const dataRef = getCloudDataRef(currentUser.id);
+  if (!dataRef) {
+    return;
+  }
+  try {
+    const snapshot = await getDoc(dataRef);
+    const localUpdatedAt = normalizeCloudTimestamp(loadLocalDataUpdatedAt());
+    const hasLocalContent = !isLocalDataEmpty();
+    if (!snapshot.exists()) {
+      if (hasLocalContent) {
+        queueCloudSync();
+      }
+      return;
+    }
+    const cloudData = snapshot.data() || {};
+    const cloudUpdatedAt = normalizeCloudTimestamp(cloudData.updatedAt);
+    const shouldPullCloud = !hasLocalContent || (cloudUpdatedAt && (!localUpdatedAt || cloudUpdatedAt > localUpdatedAt));
+    if (!shouldPullCloud) {
+      queueCloudSync();
+      return;
+    }
+    suppressCloudSync = true;
+    writeCloudPayloadToLocal(cloudData);
+    initializeData();
+    suppressCloudSync = false;
+    if (cloudUpdatedAt) {
+      markLocalDataUpdatedAt(cloudUpdatedAt);
+    }
+  } catch {
+    // Leave local cache as source of truth if network fails.
+  } finally {
+    suppressCloudSync = false;
+  }
+}
+
+async function loadCurrentUserProfile(authUser) {
+  if (!authUser) {
+    return null;
+  }
+  if (!firebaseConfigured || !firebaseDb) {
+    return {
+      id: authUser.uid,
+      firstName: "",
+      lastName: "",
+      email: normalizeEmail(authUser.email),
+      username: normalizeUsername(authUser.email ? authUser.email.split("@")[0] : "User"),
+      usernameKey: getUsernameKey(authUser.email ? authUser.email.split("@")[0] : "User"),
+      createdAt: new Date().toISOString()
+    };
+  }
+  const profileRef = getCloudProfileRef(authUser.uid);
+  if (!profileRef) {
+    return null;
+  }
+  const snapshot = await getDoc(profileRef);
+  const raw = snapshot.exists() ? (snapshot.data() || {}) : {};
+  const username = normalizeUsername(raw.username) || normalizeUsername(authUser.email ? authUser.email.split("@")[0] : "User");
+  const profile = {
+    id: authUser.uid,
+    firstName: normalizeProfileName(raw.firstName),
+    lastName: normalizeProfileName(raw.lastName),
+    email: normalizeEmail(raw.email || authUser.email || ""),
+    username,
+    usernameKey: getUsernameKey(username),
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString()
+  };
+  if (!snapshot.exists()) {
+    await setDoc(profileRef, profile, { merge: true });
+  }
+  return profile;
+}
+
+function resetStateForSignedOutUser() {
+  if (cloudSyncTimer) {
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = null;
+  }
+  cloudSyncInFlight = false;
+  suppressCloudSync = false;
+  currentUser = null;
+  trackers = [];
+  entries = [];
+  checkIns = [];
+  checkInEntries = [];
+  goalJournalEntries = [];
+  schedules = [];
+  periodSnapshots = [];
+  rewards = [];
+  pointTransactions = [];
+  settings = getDefaultSettings();
+  activeTab = "manage";
+  entryListSortMode = "date_desc";
+  entryListTypeFilter = "all";
+  entryListStatusFilter = "active";
+  entryListBucketFilter = "all";
+  periodGoalFilterState.week.type = "all";
+  periodGoalFilterState.week.status = "active";
+  periodGoalFilterState.month.type = "all";
+  periodGoalFilterState.month.status = "active";
+  periodGoalFilterState.year.type = "all";
+  periodGoalFilterState.year.status = "active";
+  bucketListGoalStatusFilter = "active";
+  bucketListItemStatusFilter = "all";
+  scheduleWeekAnchor = normalizeDate(new Date());
+  resetViewAnchors();
+  resetGoalCompareState();
+  resetScheduleTileFlips();
+  resetGraphPointsState();
+  resetProjectionLineState();
+  resetPeriodAccordionState();
+  resetInlineGraphState();
+  closeGraphModal();
+  setAuthMode("signin");
+  if (loginForm) {
+    loginForm.reset();
+  }
+  if (registerForm) {
+    registerForm.reset();
+  }
+  showAuthMessage(
+    firebaseConfigured ? "" : "Add your Firebase config in firebase-config.js to enable cloud sync.",
+    !firebaseConfigured
+  );
+  if (csvUploadStatus) {
+    csvUploadStatus.textContent = "";
+  }
+}
+
 function initializeAuth() {
   users = loadUsers();
-  const sessionUserId = loadSessionUserId();
-  currentUser = users.find((user) => user.id === sessionUserId) || null;
-  if (sessionUserId && !currentUser) {
-    clearSessionUserId();
-  }
-  if (!currentUser) {
-    settings = getDefaultSettings();
+  const hasFirebase = initializeFirebaseServices();
+  if (!hasFirebase || !firebaseAuth) {
+    resetStateForSignedOutUser();
     render();
     return;
   }
 
-  migrateLegacyDataToUser();
-  initializeData();
-  resetUiStateForLogin();
-  render();
+  onAuthStateChanged(firebaseAuth, async (authUser) => {
+    if (!authUser) {
+      resetStateForSignedOutUser();
+      render();
+      return;
+    }
+
+    try {
+      currentUser = await loadCurrentUserProfile(authUser);
+      migrateLegacyDataToUser();
+      initializeData();
+      await syncCloudDataOnLogin();
+      resetUiStateForLogin();
+      render();
+    } catch {
+      resetStateForSignedOutUser();
+      showAuthMessage("Unable to load account data.", true);
+      render();
+    }
+  });
 }
 
 function resetUiStateForLogin() {
@@ -5637,6 +5932,8 @@ function saveTrackers() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(TRACKERS_STORAGE_KEY), JSON.stringify(trackers));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveEntries() {
@@ -5644,6 +5941,8 @@ function saveEntries() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(ENTRIES_STORAGE_KEY), JSON.stringify(entries));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveCheckIns() {
@@ -5651,6 +5950,8 @@ function saveCheckIns() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(CHECKINS_STORAGE_KEY), JSON.stringify(checkIns));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveCheckInEntries() {
@@ -5658,6 +5959,8 @@ function saveCheckInEntries() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(CHECKIN_ENTRIES_STORAGE_KEY), JSON.stringify(checkInEntries));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveGoalJournalEntries() {
@@ -5665,6 +5968,8 @@ function saveGoalJournalEntries() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(GOAL_JOURNAL_STORAGE_KEY), JSON.stringify(goalJournalEntries));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveSchedules() {
@@ -5672,6 +5977,8 @@ function saveSchedules() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(SCHEDULE_STORAGE_KEY), JSON.stringify(schedules));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function savePeriodSnapshots() {
@@ -5679,6 +5986,8 @@ function savePeriodSnapshots() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(PERIOD_SNAPSHOTS_STORAGE_KEY), JSON.stringify(periodSnapshots));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveRewards() {
@@ -5686,6 +5995,8 @@ function saveRewards() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(REWARDS_STORAGE_KEY), JSON.stringify(rewards));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function savePointTransactions() {
@@ -5693,6 +6004,8 @@ function savePointTransactions() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(POINT_TRANSACTIONS_STORAGE_KEY), JSON.stringify(pointTransactions));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function saveSettings() {
@@ -5700,6 +6013,8 @@ function saveSettings() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(SETTINGS_STORAGE_KEY), JSON.stringify(settings));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
 }
 
 function createId() {
