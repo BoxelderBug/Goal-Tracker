@@ -5450,6 +5450,21 @@ function getFirebaseAuthErrorMessage(error, fallbackMessage) {
   if (code) {
     return `${fallbackMessage} (${code})`;
   }
+  const rawMessage = String(error && error.message || "").trim();
+  if (rawMessage) {
+    return `${fallbackMessage} (${rawMessage})`;
+  }
+  const nestedMessage = String(
+    error
+    && error.customData
+    && error.customData._tokenResponse
+    && error.customData._tokenResponse.error
+    && error.customData._tokenResponse.error.message
+    || ""
+  ).trim();
+  if (nestedMessage) {
+    return `${fallbackMessage} (${nestedMessage})`;
+  }
   return fallbackMessage;
 }
 
