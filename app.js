@@ -38,12 +38,14 @@ const loginForm = document.querySelector("#login-form");
 const registerForm = document.querySelector("#register-form");
 const loginUsername = document.querySelector("#login-username");
 const loginPassword = document.querySelector("#login-password");
+const loginShowPassword = document.querySelector("#login-show-password");
 const registerFirstName = document.querySelector("#register-first-name");
 const registerLastName = document.querySelector("#register-last-name");
 const registerEmail = document.querySelector("#register-email");
 const registerUsername = document.querySelector("#register-username");
 const registerPassword = document.querySelector("#register-password");
 const registerPasswordConfirm = document.querySelector("#register-password-confirm");
+const registerShowPassword = document.querySelector("#register-show-password");
 const authMessage = document.querySelector("#auth-message");
 const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authForms = document.querySelectorAll("[data-auth-form]");
@@ -53,6 +55,8 @@ const activeUserLabel = document.querySelector("#active-user-label");
 const menuButtons = document.querySelectorAll(".menu-btn");
 const dropdowns = document.querySelectorAll("[data-dropdown]");
 const tabPanels = document.querySelectorAll(".tab-panel");
+const tabStripPanel = document.querySelector(".tab-strip-panel");
+const mobileMenuToggle = document.querySelector("#mobile-menu-toggle");
 
 const goalForm = document.querySelector("#goal-form");
 const goalName = document.querySelector("#goal-name");
@@ -332,9 +336,87 @@ if (csvUploadStatus) {
 updateGoalTypeFields();
 setAuthMode("signin");
 initializeAuth();
+applyPasswordVisibilityToggle();
+setMobileMenuOpen(false);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     flushCloudSync();
+  }
+});
+
+function closeAllDropdownMenus() {
+  dropdowns.forEach((dropdown) => {
+    dropdown.classList.remove("open");
+  });
+}
+
+function isMobileMenuMode() {
+  return window.matchMedia("(max-width: 760px)").matches;
+}
+
+function setMobileMenuOpen(open) {
+  if (!tabStripPanel || !mobileMenuToggle) {
+    return;
+  }
+  const shouldOpen = Boolean(open && isMobileMenuMode());
+  tabStripPanel.classList.toggle("mobile-menu-open", shouldOpen);
+  mobileMenuToggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+  mobileMenuToggle.textContent = shouldOpen ? "Close Menu" : "Menu";
+  if (!shouldOpen) {
+    closeAllDropdownMenus();
+  }
+}
+
+if (mobileMenuToggle) {
+  mobileMenuToggle.addEventListener("click", () => {
+    const currentlyOpen = tabStripPanel ? tabStripPanel.classList.contains("mobile-menu-open") : false;
+    setMobileMenuOpen(!currentlyOpen);
+  });
+}
+
+window.addEventListener("resize", () => {
+  if (!isMobileMenuMode()) {
+    setMobileMenuOpen(false);
+  }
+});
+
+dropdowns.forEach((dropdown) => {
+  const toggle = dropdown.querySelector("[data-dropdown-toggle]");
+  if (!toggle) {
+    return;
+  }
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const shouldOpen = !dropdown.classList.contains("open");
+    closeAllDropdownMenus();
+    if (shouldOpen) {
+      dropdown.classList.add("open");
+    }
+  });
+  dropdown.querySelectorAll(".menu-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      closeAllDropdownMenus();
+    });
+  });
+});
+
+document.addEventListener("click", (event) => {
+  if (isMobileMenuMode() && tabStripPanel && !event.target.closest(".tab-strip-panel")) {
+    setMobileMenuOpen(false);
+  }
+  if (mobileMenuToggle && event.target === mobileMenuToggle) {
+    return;
+  }
+  if (!event.target.closest("[data-dropdown]")) {
+    closeAllDropdownMenus();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeAllDropdownMenus();
+    setMobileMenuOpen(false);
   }
 });
 
@@ -343,6 +425,7 @@ menuButtons.forEach((button) => {
     if (!currentUser) {
       return;
     }
+    closeAllDropdownMenus();
     activeTab = button.dataset.tab;
     if (!isBucketListEnabled() && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
       activeTab = "entry";
@@ -361,6 +444,9 @@ menuButtons.forEach((button) => {
     renderTabs();
     if (activeTab === "goal-schedule") {
       renderGoalScheduleTab();
+    }
+    if (isMobileMenuMode()) {
+      setMobileMenuOpen(false);
     }
   });
 });
@@ -387,6 +473,28 @@ if (authPanel) {
   });
 }
 
+function applyPasswordVisibilityToggle() {
+  const loginVisible = Boolean(loginShowPassword && loginShowPassword.checked);
+  if (loginPassword) {
+    loginPassword.type = loginVisible ? "text" : "password";
+  }
+  const registerVisible = Boolean(registerShowPassword && registerShowPassword.checked);
+  if (registerPassword) {
+    registerPassword.type = registerVisible ? "text" : "password";
+  }
+  if (registerPasswordConfirm) {
+    registerPasswordConfirm.type = registerVisible ? "text" : "password";
+  }
+}
+
+if (loginShowPassword) {
+  loginShowPassword.addEventListener("change", applyPasswordVisibilityToggle);
+}
+
+if (registerShowPassword) {
+  registerShowPassword.addEventListener("change", applyPasswordVisibilityToggle);
+}
+
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const email = normalizeEmail(loginUsername.value);
@@ -402,6 +510,7 @@ loginForm.addEventListener("submit", async (event) => {
   try {
     await signInWithEmailAndPassword(firebaseAuth, email, password);
     loginForm.reset();
+    applyPasswordVisibilityToggle();
     showAuthMessage("");
   } catch (error) {
     const code = getFirebaseErrorCode(error);
@@ -468,6 +577,7 @@ registerForm.addEventListener("submit", async (event) => {
       createdAt: new Date().toISOString()
     }, { merge: true });
     registerForm.reset();
+    applyPasswordVisibilityToggle();
     showAuthMessage("");
   } catch (error) {
     // Account was created, but Firestore profile sync failed.
@@ -566,6 +676,8 @@ if (manageGoalsForm) {
     }
 
     const updates = new Map();
+    const deleteIds = new Set();
+    const deleteNames = [];
     for (const row of rows) {
       const id = row.dataset.id;
       if (!id) {
@@ -591,6 +703,15 @@ if (manageGoalsForm) {
         continue;
       }
 
+      const statusValue = archivedInput
+        ? String(archivedInput.value || "active")
+        : (tracker.archived ? "archived" : "active");
+      if (statusValue === "delete") {
+        deleteIds.add(id);
+        deleteNames.push(tracker.name);
+        continue;
+      }
+
       const nameValue = String(nameInput.value || "").trim();
       const goalTypeValue = normalizeGoalType(goalTypeInput ? goalTypeInput.value : tracker.goalType);
       const lockedUnit = getLockedUnitForGoalType(goalTypeValue);
@@ -608,7 +729,7 @@ if (manageGoalsForm) {
       updates.set(id, {
         name: nameValue,
         goalType: goalTypeValue,
-        archived: archivedInput ? archivedInput.value === "archived" : Boolean(tracker.archived),
+        archived: statusValue === "archived",
         unit: unitValue,
         weeklyGoal: normalizePositiveInt(weeklyInput.value, tracker.weeklyGoal),
         monthlyGoal: normalizePositiveInt(monthlyInput.value, tracker.monthlyGoal),
@@ -628,6 +749,16 @@ if (manageGoalsForm) {
       });
     }
 
+    if (deleteIds.size > 0) {
+      const prompt = deleteNames.length === 1
+        ? `Delete goal "${deleteNames[0]}"? This also removes related entries and schedule items.`
+        : `Delete ${deleteIds.size} goals? This also removes related entries and schedule items.`;
+      const confirmed = confirm(prompt);
+      if (!confirmed) {
+        return;
+      }
+    }
+
     trackers = trackers.map((tracker) => {
       const update = updates.get(tracker.id);
       if (!update) {
@@ -639,9 +770,37 @@ if (manageGoalsForm) {
       };
     });
 
+    if (deleteIds.size > 0) {
+      deleteIds.forEach((id) => {
+        removeGoalWithRelatedData(id);
+      });
+      saveEntries();
+      saveSchedules();
+    }
     saveTrackers();
     render();
   });
+}
+
+function removeGoalWithRelatedData(id) {
+  trackers = trackers.filter((item) => item.id !== id);
+  entries = entries.filter((entry) => entry.trackerId !== id);
+  schedules = schedules.filter((item) => item.trackerId !== id);
+  Object.keys(goalCompareState).forEach((periodName) => {
+    delete goalCompareState[periodName][id];
+  });
+  Object.keys(graphPointsState).forEach((periodName) => {
+    delete graphPointsState[periodName][id];
+  });
+  Object.keys(projectionLineState).forEach((periodName) => {
+    delete projectionLineState[periodName][id];
+  });
+  Object.keys(inlineGraphState).forEach((periodName) => {
+    delete inlineGraphState[periodName][id];
+  });
+  if (graphModalState.trackerId === id) {
+    closeGraphModal();
+  }
 }
 
 manageList.addEventListener("click", (event) => {
@@ -673,24 +832,7 @@ manageList.addEventListener("click", (event) => {
   if (!confirmed) {
     return;
   }
-  trackers = trackers.filter((item) => item.id !== id);
-  entries = entries.filter((entry) => entry.trackerId !== id);
-  schedules = schedules.filter((item) => item.trackerId !== id);
-  Object.keys(goalCompareState).forEach((periodName) => {
-    delete goalCompareState[periodName][id];
-  });
-  Object.keys(graphPointsState).forEach((periodName) => {
-    delete graphPointsState[periodName][id];
-  });
-  Object.keys(projectionLineState).forEach((periodName) => {
-    delete projectionLineState[periodName][id];
-  });
-  Object.keys(inlineGraphState).forEach((periodName) => {
-    delete inlineGraphState[periodName][id];
-  });
-  if (graphModalState.trackerId === id) {
-    closeGraphModal();
-  }
+  removeGoalWithRelatedData(id);
   saveTrackers();
   saveEntries();
   saveSchedules();
@@ -2383,7 +2525,8 @@ function renderManageGoals() {
         <td>
           <select data-field="archived">
             <option value="active" ${tracker.archived ? "" : "selected"}>Active</option>
-            <option value="archived" ${tracker.archived ? "selected" : ""}>Archived</option>
+            <option value="archived" ${tracker.archived ? "selected" : ""}>Archive</option>
+            <option value="delete">Delete</option>
           </select>
         </td>
         <td>
@@ -2406,12 +2549,6 @@ function renderManageGoals() {
         </td>
         <td class="goal-points-col" ${rewardPointsEnabled ? "" : "hidden"}>
           <input data-field="goalPointsYearly" type="number" min="0" max="1000000" value="${getTrackerGoalPointsForPeriod(tracker, "year")}" ${rewardPointsEnabled ? "" : "disabled"} />
-        </td>
-        <td class="goal-actions-cell">
-          <div class="actions actions-inline">
-            <button class="btn" type="button" data-action="toggle-archive-goal" data-id="${tracker.id}">${tracker.archived ? "Unarchive" : "Archive"}</button>
-            <button class="btn btn-danger" type="button" data-action="delete-goal" data-id="${tracker.id}">Delete</button>
-          </div>
         </td>
       </tr>
     `)
@@ -4915,6 +5052,8 @@ function resetStateForSignedOutUser() {
   if (registerForm) {
     registerForm.reset();
   }
+  setMobileMenuOpen(false);
+  applyPasswordVisibilityToggle();
   showAuthMessage(
     firebaseConfigured ? "" : "Add your Firebase config in firebase-config.js to enable cloud sync.",
     !firebaseConfigured
@@ -6634,3 +6773,4 @@ function escapeHtml(value) {
 function escapeAttr(value) {
   return escapeHtml(value).replaceAll("\n", " ");
 }
+

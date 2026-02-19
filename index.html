@@ -29,6 +29,10 @@
             Password
             <input id="login-password" type="password" maxlength="120" autocomplete="current-password" required />
           </label>
+          <label class="check-inline auth-show-password">
+            <input id="login-show-password" type="checkbox" />
+            Show password
+          </label>
           <button class="btn btn-primary" type="submit">Sign In</button>
           <p class="auth-form-note">Need an account? <button class="auth-link-btn" type="button" data-auth-mode-target="register">Create one</button></p>
         </form>
@@ -60,6 +64,10 @@
             Confirm Password
             <input id="register-password-confirm" type="password" maxlength="120" autocomplete="new-password" required />
           </label>
+          <label class="check-inline auth-show-password">
+            <input id="register-show-password" type="checkbox" />
+            Show password
+          </label>
           <button class="btn" type="submit">Create Account</button>
           <p class="auth-form-note">Already have an account? <button class="auth-link-btn" type="button" data-auth-mode-target="signin">Sign in</button></p>
         </form>
@@ -81,7 +89,8 @@
       </header>
 
       <section class="panel tab-strip-panel">
-        <div class="nav-groups" aria-label="Tracker sections">
+        <button id="mobile-menu-toggle" class="btn mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-groups">Menu</button>
+        <div id="main-nav-groups" class="nav-groups" aria-label="Tracker sections">
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
             <div class="dropdown-menu">
@@ -195,7 +204,6 @@
                   <th class="goal-points-col" hidden>W Pts</th>
                   <th class="goal-points-col" hidden>M Pts</th>
                   <th class="goal-points-col" hidden>Y Pts</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="manage-list"></tbody>
