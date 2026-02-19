@@ -112,6 +112,7 @@ const settingsForm = document.querySelector("#settings-form");
 const weekStartSelect = document.querySelector("#week-start-select");
 const compareDefaultSelect = document.querySelector("#compare-default-select");
 const projectionAverageSelect = document.querySelector("#projection-average-select");
+const bucketListEnabledSelect = document.querySelector("#bucket-list-enabled-select");
 const themeSelect = document.querySelector("#theme-select");
 
 const weekRangeLabel = document.querySelector("#week-range");
@@ -208,8 +209,7 @@ const graphModalState = {
   period: "",
   trackerId: "",
   avgMode: "week",
-  historyMetric: "avg",
-  historyScope: "total"
+  historyMetric: "avg"
 };
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
@@ -275,6 +275,11 @@ menuButtons.forEach((button) => {
       return;
     }
     activeTab = button.dataset.tab;
+    if (!isBucketListEnabled() && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
+      activeTab = "entry";
+      renderTabs();
+      return;
+    }
     if (activeTab === "goal-schedule") {
       scheduleWeekAnchor = normalizeDate(new Date());
       resetScheduleTileFlips();
@@ -452,6 +457,9 @@ goalForm.addEventListener("submit", (event) => {
     return;
   }
   const normalizedGoalType = normalizeGoalType(goalType ? goalType.value : "quantity");
+  if (normalizedGoalType === "bucket" && !isBucketListEnabled()) {
+    return;
+  }
   const name = goalName.value.trim();
   const lockedUnit = getLockedUnitForGoalType(normalizedGoalType);
   const unit = lockedUnit || normalizeGoalUnit(goalUnit.value);
@@ -629,7 +637,11 @@ if (manageList) {
     if (!unitInput) {
       return;
     }
-    const normalizedType = normalizeGoalType(typeSelect.value);
+    let normalizedType = normalizeGoalType(typeSelect.value);
+    if (normalizedType === "bucket" && !isBucketListEnabled()) {
+      typeSelect.value = "quantity";
+      normalizedType = "quantity";
+    }
     const lockedUnit = getLockedUnitForGoalType(normalizedType);
     unitInput.disabled = Boolean(lockedUnit);
     if (lockedUnit) {
@@ -1178,16 +1190,17 @@ settingsForm.addEventListener("submit", (event) => {
   settings.projectionAverageSource = normalizeProjectionAverageSource(
     projectionAverageSelect ? projectionAverageSelect.value : settings.projectionAverageSource
   );
+  settings.bucketListEnabled = bucketListEnabledSelect ? bucketListEnabledSelect.value !== "off" : true;
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
   if (priorCompareDefault !== settings.compareToLastDefault) {
     resetGoalCompareState();
   }
   saveSettings();
   applyTheme();
+  applyBucketListFeatureVisibility();
   scheduleWeekAnchor = normalizeDate(new Date());
   resetScheduleTileFlips();
-  renderGoalScheduleTab();
-  renderPeriodTabs();
+  render();
 });
 
 weekPrevButton.addEventListener("click", () => {
@@ -1380,13 +1393,6 @@ function handleGraphCardActions(event) {
     return;
   }
 
-  const historyScopeButton = event.target.closest("button[data-action='set-history-scope']");
-  if (historyScopeButton) {
-    graphModalState.historyScope = normalizeHistoryScope(historyScopeButton.dataset.scope);
-    renderGraphModal();
-    return;
-  }
-
   const toggleButton = event.target.closest("button[data-action='toggle-inline-chart']");
   if (toggleButton) {
     const period = toggleButton.dataset.period;
@@ -1413,7 +1419,6 @@ function handleGraphCardActions(event) {
   graphModalState.trackerId = id;
   graphModalState.avgMode = period;
   graphModalState.historyMetric = "avg";
-  graphModalState.historyScope = "total";
   renderPeriodTabs();
 }
 
@@ -1423,7 +1428,6 @@ function closeGraphModal() {
   graphModalState.trackerId = "";
   graphModalState.avgMode = "week";
   graphModalState.historyMetric = "avg";
-  graphModalState.historyScope = "total";
   if (graphModal) {
     graphModal.classList.add("hidden");
     graphModal.setAttribute("aria-hidden", "true");
@@ -1500,8 +1504,7 @@ function renderGraphModal() {
     series,
     index,
     normalizePeriodMode(graphModalState.avgMode || graphModalState.period),
-    normalizeHistoryMetric(graphModalState.historyMetric),
-    normalizeHistoryScope(graphModalState.historyScope)
+    normalizeHistoryMetric(graphModalState.historyMetric)
   );
   graphModalBody.innerHTML += createExpandedTargetStatusMarkup(tracker, index, normalizeDate(new Date()));
 
@@ -1598,7 +1601,7 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
   };
 }
 
-function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric, historyScope) {
+function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric) {
   const unit = normalizeGoalUnit(tracker.unit);
   const today = normalizeDate(new Date());
   const todayKey = getDateKey(today);
@@ -1617,9 +1620,8 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
 
   const selectedMode = normalizePeriodMode(averageMode || periodName);
   const selectedMetric = normalizeHistoryMetric(historyMetric);
-  const selectedScope = normalizeHistoryScope(historyScope);
   const averageRange = getCurrentRangeForMode(selectedMode, today);
-  const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric, selectedScope);
+  const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric);
   const maxMetricValue = Math.max(...history.map((item) => item.value), 1);
   const barsMarkup = history.map((item) => {
     const heightPct = Math.max(Math.round((item.value / maxMetricValue) * 100), 2);
@@ -1647,26 +1649,14 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   `).join("");
 
   const metricButtons = [
-    { key: "avg", label: "Avg" },
-    { key: "sum", label: "Sum" }
+    { key: "avg", label: "Average" },
+    { key: "total", label: "Total" }
   ].map((item) => `
     <button
       type="button"
       class="avg-mode-btn${selectedMetric === item.key ? " active" : ""}"
       data-action="set-history-metric"
       data-metric="${item.key}"
-    >${item.label}</button>
-  `).join("");
-
-  const scopeButtons = [
-    { key: "total", label: "Total" },
-    { key: "to-date", label: "To Date" }
-  ].map((item) => `
-    <button
-      type="button"
-      class="avg-mode-btn${selectedScope === item.key ? " active" : ""}"
-      data-action="set-history-scope"
-      data-scope="${item.key}"
     >${item.label}</button>
   `).join("");
 
@@ -1682,8 +1672,7 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const currentWeekLabel = getPeriodRecordLabel("week", getWeekRange(today));
   const currentMonthLabel = getPeriodRecordLabel("month", getMonthRange(today));
   const currentYearLabel = getPeriodRecordLabel("year", getYearRange(today));
-  const historyTitle = selectedMetric === "sum" ? "Sum vs last 5 periods" : "Average/day vs last 5 periods";
-  const scopeText = selectedScope === "to-date" ? "To Date" : "Total";
+  const historyTitle = selectedMetric === "total" ? "Total vs last 5 periods" : "Average/day vs last 5 periods";
 
   return `
     <section class="deep-dive-insights">
@@ -1712,12 +1701,11 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
           </div>
         </article>
         <article class="deep-dive-card">
-          <p class="target-status-line"><strong>${escapeHtml(historyTitle)} (${escapeHtml(scopeText)})</strong> (${escapeHtml(unit)})</p>
+          <p class="target-status-line"><strong>${escapeHtml(historyTitle)}</strong> (${escapeHtml(unit)})</p>
           <div class="avg-controls-row">
             <div class="avg-mode-toggle">${modeButtons}</div>
             <div class="avg-mode-toggle avg-mode-toggle-right">
               <div class="avg-mode-group">${metricButtons}</div>
-              <div class="avg-mode-group">${scopeButtons}</div>
             </div>
           </div>
           <div class="avg-bars">${barsMarkup}</div>
@@ -1735,17 +1723,10 @@ function normalizePeriodMode(value) {
 }
 
 function normalizeHistoryMetric(value) {
-  if (value === "sum") {
-    return "sum";
+  if (value === "total" || value === "sum") {
+    return "total";
   }
   return "avg";
-}
-
-function normalizeHistoryScope(value) {
-  if (value === "to-date") {
-    return "to-date";
-  }
-  return "total";
 }
 
 function getCurrentRangeForMode(mode, date) {
@@ -1914,32 +1895,20 @@ function formatCurrentPeriodText(total, unit, label) {
   return `${formatAmountWithUnit(total, unit)} | ${label}`;
 }
 
-function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg", scopeType = "total") {
+function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg") {
   const selectedMetric = normalizeHistoryMetric(metricType);
-  const selectedScope = normalizeHistoryScope(scopeType);
   const history = [];
   const firstEntryDate = getTrackerFirstEntryDate(tracker.id);
-  const compareDate = normalizeDate(new Date());
-  const currentElapsedDays = Math.max(getElapsedDays(currentRange, compareDate), 1);
   for (let offset = 0; offset <= 5; offset += 1) {
-    const range = shiftPeriodRange(periodName, currentRange, offset);
+    const compareRange = shiftPeriodRange(periodName, currentRange, offset);
     if (offset > 0) {
-      if (!firstEntryDate || range.end < firstEntryDate) {
+      if (!firstEntryDate || compareRange.end < firstEntryDate) {
         break;
       }
     }
-    let compareRange = range;
-    if (selectedScope === "to-date") {
-      const cappedDays = Math.min(currentElapsedDays, getRangeDays(range));
-      compareRange = {
-        start: new Date(range.start),
-        end: addDays(range.start, cappedDays - 1)
-      };
-    }
-
     const total = sumTrackerRange(index, tracker.id, compareRange);
     const days = getRangeDays(compareRange);
-    const value = selectedMetric === "sum" ? total : safeDivide(total, days);
+    const value = selectedMetric === "total" ? total : safeDivide(total, days);
     history.push({
       offset,
       value,
@@ -2103,6 +2072,7 @@ function render() {
     return;
   }
   updateGoalTypeFields();
+  applyBucketListFeatureVisibility();
   renderTabs();
   renderManageGoals();
   renderCheckinsTab();
@@ -2184,6 +2154,7 @@ function renderManageGoals() {
   if (manageTable) {
     manageTable.style.display = "table";
   }
+  const bucketTypeEnabled = isBucketListEnabled();
   manageList.innerHTML = trackers
     .map((tracker, index) => `
       <tr class="goal-row" style="--stagger:${index}" data-id="${tracker.id}">
@@ -2194,7 +2165,9 @@ function renderManageGoals() {
           <select data-field="goalType">
             <option value="quantity" ${normalizeGoalType(tracker.goalType) === "quantity" ? "selected" : ""}>Quantity</option>
             <option value="yesno" ${normalizeGoalType(tracker.goalType) === "yesno" ? "selected" : ""}>Yes/No</option>
-            <option value="bucket" ${normalizeGoalType(tracker.goalType) === "bucket" ? "selected" : ""}>Bucket List</option>
+            ${(bucketTypeEnabled || normalizeGoalType(tracker.goalType) === "bucket")
+              ? `<option value="bucket" ${normalizeGoalType(tracker.goalType) === "bucket" ? "selected" : ""}>Bucket List</option>`
+              : ""}
             <option value="floating" ${normalizeGoalType(tracker.goalType) === "floating" ? "selected" : ""}>Floating</option>
           </select>
         </td>
@@ -2422,6 +2395,14 @@ function renderGoalJournalTab() {
 
 function renderBucketEntryTab() {
   if (!bucketEntryGoal || !recentBucketEntriesList || !recentBucketEntriesEmpty || !bucketEntryDate) {
+    return;
+  }
+  if (!isBucketListEnabled()) {
+    bucketEntryGoal.innerHTML = "<option value=''>Bucket List is turned off</option>";
+    bucketEntryGoal.disabled = true;
+    recentBucketEntriesList.innerHTML = "";
+    recentBucketEntriesEmpty.textContent = "Turn Bucket List on in Settings to use this view.";
+    recentBucketEntriesEmpty.style.display = "block";
     return;
   }
   const submitButton = bucketEntryForm ? bucketEntryForm.querySelector("button[type='submit']") : null;
@@ -3118,6 +3099,13 @@ function getTrackersForPeriod(periodName) {
 
 function renderBucketListViewTab() {
   if (!bucketListSummary || !bucketListViewList || !bucketListViewEmpty) {
+    return;
+  }
+  if (!isBucketListEnabled()) {
+    bucketListSummary.innerHTML = "";
+    bucketListViewList.innerHTML = "";
+    bucketListViewEmpty.textContent = "Turn Bucket List on in Settings to use this view.";
+    bucketListViewEmpty.style.display = "block";
     return;
   }
   if (!currentUser) {
@@ -3940,6 +3928,9 @@ function resetUiStateForLogin() {
   if (projectionAverageSelect) {
     projectionAverageSelect.value = normalizeProjectionAverageSource(settings.projectionAverageSource);
   }
+  if (bucketListEnabledSelect) {
+    bucketListEnabledSelect.value = isBucketListEnabled() ? "on" : "off";
+  }
   if (themeSelect) {
     themeSelect.value = normalizeThemeKey(settings.theme);
   }
@@ -4207,6 +4198,7 @@ function getDefaultSettings() {
     weekStart: "monday",
     compareToLastDefault: true,
     projectionAverageSource: "period",
+    bucketListEnabled: true,
     theme: "teal"
   };
 }
@@ -4227,6 +4219,33 @@ function normalizeThemeKey(value) {
 function applyTheme() {
   const theme = normalizeThemeKey(settings && settings.theme);
   document.body.setAttribute("data-theme", theme);
+}
+
+function isBucketListEnabled() {
+  return !(settings && settings.bucketListEnabled === false);
+}
+
+function applyBucketListFeatureVisibility() {
+  const enabled = isBucketListEnabled();
+  document.querySelectorAll("[data-tab='bucket-entry'], [data-tab='bucket-list']").forEach((button) => {
+    button.hidden = !enabled;
+  });
+  document.querySelectorAll("[data-tab-panel='bucket-entry'], [data-tab-panel='bucket-list']").forEach((panel) => {
+    if (!enabled) {
+      panel.hidden = true;
+      panel.classList.remove("active");
+    }
+  });
+  document.querySelectorAll("option[value='bucket']").forEach((option) => {
+    option.hidden = !enabled;
+  });
+  if (!enabled && goalType && goalType.value === "bucket") {
+    goalType.value = "quantity";
+    updateGoalTypeFields();
+  }
+  if (!enabled && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
+    activeTab = "entry";
+  }
 }
 
 function showAuthMessage(message, isError = false) {
@@ -4634,6 +4653,7 @@ function loadSettings() {
       weekStart: parsed && parsed.weekStart === "sunday" ? "sunday" : "monday",
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
       projectionAverageSource: normalizeProjectionAverageSource(parsed && parsed.projectionAverageSource),
+      bucketListEnabled: !(parsed && parsed.bucketListEnabled === false),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
   } catch {
@@ -5027,6 +5047,9 @@ function getBucketCloseEntryMap() {
 }
 
 function closeOutBucketGoal(trackerId, dateValue, notes = "") {
+  if (!isBucketListEnabled()) {
+    return { success: false, message: "Bucket List is turned off in Settings." };
+  }
   const tracker = trackers.find((item) => item.id === trackerId);
   if (!tracker || normalizeGoalType(tracker.goalType) !== "bucket") {
     return { success: false, message: "Select a valid bucket goal." };
@@ -5061,6 +5084,9 @@ function closeOutBucketGoal(trackerId, dateValue, notes = "") {
 }
 
 function reopenBucketGoal(trackerId, dateValue, notes = "") {
+  if (!isBucketListEnabled()) {
+    return { success: false, message: "Bucket List is turned off in Settings." };
+  }
   const tracker = trackers.find((item) => item.id === trackerId);
   if (!tracker || normalizeGoalType(tracker.goalType) !== "bucket") {
     return { success: false, message: "Select a valid bucket goal." };
