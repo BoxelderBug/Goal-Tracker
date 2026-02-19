@@ -111,6 +111,7 @@
           </div>
 
           <button class="btn menu-btn top-tab" type="button" data-tab="goal-journal">Goal Journal</button>
+          <button id="point-store-menu-btn" class="btn menu-btn top-tab" type="button" data-tab="point-store" hidden>Point Store</button>
 
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
@@ -162,6 +163,20 @@
               <input id="goal-yearly" type="number" min="1" max="1000000" value="260" required />
             </label>
           </div>
+          <div id="goal-reward-points-wrap" class="form-grid form-grid-3" hidden>
+            <label>
+              Weekly Points
+              <input id="goal-reward-weekly-points" type="number" min="0" max="1000000" value="1" />
+            </label>
+            <label>
+              Monthly Points
+              <input id="goal-reward-monthly-points" type="number" min="0" max="1000000" value="3" />
+            </label>
+            <label>
+              Yearly Points
+              <input id="goal-reward-yearly-points" type="number" min="0" max="1000000" value="10" />
+            </label>
+          </div>
           <button class="btn btn-primary" type="submit">Add Goal</button>
         </form>
 
@@ -177,6 +192,9 @@
                   <th>Weekly</th>
                   <th>Monthly</th>
                   <th>Yearly</th>
+                  <th class="goal-points-col" hidden>W Pts</th>
+                  <th class="goal-points-col" hidden>M Pts</th>
+                  <th class="goal-points-col" hidden>Y Pts</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -566,6 +584,31 @@
       <p id="bucket-list-view-empty" class="empty-state">No bucket list goals yet.</p>
     </section>
 
+      <section class="panel tab-panel" data-tab-panel="point-store" hidden>
+      <h2>Point Store</h2>
+      <p class="muted">Spend your point bank on rewards you define in Settings.</p>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <p>Point Bank</p>
+          <strong id="point-bank-balance">0</strong>
+        </article>
+        <article class="summary-card">
+          <p>Total Earned</p>
+          <strong id="point-bank-earned">0</strong>
+        </article>
+        <article class="summary-card">
+          <p>Total Spent</p>
+          <strong id="point-bank-spent">0</strong>
+        </article>
+      </div>
+      <h3>Rewards</h3>
+      <ul id="point-store-reward-list" class="card-list"></ul>
+      <p id="point-store-reward-empty" class="empty-state">No rewards yet. Add rewards in Settings.</p>
+      <h3>Point Bank History</h3>
+      <ul id="point-store-history-list" class="card-list compact-list"></ul>
+      <p id="point-store-history-empty" class="empty-state">No point activity yet.</p>
+    </section>
+
       <section class="panel tab-panel" data-tab-panel="checkins" hidden>
       <h2>Manage Check-ins</h2>
       <p class="muted">Create periodic check-ins that are tracked once per week, month, or year.</p>
@@ -631,20 +674,13 @@
             <option value="year">Year To Date</option>
           </select>
         </label>
-        <div class="form-grid form-grid-3">
-          <label>
-            Weekly Goal Points
-            <input id="weekly-goal-points" type="number" min="0" step="1" value="1" />
-          </label>
-          <label>
-            Monthly Goal Points
-            <input id="monthly-goal-points" type="number" min="0" step="1" value="1" />
-          </label>
-          <label>
-            Yearly Goal Points
-            <input id="yearly-goal-points" type="number" min="0" step="1" value="1" />
-          </label>
-        </div>
+        <label>
+          Reward Points System
+          <select id="reward-points-enabled-select">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </label>
         <label>
           Bucket List Feature
           <select id="bucket-list-enabled-select">
@@ -667,7 +703,33 @@
         </label>
         <button class="btn" type="submit">Save Settings</button>
       </form>
-      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, projection behavior, goal completion points, bucket list visibility, and your saved color theme.</p>
+      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, projection behavior, reward points, bucket list visibility, and your saved color theme.</p>
+
+      <section id="point-store-settings-section" class="snapshot-panel" hidden>
+        <div class="snapshot-panel-head">
+          <h3>Point Store Rewards</h3>
+          <p class="muted small">Define rewards and costs for spending your point bank.</p>
+        </div>
+        <form id="reward-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Reward Name
+              <input id="reward-name" type="text" maxlength="90" placeholder="Movie night, new game, coffee run..." required />
+            </label>
+            <label>
+              Cost (Points)
+              <input id="reward-cost" type="number" min="1" max="1000000" value="10" required />
+            </label>
+            <label>
+              Notes
+              <input id="reward-notes" type="text" maxlength="160" placeholder="Optional reward details" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Reward</button>
+        </form>
+        <ul id="reward-settings-list" class="card-list"></ul>
+        <p id="reward-settings-empty" class="empty-state">No rewards configured yet.</p>
+      </section>
       </section>
 
       <div id="graph-modal" class="graph-modal hidden" aria-hidden="true">

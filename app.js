@@ -6,6 +6,8 @@ const GOAL_JOURNAL_STORAGE_KEY = "goal-tracker-goal-journal-v1";
 const SCHEDULE_STORAGE_KEY = "goal-tracker-schedules-v1";
 const SETTINGS_STORAGE_KEY = "goal-tracker-settings-v1";
 const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
+const REWARDS_STORAGE_KEY = "goal-tracker-rewards-v1";
+const POINT_TRANSACTIONS_STORAGE_KEY = "goal-tracker-point-transactions-v1";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
@@ -40,6 +42,10 @@ const goalUnit = document.querySelector("#goal-unit");
 const goalWeekly = document.querySelector("#goal-weekly");
 const goalMonthly = document.querySelector("#goal-monthly");
 const goalYearly = document.querySelector("#goal-yearly");
+const goalRewardPointsWrap = document.querySelector("#goal-reward-points-wrap");
+const goalRewardWeeklyPoints = document.querySelector("#goal-reward-weekly-points");
+const goalRewardMonthlyPoints = document.querySelector("#goal-reward-monthly-points");
+const goalRewardYearlyPoints = document.querySelector("#goal-reward-yearly-points");
 const manageList = document.querySelector("#manage-list");
 const manageEmpty = document.querySelector("#manage-empty");
 const manageTable = document.querySelector("#manage-table");
@@ -113,11 +119,24 @@ const settingsForm = document.querySelector("#settings-form");
 const weekStartSelect = document.querySelector("#week-start-select");
 const compareDefaultSelect = document.querySelector("#compare-default-select");
 const projectionAverageSelect = document.querySelector("#projection-average-select");
-const weeklyGoalPointsInput = document.querySelector("#weekly-goal-points");
-const monthlyGoalPointsInput = document.querySelector("#monthly-goal-points");
-const yearlyGoalPointsInput = document.querySelector("#yearly-goal-points");
+const rewardPointsEnabledSelect = document.querySelector("#reward-points-enabled-select");
 const bucketListEnabledSelect = document.querySelector("#bucket-list-enabled-select");
 const themeSelect = document.querySelector("#theme-select");
+const pointStoreMenuButton = document.querySelector("#point-store-menu-btn");
+const pointStoreSettingsSection = document.querySelector("#point-store-settings-section");
+const rewardForm = document.querySelector("#reward-form");
+const rewardName = document.querySelector("#reward-name");
+const rewardCost = document.querySelector("#reward-cost");
+const rewardNotes = document.querySelector("#reward-notes");
+const rewardSettingsList = document.querySelector("#reward-settings-list");
+const rewardSettingsEmpty = document.querySelector("#reward-settings-empty");
+const pointBankBalance = document.querySelector("#point-bank-balance");
+const pointBankEarned = document.querySelector("#point-bank-earned");
+const pointBankSpent = document.querySelector("#point-bank-spent");
+const pointStoreRewardList = document.querySelector("#point-store-reward-list");
+const pointStoreRewardEmpty = document.querySelector("#point-store-reward-empty");
+const pointStoreHistoryList = document.querySelector("#point-store-history-list");
+const pointStoreHistoryEmpty = document.querySelector("#point-store-history-empty");
 
 const weekRangeLabel = document.querySelector("#week-range");
 const monthRangeLabel = document.querySelector("#month-range");
@@ -175,6 +194,8 @@ let checkInEntries = [];
 let goalJournalEntries = [];
 let schedules = [];
 let periodSnapshots = [];
+let rewards = [];
+let pointTransactions = [];
 let settings = getDefaultSettings();
 let activeTab = "manage";
 let entryListSortMode = "date_desc";
@@ -294,6 +315,11 @@ menuButtons.forEach((button) => {
     activeTab = button.dataset.tab;
     if (!isBucketListEnabled() && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
       activeTab = "entry";
+      renderTabs();
+      return;
+    }
+    if (!isRewardPointsEnabled() && activeTab === "point-store") {
+      activeTab = "manage";
       renderTabs();
       return;
     }
@@ -429,6 +455,9 @@ logoutButton.addEventListener("click", () => {
   checkInEntries = [];
   goalJournalEntries = [];
   schedules = [];
+  periodSnapshots = [];
+  rewards = [];
+  pointTransactions = [];
   settings = getDefaultSettings();
   activeTab = "manage";
   entryListSortMode = "date_desc";
@@ -483,6 +512,9 @@ goalForm.addEventListener("submit", (event) => {
   const weeklyGoal = normalizePositiveInt(goalWeekly.value, 1);
   const monthlyGoal = normalizePositiveInt(goalMonthly.value, 1);
   const yearlyGoal = normalizePositiveInt(goalYearly.value, 1);
+  const rewardWeeklyPoints = normalizeGoalPoints(goalRewardWeeklyPoints ? goalRewardWeeklyPoints.value : 1, 1);
+  const rewardMonthlyPoints = normalizeGoalPoints(goalRewardMonthlyPoints ? goalRewardMonthlyPoints.value : 3, 3);
+  const rewardYearlyPoints = normalizeGoalPoints(goalRewardYearlyPoints ? goalRewardYearlyPoints.value : 10, 10);
   if (!name || !unit || weeklyGoal < 1 || monthlyGoal < 1 || yearlyGoal < 1) {
     return;
   }
@@ -495,7 +527,10 @@ goalForm.addEventListener("submit", (event) => {
     unit,
     weeklyGoal,
     monthlyGoal,
-    yearlyGoal
+    yearlyGoal,
+    goalPointsWeekly: rewardWeeklyPoints,
+    goalPointsMonthly: rewardMonthlyPoints,
+    goalPointsYearly: rewardYearlyPoints
   });
 
   saveTrackers();
@@ -507,6 +542,15 @@ goalForm.addEventListener("submit", (event) => {
   goalWeekly.value = "5";
   goalMonthly.value = "22";
   goalYearly.value = "260";
+  if (goalRewardWeeklyPoints) {
+    goalRewardWeeklyPoints.value = "1";
+  }
+  if (goalRewardMonthlyPoints) {
+    goalRewardMonthlyPoints.value = "3";
+  }
+  if (goalRewardYearlyPoints) {
+    goalRewardYearlyPoints.value = "10";
+  }
   updateGoalTypeFields();
   render();
 });
@@ -542,6 +586,9 @@ if (manageGoalsForm) {
       const weeklyInput = row.querySelector("input[data-field='weeklyGoal']");
       const monthlyInput = row.querySelector("input[data-field='monthlyGoal']");
       const yearlyInput = row.querySelector("input[data-field='yearlyGoal']");
+      const goalPointsWeeklyInput = row.querySelector("input[data-field='goalPointsWeekly']");
+      const goalPointsMonthlyInput = row.querySelector("input[data-field='goalPointsMonthly']");
+      const goalPointsYearlyInput = row.querySelector("input[data-field='goalPointsYearly']");
       if (!nameInput || !unitInput || !weeklyInput || !monthlyInput || !yearlyInput) {
         continue;
       }
@@ -567,7 +614,19 @@ if (manageGoalsForm) {
         unit: unitValue,
         weeklyGoal: normalizePositiveInt(weeklyInput.value, tracker.weeklyGoal),
         monthlyGoal: normalizePositiveInt(monthlyInput.value, tracker.monthlyGoal),
-        yearlyGoal: normalizePositiveInt(yearlyInput.value, tracker.yearlyGoal)
+        yearlyGoal: normalizePositiveInt(yearlyInput.value, tracker.yearlyGoal),
+        goalPointsWeekly: normalizeGoalPoints(
+          goalPointsWeeklyInput ? goalPointsWeeklyInput.value : getTrackerGoalPointsForPeriod(tracker, "week"),
+          getTrackerGoalPointsForPeriod(tracker, "week")
+        ),
+        goalPointsMonthly: normalizeGoalPoints(
+          goalPointsMonthlyInput ? goalPointsMonthlyInput.value : getTrackerGoalPointsForPeriod(tracker, "month"),
+          getTrackerGoalPointsForPeriod(tracker, "month")
+        ),
+        goalPointsYearly: normalizeGoalPoints(
+          goalPointsYearlyInput ? goalPointsYearlyInput.value : getTrackerGoalPointsForPeriod(tracker, "year"),
+          getTrackerGoalPointsForPeriod(tracker, "year")
+        )
       });
     }
 
@@ -1196,6 +1255,111 @@ if (goalJournalList) {
   });
 }
 
+if (rewardForm) {
+  rewardForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser || !isRewardPointsEnabled()) {
+      return;
+    }
+    const name = String(rewardName ? rewardName.value : "").trim();
+    const cost = normalizePositiveInt(rewardCost ? rewardCost.value : 1, 1);
+    const notes = String(rewardNotes ? rewardNotes.value : "").trim();
+    if (!name || cost < 1) {
+      return;
+    }
+    rewards.unshift({
+      id: createId(),
+      name,
+      cost,
+      notes,
+      createdAt: new Date().toISOString()
+    });
+    saveRewards();
+    rewardForm.reset();
+    if (rewardCost) {
+      rewardCost.value = "10";
+    }
+    renderRewardsSettings();
+    renderPointStoreTab();
+  });
+}
+
+if (rewardSettingsList) {
+  rewardSettingsList.addEventListener("click", (event) => {
+    if (!currentUser || !isRewardPointsEnabled()) {
+      return;
+    }
+    const saveButton = event.target.closest("button[data-action='save-reward']");
+    if (saveButton) {
+      const rewardId = String(saveButton.dataset.id || "");
+      const card = saveButton.closest("li[data-reward-id]");
+      if (!rewardId || !card) {
+        return;
+      }
+      const nameInput = card.querySelector("input[data-field='name']");
+      const costInput = card.querySelector("input[data-field='cost']");
+      const notesInput = card.querySelector("input[data-field='notes']");
+      const reward = rewards.find((item) => item.id === rewardId);
+      if (!reward || !nameInput || !costInput || !notesInput) {
+        return;
+      }
+      const nextName = String(nameInput.value || "").trim();
+      const nextCost = normalizePositiveInt(costInput.value, reward.cost);
+      const nextNotes = String(notesInput.value || "").trim();
+      if (!nextName || nextCost < 1) {
+        return;
+      }
+      reward.name = nextName;
+      reward.cost = nextCost;
+      reward.notes = nextNotes;
+      saveRewards();
+      renderRewardsSettings();
+      renderPointStoreTab();
+      return;
+    }
+
+    const deleteButton = event.target.closest("button[data-action='delete-reward']");
+    if (!deleteButton) {
+      return;
+    }
+    const rewardId = String(deleteButton.dataset.id || "");
+    const reward = rewards.find((item) => item.id === rewardId);
+    if (!reward) {
+      return;
+    }
+    const confirmed = confirm(`Delete reward "${reward.name}"?`);
+    if (!confirmed) {
+      return;
+    }
+    rewards = rewards.filter((item) => item.id !== rewardId);
+    saveRewards();
+    renderRewardsSettings();
+    renderPointStoreTab();
+  });
+}
+
+if (pointStoreRewardList) {
+  pointStoreRewardList.addEventListener("click", (event) => {
+    if (!currentUser || !isRewardPointsEnabled()) {
+      return;
+    }
+    const redeemButton = event.target.closest("button[data-action='redeem-reward']");
+    if (!redeemButton) {
+      return;
+    }
+    const rewardId = String(redeemButton.dataset.id || "");
+    const result = redeemReward(rewardId);
+    if (!result.success && result.message) {
+      alert(result.message);
+    }
+    if (result.success) {
+      renderPointStoreTab();
+      renderRewardsSettings();
+      renderAuthState();
+    }
+  });
+}
+
 settingsForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!currentUser) {
@@ -1207,18 +1371,7 @@ settingsForm.addEventListener("submit", (event) => {
   settings.projectionAverageSource = normalizeProjectionAverageSource(
     projectionAverageSelect ? projectionAverageSelect.value : settings.projectionAverageSource
   );
-  settings.weeklyGoalPoints = normalizeGoalPoints(
-    weeklyGoalPointsInput ? weeklyGoalPointsInput.value : settings.weeklyGoalPoints,
-    settings.weeklyGoalPoints
-  );
-  settings.monthlyGoalPoints = normalizeGoalPoints(
-    monthlyGoalPointsInput ? monthlyGoalPointsInput.value : settings.monthlyGoalPoints,
-    settings.monthlyGoalPoints
-  );
-  settings.yearlyGoalPoints = normalizeGoalPoints(
-    yearlyGoalPointsInput ? yearlyGoalPointsInput.value : settings.yearlyGoalPoints,
-    settings.yearlyGoalPoints
-  );
+  settings.rewardPointsEnabled = rewardPointsEnabledSelect ? rewardPointsEnabledSelect.value === "on" : false;
   settings.bucketListEnabled = bucketListEnabledSelect ? bucketListEnabledSelect.value !== "off" : true;
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
   if (priorCompareDefault !== settings.compareToLastDefault) {
@@ -1227,6 +1380,7 @@ settingsForm.addEventListener("submit", (event) => {
   saveSettings();
   applyTheme();
   applyBucketListFeatureVisibility();
+  applyRewardPointsFeatureVisibility();
   scheduleWeekAnchor = normalizeDate(new Date());
   resetScheduleTileFlips();
   render();
@@ -2120,6 +2274,7 @@ function render() {
   }
   updateGoalTypeFields();
   applyBucketListFeatureVisibility();
+  applyRewardPointsFeatureVisibility();
   renderTabs();
   renderManageGoals();
   renderCheckinsTab();
@@ -2131,6 +2286,8 @@ function render() {
   renderGoalScheduleTab();
   renderPeriodTabs();
   renderBucketListViewTab();
+  renderRewardsSettings();
+  renderPointStoreTab();
 }
 
 function renderTabs() {
@@ -2159,8 +2316,11 @@ function renderAuthState() {
   const isAuthenticated = Boolean(currentUser);
   appShell.hidden = !isAuthenticated;
   authPanel.hidden = isAuthenticated;
-  const displayName = isAuthenticated ? getUserDisplayName(currentUser) : "";
-  activeUserLabel.textContent = isAuthenticated ? `Signed in as ${displayName}` : "";
+  const username = isAuthenticated ? getUserDisplayName(currentUser) : "";
+  const pointSuffix = isAuthenticated
+    ? ` | ${formatAmount(getPointBankBalance())} pts`
+    : "";
+  activeUserLabel.textContent = isAuthenticated ? `${username}${pointSuffix}` : "";
   if (isAuthenticated) {
     showAuthMessage("");
   } else if (graphModal) {
@@ -2202,6 +2362,10 @@ function renderManageGoals() {
     manageTable.style.display = "table";
   }
   const bucketTypeEnabled = isBucketListEnabled();
+  const rewardPointsEnabled = isRewardPointsEnabled();
+  document.querySelectorAll(".goal-points-col").forEach((cell) => {
+    cell.hidden = !rewardPointsEnabled;
+  });
   manageList.innerHTML = trackers
     .map((tracker, index) => `
       <tr class="goal-row" style="--stagger:${index}" data-id="${tracker.id}">
@@ -2235,6 +2399,15 @@ function renderManageGoals() {
         </td>
         <td>
           <input data-field="yearlyGoal" type="number" min="1" max="1000000" value="${tracker.yearlyGoal}" required />
+        </td>
+        <td class="goal-points-col" ${rewardPointsEnabled ? "" : "hidden"}>
+          <input data-field="goalPointsWeekly" type="number" min="0" max="1000000" value="${getTrackerGoalPointsForPeriod(tracker, "week")}" ${rewardPointsEnabled ? "" : "disabled"} />
+        </td>
+        <td class="goal-points-col" ${rewardPointsEnabled ? "" : "hidden"}>
+          <input data-field="goalPointsMonthly" type="number" min="0" max="1000000" value="${getTrackerGoalPointsForPeriod(tracker, "month")}" ${rewardPointsEnabled ? "" : "disabled"} />
+        </td>
+        <td class="goal-points-col" ${rewardPointsEnabled ? "" : "hidden"}>
+          <input data-field="goalPointsYearly" type="number" min="0" max="1000000" value="${getTrackerGoalPointsForPeriod(tracker, "year")}" ${rewardPointsEnabled ? "" : "disabled"} />
         </td>
         <td class="goal-actions-cell">
           <div class="actions actions-inline">
@@ -2901,6 +3074,7 @@ function renderPeriodTabs() {
   renderPeriodSnapshots("month", month);
   renderPeriodSnapshots("year", year);
   renderGraphModal();
+  renderAuthState();
 }
 
 function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, targetFn, index) {
@@ -2926,6 +3100,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   let paceProgressTotal = 0;
   let paceTargetTotal = 0;
   let completedGoalsCount = 0;
+  let goalPointsEarned = 0;
+  const rewardPointsEnabled = isRewardPointsEnabled();
 
   filteredTrackers.forEach((tracker) => {
     const periodProgress = sumTrackerRange(index, tracker.id, range);
@@ -2934,6 +3110,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
     goalsTargetTotal = addAmount(goalsTargetTotal, goalTarget);
     if (goalTarget > 0 && periodProgress >= goalTarget) {
       completedGoalsCount += 1;
+      if (rewardPointsEnabled) {
+        goalPointsEarned = addAmount(goalPointsEarned, getTrackerGoalPointsForPeriod(tracker, periodName));
+      }
     }
     if (!isFloatingGoalType(tracker.goalType)) {
       paceProgressTotal = addAmount(paceProgressTotal, periodProgress);
@@ -2959,8 +3138,14 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
   const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
   const onPaceClass = onPace === null ? "" : onPace ? "pace-on" : "pace-off";
-  const pointsPerGoal = getGoalPointsForPeriod(periodName);
-  const goalPointsEarned = completedGoalsCount * pointsPerGoal;
+  const goalPointsCard = rewardPointsEnabled
+    ? `
+    <article class="summary-card">
+      <p>Goal Points</p>
+      <strong>${formatAmount(goalPointsEarned)} (${completedGoalsCount} completed)</strong>
+    </article>
+  `
+    : "";
 
   summaryEl.innerHTML = `
     <article class="summary-card">
@@ -2975,10 +3160,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       <p>Items</p>
       <strong>${filteredTrackers.length} goals + ${dueCheckIns.length} check-ins</strong>
     </article>
-    <article class="summary-card">
-      <p>Goal Points</p>
-      <strong>${formatAmount(goalPointsEarned)} (${completedGoalsCount} x ${formatAmount(pointsPerGoal)})</strong>
-    </article>
+    ${goalPointsCard}
   `;
 
   const goalCardsMarkup = filteredTrackers
@@ -3171,6 +3353,10 @@ function closeOutPeriod(periodName) {
   periodSnapshots.unshift(snapshot);
   periodSnapshots.sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
   savePeriodSnapshots();
+  if (isRewardPointsEnabled()) {
+    upsertCloseoutPointAward(snapshot);
+    savePointTransactions();
+  }
   renderPeriodTabs();
 }
 
@@ -3188,6 +3374,8 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   let paceProgressTotal = 0;
   let paceTargetTotal = 0;
   let completedGoalsCount = 0;
+  let goalPointsEarned = 0;
+  const rewardPointsEnabled = isRewardPointsEnabled();
 
   const goalSnapshots = trackersForPeriod.map((tracker) => {
     const target = getTrackerTargetForPeriod(tracker, periodName);
@@ -3202,6 +3390,9 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
     goalsTargetTotal = addAmount(goalsTargetTotal, target);
     if (target > 0 && progress >= target) {
       completedGoalsCount += 1;
+      if (rewardPointsEnabled) {
+        goalPointsEarned = addAmount(goalPointsEarned, getTrackerGoalPointsForPeriod(tracker, periodName));
+      }
     }
     if (!isFloating) {
       paceProgressTotal = addAmount(paceProgressTotal, progress);
@@ -3250,8 +3441,6 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   const paceTargetWithCheckIns = addAmount(paceTargetTotal, checkInTargetTotal);
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
   const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
-  const pointsPerGoal = getGoalPointsForPeriod(periodName);
-  const goalPointsEarned = completedGoalsCount * pointsPerGoal;
   const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active" };
 
   return {
@@ -3272,7 +3461,6 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
       goalsCount: trackersForPeriod.length,
       checkInsCount: dueCheckIns.length,
       completedGoalsCount,
-      pointsPerGoal,
       goalPointsEarned
     },
     goals: goalSnapshots,
@@ -3300,14 +3488,33 @@ function getTrackerTargetForPeriod(tracker, periodName) {
   return tracker.weeklyGoal;
 }
 
-function getGoalPointsForPeriod(periodName) {
-  if (periodName === "month") {
-    return normalizeGoalPoints(settings && settings.monthlyGoalPoints, 1);
+function getTrackerGoalPointsForPeriod(tracker, periodName) {
+  const normalizedPeriod = periodName === "month"
+    ? "month"
+    : periodName === "year"
+    ? "year"
+    : "week";
+  const fallbackByPeriod = normalizedPeriod === "month"
+    ? 3
+    : normalizedPeriod === "year"
+    ? 10
+    : 1;
+  const hasLegacyPoints = Boolean(
+    tracker
+    && tracker.goalPoints !== undefined
+    && tracker.goalPoints !== null
+    && tracker.goalPoints !== ""
+  );
+  const legacyPoints = hasLegacyPoints
+    ? normalizeGoalPoints(tracker.goalPoints, fallbackByPeriod)
+    : fallbackByPeriod;
+  if (normalizedPeriod === "month") {
+    return normalizeGoalPoints(tracker && tracker.goalPointsMonthly, legacyPoints);
   }
-  if (periodName === "year") {
-    return normalizeGoalPoints(settings && settings.yearlyGoalPoints, 1);
+  if (normalizedPeriod === "year") {
+    return normalizeGoalPoints(tracker && tracker.goalPointsYearly, legacyPoints);
   }
-  return normalizeGoalPoints(settings && settings.weeklyGoalPoints, 1);
+  return normalizeGoalPoints(tracker && tracker.goalPointsWeekly, legacyPoints);
 }
 
 function renderPeriodSnapshots(periodName, range) {
@@ -3357,7 +3564,7 @@ function renderPeriodSnapshots(periodName, range) {
         <p class="muted small">Closed ${escapeHtml(formatSnapshotClosedAt(snapshot.closedAt))}</p>
         <p class="metric-line">Completion ${escapeHtml(String(Math.max(Math.round(Number(summary.completion) || 0), 0)))}% | Progress ${escapeHtml(formatAmount(summary.totalProgress || 0))}/${escapeHtml(formatAmount(summary.totalTarget || 0))}</p>
         <p class="muted small">${escapeHtml(String(Math.max(Math.floor(Number(summary.goalsCount) || 0), 0)))} goals + ${escapeHtml(String(Math.max(Math.floor(Number(summary.checkInsCount) || 0), 0)))} check-ins</p>
-        <p class="muted small">Goal points ${escapeHtml(formatAmount(summary.goalPointsEarned || 0))} (${escapeHtml(String(Math.max(Math.floor(Number(summary.completedGoalsCount) || 0), 0)))} x ${escapeHtml(formatAmount(summary.pointsPerGoal || 0))})</p>
+        ${isRewardPointsEnabled() ? `<p class="muted small">Goal points ${escapeHtml(formatAmount(summary.goalPointsEarned || 0))} (${escapeHtml(String(Math.max(Math.floor(Number(summary.completedGoalsCount) || 0), 0)))} completed)</p>` : ""}
         ${filterLine}
       </li>
     `;
@@ -3409,6 +3616,217 @@ function formatSnapshotClosedAt(value) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function upsertCloseoutPointAward(snapshot) {
+  if (!snapshot || !snapshot.period || !snapshot.rangeStart || !snapshot.rangeEnd) {
+    return;
+  }
+  const refKey = `${snapshot.period}|${snapshot.rangeStart}|${snapshot.rangeEnd}`;
+  const amount = normalizePositiveAmount(snapshot.summary && snapshot.summary.goalPointsEarned, 0);
+  const index = pointTransactions.findIndex((item) => (
+    item
+    && item.type === "earn-closeout"
+    && item.refKey === refKey
+  ));
+  if (amount <= 0) {
+    if (index >= 0) {
+      pointTransactions.splice(index, 1);
+    }
+    return;
+  }
+  const nextTx = {
+    id: index >= 0 && pointTransactions[index] && pointTransactions[index].id
+      ? pointTransactions[index].id
+      : createId(),
+    type: "earn-closeout",
+    amount,
+    createdAt: new Date().toISOString(),
+    note: `${snapshot.period} close-out`,
+    refKey
+  };
+  if (index >= 0) {
+    pointTransactions[index] = nextTx;
+  } else {
+    pointTransactions.unshift(nextTx);
+  }
+}
+
+function getPointBankTotals() {
+  const totals = pointTransactions.reduce((acc, item) => {
+    const amount = Number(item && item.amount) || 0;
+    acc.balance = addAmount(acc.balance, amount);
+    if (amount > 0) {
+      acc.earned = addAmount(acc.earned, amount);
+    } else if (amount < 0) {
+      acc.spent = addAmount(acc.spent, Math.abs(amount));
+    }
+    return acc;
+  }, { balance: 0, earned: 0, spent: 0 });
+  return {
+    balance: Math.max(totals.balance, 0),
+    earned: totals.earned,
+    spent: totals.spent
+  };
+}
+
+function getPointBankBalance() {
+  return getPointBankTotals().balance;
+}
+
+function renderRewardsSettings() {
+  if (!rewardSettingsList || !rewardSettingsEmpty || !pointStoreSettingsSection) {
+    return;
+  }
+  if (!currentUser || !isRewardPointsEnabled()) {
+    rewardSettingsList.innerHTML = "";
+    rewardSettingsEmpty.style.display = "none";
+    return;
+  }
+
+  if (rewards.length < 1) {
+    rewardSettingsList.innerHTML = "";
+    rewardSettingsEmpty.style.display = "block";
+    return;
+  }
+
+  rewardSettingsEmpty.style.display = "none";
+  rewardSettingsList.innerHTML = rewards
+    .map((item, index) => `
+      <li class="entry-card" style="--stagger:${index}" data-reward-id="${item.id}">
+        <div class="form-grid form-grid-3">
+          <label>
+            Name
+            <input data-field="name" type="text" maxlength="90" value="${escapeHtml(item.name)}" />
+          </label>
+          <label>
+            Cost
+            <input data-field="cost" type="number" min="1" max="1000000" value="${normalizePositiveInt(item.cost, 1)}" />
+          </label>
+          <label>
+            Notes
+            <input data-field="notes" type="text" maxlength="160" value="${escapeHtml(item.notes || "")}" />
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" data-action="save-reward" data-id="${item.id}">Save Reward</button>
+          <button class="btn btn-danger" type="button" data-action="delete-reward" data-id="${item.id}">Delete Reward</button>
+        </div>
+      </li>
+    `)
+    .join("");
+}
+
+function renderPointStoreTab() {
+  if (
+    !pointBankBalance
+    || !pointBankEarned
+    || !pointBankSpent
+    || !pointStoreRewardList
+    || !pointStoreRewardEmpty
+    || !pointStoreHistoryList
+    || !pointStoreHistoryEmpty
+  ) {
+    return;
+  }
+
+  if (!currentUser || !isRewardPointsEnabled()) {
+    pointBankBalance.textContent = "0";
+    pointBankEarned.textContent = "0";
+    pointBankSpent.textContent = "0";
+    pointStoreRewardList.innerHTML = "";
+    pointStoreHistoryList.innerHTML = "";
+    pointStoreRewardEmpty.style.display = "none";
+    pointStoreHistoryEmpty.style.display = "none";
+    return;
+  }
+
+  const totals = getPointBankTotals();
+  pointBankBalance.textContent = formatAmount(totals.balance);
+  pointBankEarned.textContent = formatAmount(totals.earned);
+  pointBankSpent.textContent = formatAmount(totals.spent);
+
+  if (rewards.length < 1) {
+    pointStoreRewardList.innerHTML = "";
+    pointStoreRewardEmpty.style.display = "block";
+  } else {
+    pointStoreRewardEmpty.style.display = "none";
+    pointStoreRewardList.innerHTML = rewards
+      .map((item, index) => {
+        const cost = normalizePositiveInt(item.cost, 1);
+        const canRedeem = totals.balance >= cost;
+        return `
+          <li class="metric-card" style="--stagger:${index}">
+            <div class="metric-top">
+              <h3>${escapeHtml(item.name)}</h3>
+              <span class="pace-chip">${formatAmount(cost)} pts</span>
+            </div>
+            <p class="metric-line">${escapeHtml(item.notes || "No notes")}</p>
+            <div class="metric-footer-actions">
+              <button class="btn btn-primary" type="button" data-action="redeem-reward" data-id="${item.id}" ${canRedeem ? "" : "disabled"}>
+                ${canRedeem ? "Redeem" : "Not enough points"}
+              </button>
+            </div>
+          </li>
+        `;
+      })
+      .join("");
+  }
+
+  const history = [...pointTransactions]
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 20);
+  if (history.length < 1) {
+    pointStoreHistoryList.innerHTML = "";
+    pointStoreHistoryEmpty.style.display = "block";
+    return;
+  }
+  pointStoreHistoryEmpty.style.display = "none";
+  pointStoreHistoryList.innerHTML = history
+    .map((item, index) => {
+      const amount = Number(item.amount) || 0;
+      const label = amount >= 0 ? `+${formatAmount(amount)}` : `-${formatAmount(Math.abs(amount))}`;
+      const when = formatSnapshotClosedAt(item.createdAt);
+      const note = String(item.note || item.type || "Point update");
+      return `
+        <li class="quick-item" style="--stagger:${index}">
+          <div class="metric-top">
+            <strong>${escapeHtml(note)}</strong>
+            <span class="pace-chip">${escapeHtml(label)} pts</span>
+          </div>
+          <p class="muted small">${escapeHtml(when)}</p>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function redeemReward(rewardId) {
+  if (!currentUser) {
+    return { success: false, message: "Sign in before redeeming rewards." };
+  }
+  if (!isRewardPointsEnabled()) {
+    return { success: false, message: "Reward points are turned off in Settings." };
+  }
+  const reward = rewards.find((item) => item.id === rewardId);
+  if (!reward) {
+    return { success: false, message: "Select a valid reward." };
+  }
+  const cost = normalizePositiveInt(reward.cost, 1);
+  const balance = getPointBankBalance();
+  if (balance < cost) {
+    return { success: false, message: "Not enough points in your point bank." };
+  }
+  pointTransactions.unshift({
+    id: createId(),
+    type: "spend-reward",
+    amount: -cost,
+    createdAt: new Date().toISOString(),
+    note: `Redeemed: ${reward.name}`,
+    rewardId: reward.id
+  });
+  savePointTransactions();
+  return { success: true, message: "" };
 }
 
 function getTrackersForPeriod(periodName) {
@@ -4265,14 +4683,8 @@ function resetUiStateForLogin() {
   if (projectionAverageSelect) {
     projectionAverageSelect.value = normalizeProjectionAverageSource(settings.projectionAverageSource);
   }
-  if (weeklyGoalPointsInput) {
-    weeklyGoalPointsInput.value = String(normalizeGoalPoints(settings.weeklyGoalPoints, 1));
-  }
-  if (monthlyGoalPointsInput) {
-    monthlyGoalPointsInput.value = String(normalizeGoalPoints(settings.monthlyGoalPoints, 1));
-  }
-  if (yearlyGoalPointsInput) {
-    yearlyGoalPointsInput.value = String(normalizeGoalPoints(settings.yearlyGoalPoints, 1));
+  if (rewardPointsEnabledSelect) {
+    rewardPointsEnabledSelect.value = isRewardPointsEnabled() ? "on" : "off";
   }
   if (bucketListEnabledSelect) {
     bucketListEnabledSelect.value = isBucketListEnabled() ? "on" : "off";
@@ -4287,6 +4699,15 @@ function resetUiStateForLogin() {
   }
   if (goalUnit) {
     goalUnit.value = "units";
+  }
+  if (goalRewardWeeklyPoints) {
+    goalRewardWeeklyPoints.value = "1";
+  }
+  if (goalRewardMonthlyPoints) {
+    goalRewardMonthlyPoints.value = "3";
+  }
+  if (goalRewardYearlyPoints) {
+    goalRewardYearlyPoints.value = "10";
   }
   if (checkinCadence) {
     checkinCadence.value = "weekly";
@@ -4544,9 +4965,7 @@ function getDefaultSettings() {
     weekStart: "monday",
     compareToLastDefault: true,
     projectionAverageSource: "period",
-    weeklyGoalPoints: 1,
-    monthlyGoalPoints: 1,
-    yearlyGoalPoints: 1,
+    rewardPointsEnabled: false,
     bucketListEnabled: true,
     theme: "teal"
   };
@@ -4582,6 +5001,10 @@ function isBucketListEnabled() {
   return !(settings && settings.bucketListEnabled === false);
 }
 
+function isRewardPointsEnabled() {
+  return Boolean(settings && settings.rewardPointsEnabled === true);
+}
+
 function applyBucketListFeatureVisibility() {
   const enabled = isBucketListEnabled();
   document.querySelectorAll("[data-tab='bucket-entry'], [data-tab='bucket-list']").forEach((button) => {
@@ -4602,6 +5025,47 @@ function applyBucketListFeatureVisibility() {
   }
   if (!enabled && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
     activeTab = "entry";
+  }
+}
+
+function applyRewardPointsFeatureVisibility() {
+  const enabled = isRewardPointsEnabled();
+  if (pointStoreMenuButton) {
+    pointStoreMenuButton.hidden = !enabled;
+    if (!enabled) {
+      pointStoreMenuButton.classList.remove("active");
+      pointStoreMenuButton.setAttribute("aria-current", "false");
+    }
+  }
+  document.querySelectorAll("[data-tab='point-store']").forEach((button) => {
+    button.hidden = !enabled;
+  });
+  document.querySelectorAll("[data-tab-panel='point-store']").forEach((panel) => {
+    if (!enabled) {
+      panel.hidden = true;
+      panel.classList.remove("active");
+    }
+  });
+  if (pointStoreSettingsSection) {
+    pointStoreSettingsSection.hidden = !enabled;
+  }
+  if (goalRewardPointsWrap) {
+    goalRewardPointsWrap.hidden = !enabled;
+  }
+  if (goalRewardWeeklyPoints) {
+    goalRewardWeeklyPoints.disabled = !enabled;
+  }
+  if (goalRewardMonthlyPoints) {
+    goalRewardMonthlyPoints.disabled = !enabled;
+  }
+  if (goalRewardYearlyPoints) {
+    goalRewardYearlyPoints.disabled = !enabled;
+  }
+  document.querySelectorAll(".goal-points-col").forEach((cell) => {
+    cell.hidden = !enabled;
+  });
+  if (!enabled && activeTab === "point-store") {
+    activeTab = "manage";
   }
 }
 
@@ -4646,11 +5110,7 @@ function getUserDisplayName(user) {
   if (!user) {
     return "User";
   }
-  const fullName = `${normalizeProfileName(user.firstName)} ${normalizeProfileName(user.lastName)}`.trim();
-  if (fullName) {
-    return `${fullName} (${user.username})`;
-  }
-  return user.username || "User";
+  return normalizeUsername(user.username) || "User";
 }
 
 function normalizeUsername(value) {
@@ -4741,6 +5201,8 @@ function migrateLegacyDataToUser() {
     SCHEDULE_STORAGE_KEY,
     SETTINGS_STORAGE_KEY,
     PERIOD_SNAPSHOTS_STORAGE_KEY,
+    REWARDS_STORAGE_KEY,
+    POINT_TRANSACTIONS_STORAGE_KEY,
     LEGACY_TRACKERS_KEY
   ];
   keys.forEach((key) => {
@@ -4764,6 +5226,8 @@ function initializeData() {
     goalJournalEntries = [];
     schedules = [];
     periodSnapshots = [];
+    rewards = [];
+    pointTransactions = [];
     settings = getDefaultSettings();
     return;
   }
@@ -4778,6 +5242,8 @@ function initializeData() {
   goalJournalEntries = loadGoalJournalEntries();
   schedules = loadSchedules().filter((item) => trackers.some((tracker) => tracker.id === item.trackerId));
   periodSnapshots = loadPeriodSnapshots();
+  rewards = loadRewards();
+  pointTransactions = loadPointTransactions();
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
     entries = migrateLegacyLogs(loadedTrackers.legacyLogs, trackers);
@@ -4827,6 +5293,8 @@ function loadTrackers() {
         || (trackerGoalType === "floating" && !String(item.unit || "").trim()
           ? "items"
           : normalizeGoalUnit(item.unit));
+      const hasLegacyPoints = item.goalPoints !== undefined && item.goalPoints !== null && item.goalPoints !== "";
+      const legacyPoints = hasLegacyPoints ? normalizeGoalPoints(item.goalPoints, 1) : null;
       loadedTrackers.push({
         id: item.id,
         name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Untitled goal",
@@ -4835,7 +5303,10 @@ function loadTrackers() {
         unit: loadedUnit,
         weeklyGoal: normalizePositiveInt(item.weeklyGoal, defaultWeeklyGoal),
         monthlyGoal,
-        yearlyGoal
+        yearlyGoal,
+        goalPointsWeekly: normalizeGoalPoints(item.goalPointsWeekly, legacyPoints === null ? 1 : legacyPoints),
+        goalPointsMonthly: normalizeGoalPoints(item.goalPointsMonthly, legacyPoints === null ? 3 : legacyPoints),
+        goalPointsYearly: normalizeGoalPoints(item.goalPointsYearly, legacyPoints === null ? 10 : legacyPoints)
       });
       if (item.logs && typeof item.logs === "object") {
         legacyLogs.push({ trackerId: item.id, logs: item.logs });
@@ -5040,7 +5511,6 @@ function loadPeriodSnapshots() {
             goalsCount: Math.max(Math.floor(Number(summaryRaw.goalsCount) || 0), 0),
             checkInsCount: Math.max(Math.floor(Number(summaryRaw.checkInsCount) || 0), 0),
             completedGoalsCount: Math.max(Math.floor(Number(summaryRaw.completedGoalsCount) || 0), 0),
-            pointsPerGoal: normalizeGoalPoints(summaryRaw.pointsPerGoal, 1),
             goalPointsEarned: normalizePositiveAmount(summaryRaw.goalPointsEarned, 0)
           },
           goals: Array.isArray(snapshot.goals) ? snapshot.goals : [],
@@ -5049,6 +5519,63 @@ function loadPeriodSnapshots() {
       })
       .filter((item) => item.rangeStart && item.rangeEnd)
       .sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+  } catch {
+    return [];
+  }
+}
+
+function loadRewards() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(REWARDS_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => ({
+        id: item.id,
+        name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Untitled reward",
+        cost: normalizePositiveInt(item.cost, 1),
+        notes: typeof item.notes === "string" ? item.notes.trim() : "",
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function loadPointTransactions() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(POINT_TRANSACTIONS_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => ({
+        id: item.id,
+        type: typeof item.type === "string" ? item.type : "adjustment",
+        amount: Math.round((Number(item.amount) || 0) * 100) / 100,
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+        note: typeof item.note === "string" ? item.note.trim() : "",
+        refKey: typeof item.refKey === "string" ? item.refKey : "",
+        rewardId: typeof item.rewardId === "string" ? item.rewardId : ""
+      }))
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   } catch {
     return [];
   }
@@ -5068,9 +5595,7 @@ function loadSettings() {
       weekStart: parsed && parsed.weekStart === "sunday" ? "sunday" : "monday",
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
       projectionAverageSource: normalizeProjectionAverageSource(parsed && parsed.projectionAverageSource),
-      weeklyGoalPoints: normalizeGoalPoints(parsed && parsed.weeklyGoalPoints, 1),
-      monthlyGoalPoints: normalizeGoalPoints(parsed && parsed.monthlyGoalPoints, 1),
-      yearlyGoalPoints: normalizeGoalPoints(parsed && parsed.yearlyGoalPoints, 1),
+      rewardPointsEnabled: Boolean(parsed && (parsed.rewardPointsEnabled === true || parsed.rewardPointsEnabled === "on")),
       bucketListEnabled: !(parsed && parsed.bucketListEnabled === false),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
@@ -5154,6 +5679,20 @@ function savePeriodSnapshots() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(PERIOD_SNAPSHOTS_STORAGE_KEY), JSON.stringify(periodSnapshots));
+}
+
+function saveRewards() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(REWARDS_STORAGE_KEY), JSON.stringify(rewards));
+}
+
+function savePointTransactions() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(POINT_TRANSACTIONS_STORAGE_KEY), JSON.stringify(pointTransactions));
 }
 
 function saveSettings() {
@@ -5341,6 +5880,15 @@ function normalizeGoalUnit(value) {
 function updateGoalTypeFields() {
   if (!goalType || !goalUnit || !goalWeekly || !goalMonthly || !goalYearly) {
     return;
+  }
+  if (goalRewardWeeklyPoints && (!goalRewardWeeklyPoints.value || Number(goalRewardWeeklyPoints.value) < 0)) {
+    goalRewardWeeklyPoints.value = "1";
+  }
+  if (goalRewardMonthlyPoints && (!goalRewardMonthlyPoints.value || Number(goalRewardMonthlyPoints.value) < 0)) {
+    goalRewardMonthlyPoints.value = "3";
+  }
+  if (goalRewardYearlyPoints && (!goalRewardYearlyPoints.value || Number(goalRewardYearlyPoints.value) < 0)) {
+    goalRewardYearlyPoints.value = "10";
   }
   const normalizedType = normalizeGoalType(goalType.value);
   const lockedUnit = getLockedUnitForGoalType(normalizedType);

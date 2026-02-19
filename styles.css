@@ -870,6 +870,10 @@ textarea {
   border-collapse: collapse;
 }
 
+#manage-table {
+  min-width: 980px;
+}
+
 #checkin-table {
   min-width: 460px;
 }
