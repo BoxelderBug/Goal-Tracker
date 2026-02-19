@@ -1,5 +1,5 @@
 window.GOAL_TRACKER_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCp1W7ms8u5dkUg-3zLcRWX5v11iglf1-U",
+  apiKey: "AIzaSyCp1WYms8u5dkUg-3zLcRWX5v11iglF1-U",
   authDomain: "goal-tracker-d0a58.firebaseapp.com",
   projectId: "goal-tracker-d0a58",
   storageBucket: "goal-tracker-d0a58.firebasestorage.app",
