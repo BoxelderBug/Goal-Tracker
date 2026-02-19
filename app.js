@@ -402,13 +402,14 @@ dropdowns.forEach((dropdown) => {
 });
 
 document.addEventListener("click", (event) => {
-  if (isMobileMenuMode() && tabStripPanel && !event.target.closest(".tab-strip-panel")) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (isMobileMenuMode() && tabStripPanel && (!target || !target.closest(".tab-strip-panel"))) {
     setMobileMenuOpen(false);
   }
-  if (mobileMenuToggle && event.target === mobileMenuToggle) {
+  if (mobileMenuToggle && target && target.closest("#mobile-menu-toggle")) {
     return;
   }
-  if (!event.target.closest("[data-dropdown]")) {
+  if (!target || !target.closest("[data-dropdown]")) {
     closeAllDropdownMenus();
   }
 });

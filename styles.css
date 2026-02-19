@@ -1996,13 +1996,13 @@ strong.pace-off,
     top: auto;
   }
 
-  .dropdown.open .dropdown-menu {
+  .tab-strip-panel.mobile-menu-open .dropdown.open .dropdown-menu {
     display: grid;
     animation: none;
   }
 
-  .dropdown:hover .dropdown-menu,
-  .dropdown:focus-within .dropdown-menu {
+  .dropdown:not(.open):hover .dropdown-menu,
+  .dropdown:not(.open):focus-within .dropdown-menu {
     display: none;
     animation: none;
   }
