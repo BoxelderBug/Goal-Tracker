@@ -1656,7 +1656,7 @@ strong.pace-off,
 .graph-svg {
   display: block;
   width: 100%;
-  height: 180px;
+  height: 240px;
 }
 
 .graph-svg-large {
@@ -1750,7 +1750,8 @@ strong.pace-off,
 
 .graph-tick {
   fill: var(--muted);
-  font-size: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 .graph-tick-y {
@@ -1760,6 +1761,10 @@ strong.pace-off,
 
 .graph-tick-x {
   text-anchor: middle;
+}
+
+.graph-tick-week {
+  dominant-baseline: hanging;
 }
 
 .graph-axis-label {

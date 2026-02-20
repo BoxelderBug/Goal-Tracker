@@ -2234,6 +2234,7 @@ function renderGraphModal() {
     showOverlayPoints: pointsEnabled,
     showProjectionPoints: pointsEnabled,
     large: true,
+    periodName: graphModalState.period,
     unit: tracker.unit,
     domainDays: getRangeDays(range),
     projection,
@@ -2746,9 +2747,8 @@ function handleGraphHover(event) {
   if (!frame || !tooltip) {
     return;
   }
-
-  const points = Array.from(svg.querySelectorAll("circle[data-point='1']"));
-  if (points.length < 1) {
+  const hoveredPoint = event.target.closest("circle[data-point='1']");
+  if (!hoveredPoint || !svg.contains(hoveredPoint)) {
     tooltip.classList.add("hidden");
     return;
   }
@@ -2760,28 +2760,17 @@ function handleGraphHover(event) {
     return;
   }
 
-  const mouseX = ((event.clientX - rect.left) / rect.width) * view.width;
-  let nearest = points[0];
-  let nearestDistance = Math.abs(Number(points[0].getAttribute("cx")) - mouseX);
-  for (let i = 1; i < points.length; i += 1) {
-    const cx = Number(points[i].getAttribute("cx"));
-    const distance = Math.abs(cx - mouseX);
-    if (distance < nearestDistance) {
-      nearest = points[i];
-      nearestDistance = distance;
-    }
-  }
-
-  const cx = Number(nearest.getAttribute("cx"));
-  const cy = Number(nearest.getAttribute("cy"));
+  hideTooltipsInList(event.currentTarget);
+  const cx = Number(hoveredPoint.getAttribute("cx"));
+  const cy = Number(hoveredPoint.getAttribute("cy"));
   const px = (cx / view.width) * rect.width;
   const py = (cy / view.height) * rect.height;
 
-  const dateLabel = nearest.dataset.dateLabel || "";
-  const amountLabel = nearest.dataset.amount || "0";
-  const cumulativeLabel = nearest.dataset.cumulative || "0";
-  const unitLabel = nearest.dataset.unit ? ` ${nearest.dataset.unit}` : "";
-  const seriesLabel = nearest.dataset.seriesLabel || "Current";
+  const dateLabel = hoveredPoint.dataset.dateLabel || "";
+  const amountLabel = hoveredPoint.dataset.amount || "0";
+  const cumulativeLabel = hoveredPoint.dataset.cumulative || "0";
+  const unitLabel = hoveredPoint.dataset.unit ? ` ${hoveredPoint.dataset.unit}` : "";
+  const seriesLabel = hoveredPoint.dataset.seriesLabel || "Current";
   tooltip.textContent = `${seriesLabel} | ${dateLabel} | Amount ${amountLabel}${unitLabel} | Cum ${cumulativeLabel}${unitLabel}`;
   tooltip.style.left = `${Math.min(Math.max(px, 10), rect.width - 10)}px`;
   tooltip.style.top = `${Math.max(py - 8, 8)}px`;
@@ -4039,6 +4028,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           showOverlayPoints: pointsEnabled,
           showProjectionPoints: pointsEnabled,
           large: false,
+          periodName,
           unit: tracker.unit,
           domainDays: getRangeDays(range),
           projection,
@@ -5414,8 +5404,10 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const showProjectionPoints = Boolean(options.showProjectionPoints);
   const large = Boolean(options.large);
   const goalHit = Boolean(options.goalHit);
+  const periodName = normalizePeriodMode(options.periodName);
   const unit = normalizeGoalUnit(options.unit);
   const domainDays = Math.max(Number(options.domainDays) || 0, series.length || 1, 1);
+  const weekTicks = periodName === "week" && domainDays <= 8;
   const projection = options.projection && Array.isArray(options.projection.points) ? options.projection : null;
   const cumulative = [];
   let running = 0;
@@ -5444,12 +5436,12 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       .sort((a, b) => a.dayIndex - b.dayIndex)
     : [];
 
-  const width = large ? 1080 : 760;
-  const height = large ? 420 : 220;
+  const width = large ? 1080 : 860;
+  const height = large ? 420 : 270;
   const padLeft = large ? 74 : 58;
   const padRight = large ? 24 : 20;
   const padTop = 20;
-  const padBottom = large ? 64 : 48;
+  const padBottom = large ? 64 : (weekTicks ? 70 : 54);
   const innerWidth = width - padLeft - padRight;
   const innerHeight = height - padTop - padBottom;
   const axisY = height - padBottom;
@@ -5491,15 +5483,26 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     `;
   }).join("");
 
-  const xTickIndexes = Array.from(new Set([0, Math.floor((domainDays - 1) / 2), domainDays - 1]))
-    .filter((value) => value >= 0)
-    .sort((a, b) => a - b);
+  const xTickIndexes = weekTicks
+    ? Array.from({ length: domainDays }, (_, index) => index)
+    : Array.from(new Set([0, Math.floor((domainDays - 1) / 2), domainDays - 1]))
+      .filter((value) => value >= 0)
+      .sort((a, b) => a - b);
   const xTickMarkup = xTickIndexes.map((index) => {
     const x = toX(index).toFixed(2);
     const tickDate = addDays(range.start, index);
+    if (weekTicks) {
+      return `
+      <line x1="${x}" y1="${axisY}" x2="${x}" y2="${axisY + 6}" class="graph-axis" />
+      <text x="${x}" y="${axisY + 16}" class="graph-tick graph-tick-x graph-tick-week">
+        <tspan x="${x}" dy="0">${escapeHtml(formatWeekday(tickDate))}</tspan>
+        <tspan x="${x}" dy="12">${escapeHtml(`${tickDate.getMonth() + 1}/${tickDate.getDate()}`)}</tspan>
+      </text>
+    `;
+    }
     return `
       <line x1="${x}" y1="${axisY}" x2="${x}" y2="${axisY + 6}" class="graph-axis" />
-      <text x="${x}" y="${axisY + 20}" class="graph-tick graph-tick-x">${escapeHtml(formatMonthDay(tickDate))}</text>
+      <text x="${x}" y="${axisY + 22}" class="graph-tick graph-tick-x">${escapeHtml(formatMonthDay(tickDate))}</text>
     `;
   }).join("");
 
