@@ -42,6 +42,7 @@ const CLOUD_LOCAL_UPDATED_AT_KEY = "goal-tracker-cloud-local-updated-v1";
 const CLOUD_PROFILE_COLLECTION = "goalTrackerProfiles";
 const CLOUD_DATA_COLLECTION = "goalTrackerData";
 const CLOUD_NOTIFICATION_COLLECTION = "goalTrackerNotifications";
+const CLOUD_GOAL_SHARE_COLLECTION = "goalTrackerGoalShares";
 
 const appShell = document.querySelector("#app-shell");
 const authPanel = document.querySelector("#auth-panel");
@@ -291,6 +292,10 @@ let currentUser = null;
 let notifications = [];
 let notificationsPanelOpen = false;
 let notificationsUnsubscribe = null;
+let goalSharePartnerUnsubscribe = null;
+let goalShareOwnerUnsubscribe = null;
+let sharedGoalShares = [];
+let sharedGoalOwnerData = new Map();
 let firebaseApp = null;
 let firebaseAuth = null;
 let firebaseDb = null;
@@ -319,9 +324,9 @@ const inlineGraphState = {
   year: {}
 };
 const periodAccordionState = {
-  week: { goals: true, checkins: true },
-  month: { goals: true, checkins: true },
-  year: { goals: true, checkins: true }
+  week: { goals: true, checkins: true, shared: false },
+  month: { goals: true, checkins: true, shared: false },
+  year: { goals: true, checkins: true, shared: false }
 };
 const flippedScheduleDays = {};
 const graphModalState = {
@@ -716,6 +721,25 @@ if (notificationsMarkReadButton) {
   });
 }
 
+if (notificationsList) {
+  notificationsList.addEventListener("click", async (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const actionButton = event.target.closest("button[data-action='approve-share-invite'], button[data-action='reject-share-invite']");
+    if (!actionButton) {
+      return;
+    }
+    const shareId = String(actionButton.dataset.shareId || "");
+    const notificationId = String(actionButton.dataset.notificationId || "");
+    const approve = actionButton.dataset.action === "approve-share-invite";
+    const result = await respondToGoalShareInvite(notificationId, shareId, approve);
+    if (!result.success && result.message) {
+      alert(result.message);
+    }
+  });
+}
+
 if (goalType) {
   goalType.addEventListener("change", () => {
     updateGoalTypeFields();
@@ -759,7 +783,12 @@ goalForm.addEventListener("submit", (event) => {
     yearlyGoal,
     goalPointsWeekly: rewardWeeklyPoints,
     goalPointsMonthly: rewardMonthlyPoints,
-    goalPointsYearly: rewardYearlyPoints
+    goalPointsYearly: rewardYearlyPoints,
+    accountabilityPartnerEmail: "",
+    accountabilityPartnerName: "",
+    accountabilityPartnerId: "",
+    accountabilityShareId: "",
+    accountabilityStatus: "none"
   });
 
   saveTrackers();
@@ -794,7 +823,7 @@ goalForm.addEventListener("submit", (event) => {
 });
 
 if (manageGoalsForm) {
-  manageGoalsForm.addEventListener("submit", (event) => {
+  manageGoalsForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!currentUser) {
       return;
@@ -805,6 +834,12 @@ if (manageGoalsForm) {
       return;
     }
 
+    const previousTrackersById = new Map(trackers.map((item) => [item.id, { ...item }]));
+    const friendByEmail = new Map(
+      friends
+        .filter((item) => item && item.email)
+        .map((item) => [normalizeEmail(item.email), item])
+    );
     const updates = new Map();
     const deleteIds = new Set();
     const deleteNames = [];
@@ -831,6 +866,7 @@ if (manageGoalsForm) {
       const goalPointsWeeklyInput = row.querySelector("input[data-field='goalPointsWeekly']");
       const goalPointsMonthlyInput = row.querySelector("input[data-field='goalPointsMonthly']");
       const goalPointsYearlyInput = row.querySelector("input[data-field='goalPointsYearly']");
+      const accountabilityPartnerInput = row.querySelector("select[data-field='accountabilityPartner']");
       if (!nameInput || !unitInput || !weeklyInput || !monthlyInput || !yearlyInput) {
         continue;
       }
@@ -848,6 +884,10 @@ if (manageGoalsForm) {
       const goalTypeValue = normalizeGoalType(goalTypeInput ? goalTypeInput.value : tracker.goalType);
       const lockedUnit = getLockedUnitForGoalType(goalTypeValue);
       const unitValue = lockedUnit || normalizeGoalUnit(unitInput.value);
+      const selectedPartnerEmail = normalizeEmail(
+        accountabilityPartnerInput ? accountabilityPartnerInput.value : tracker.accountabilityPartnerEmail
+      );
+      const selectedFriend = friendByEmail.get(selectedPartnerEmail) || null;
       if (!nameValue || (!lockedUnit && !unitValue)) {
         alert("Each goal needs a name and unit before saving.");
         if (!nameValue) {
@@ -879,7 +919,22 @@ if (manageGoalsForm) {
         goalPointsYearly: normalizeGoalPoints(
           goalPointsYearlyInput ? goalPointsYearlyInput.value : getTrackerGoalPointsForPeriod(tracker, "year"),
           getTrackerGoalPointsForPeriod(tracker, "year")
-        )
+        ),
+        accountabilityPartnerEmail: selectedPartnerEmail,
+        accountabilityPartnerName: selectedPartnerEmail
+          ? (selectedFriend ? selectedFriend.name : (tracker.accountabilityPartnerName || selectedPartnerEmail))
+          : "",
+        accountabilityPartnerId: selectedPartnerEmail
+          ? (selectedPartnerEmail === normalizeEmail(tracker.accountabilityPartnerEmail) ? (tracker.accountabilityPartnerId || "") : "")
+          : "",
+        accountabilityStatus: selectedPartnerEmail
+          ? (selectedPartnerEmail === normalizeEmail(tracker.accountabilityPartnerEmail)
+            ? normalizeAccountabilityStatus(tracker.accountabilityStatus)
+            : "pending")
+          : "none",
+        accountabilityShareId: selectedPartnerEmail
+          ? (selectedPartnerEmail === normalizeEmail(tracker.accountabilityPartnerEmail) ? (tracker.accountabilityShareId || "") : "")
+          : ""
       });
     }
 
@@ -910,6 +965,10 @@ if (manageGoalsForm) {
       });
       saveEntries();
       saveSchedules();
+    }
+    const accountabilitySyncErrors = await syncTrackerAccountabilityShares(previousTrackersById, deleteIds);
+    if (accountabilitySyncErrors.length > 0) {
+      alert(`Some accountability updates could not be sent: ${accountabilitySyncErrors.slice(0, 3).join(" | ")}${accountabilitySyncErrors.length > 3 ? " ..." : ""}`);
     }
     saveTrackers();
     render();
@@ -1199,6 +1258,7 @@ entryForm.addEventListener("submit", (event) => {
     notes: String(entryNotes.value || "").trim(),
     createdAt: new Date().toISOString()
   });
+  notifyAccountabilityPartnerEntryUpdate(tracker, amount, dateValue);
 
   saveEntries();
   if (isBinaryGoal) {
@@ -1287,6 +1347,7 @@ if (weekEntryForm) {
         return;
       }
       const [trackerId, date] = key.split("|");
+      const tracker = trackerById.get(trackerId) || null;
       entries.unshift({
         id: createId(),
         trackerId,
@@ -1295,6 +1356,9 @@ if (weekEntryForm) {
         notes: latestNotesByKey.get(key) || "Week Update",
         createdAt: new Date().toISOString()
       });
+      if (tracker) {
+        notifyAccountabilityPartnerEntryUpdate(tracker, amount, date);
+      }
       insertedCount += 1;
     });
 
@@ -1930,6 +1994,7 @@ yearList.addEventListener("click", handleGraphCardActions);
 });
 [weekList, monthList, yearList].forEach((listElement) => {
   listElement.addEventListener("change", handleViewControlChange);
+  listElement.addEventListener("submit", handleSharedGoalEntrySubmit);
   listElement.addEventListener("click", (event) => {
     const summary = event.target.closest("summary.accordion-summary");
     if (!summary) {
@@ -2810,6 +2875,40 @@ function renderAuthState() {
   }
 }
 
+async function handleSharedGoalEntrySubmit(event) {
+  if (!currentUser) {
+    return;
+  }
+  const form = event.target.closest("form[data-action='add-shared-goal-entry']");
+  if (!form) {
+    return;
+  }
+  event.preventDefault();
+  const shareId = String(form.dataset.shareId || "");
+  const ownerId = String(form.dataset.ownerId || "");
+  const goalId = String(form.dataset.goalId || "");
+  const dateValue = String(form.elements.date ? form.elements.date.value : "");
+  const amount = normalizePositiveAmount(form.elements.amount ? form.elements.amount.value : "", -1);
+  const notes = String(form.elements.notes ? form.elements.notes.value : "").trim();
+  if (!shareId || !ownerId || !goalId || !isDateKey(dateValue) || amount < 0) {
+    alert("Enter a valid date and amount for the shared goal update.");
+    return;
+  }
+  const result = await addSharedGoalEntryUpdate(shareId, ownerId, goalId, dateValue, amount, notes);
+  if (!result.success && result.message) {
+    alert(result.message);
+    return;
+  }
+  if (form.elements.amount) {
+    form.elements.amount.value = "1.00";
+  }
+  if (form.elements.notes) {
+    form.elements.notes.value = "";
+  }
+  await refreshSharedGoalOwnerData();
+  renderPeriodTabs();
+}
+
 function renderNotifications() {
   if (
     !notificationsToggleButton
@@ -2853,15 +2952,27 @@ function renderNotifications() {
   notificationsEmpty.style.display = "none";
   notificationsList.innerHTML = notifications
     .slice(0, 30)
-    .map((item, index) => `
-      <li class="quick-item" style="--stagger:${index}">
-        <div class="metric-top">
-          <strong>${escapeHtml(getNotificationMessage(item))}</strong>
-          <span class="pace-chip${item.read ? "" : " pace-on"}">${item.read ? "Read" : "New"}</span>
-        </div>
-        <p class="muted small">${escapeHtml(formatSnapshotClosedAt(item.createdAt))}</p>
-      </li>
-    `)
+    .map((item, index) => {
+      const canRespondToInvite = item.type === "goal-share-invite" && !item.actioned;
+      const inviteActions = canRespondToInvite
+        ? `
+          <div class="actions">
+            <button class="btn btn-primary" type="button" data-action="approve-share-invite" data-notification-id="${item.id}" data-share-id="${item.shareId}">Approve</button>
+            <button class="btn btn-danger" type="button" data-action="reject-share-invite" data-notification-id="${item.id}" data-share-id="${item.shareId}">Decline</button>
+          </div>
+        `
+        : "";
+      return `
+        <li class="quick-item" style="--stagger:${index}">
+          <div class="metric-top">
+            <strong>${escapeHtml(getNotificationMessage(item))}</strong>
+            <span class="pace-chip${item.read ? "" : " pace-on"}">${item.read ? "Read" : "New"}</span>
+          </div>
+          <p class="muted small">${escapeHtml(formatSnapshotClosedAt(item.createdAt))}</p>
+          ${inviteActions}
+        </li>
+      `;
+    })
     .join("");
 }
 
@@ -2899,6 +3010,24 @@ function renderManageGoals() {
   }
   const bucketTypeEnabled = isBucketListEnabled();
   const rewardPointsEnabled = isRewardPointsEnabled();
+  const friendOptionsMarkup = (selectedEmail = "") => {
+    const selected = normalizeEmail(selectedEmail);
+    const friendOptions = friends
+      .map((item) => {
+        const email = normalizeEmail(item.email);
+        if (!email) {
+          return "";
+        }
+        const selectedAttr = email === selected ? "selected" : "";
+        const label = item.name ? `${item.name} (${email})` : email;
+        return `<option value="${escapeAttr(email)}" ${selectedAttr}>${escapeHtml(label)}</option>`;
+      })
+      .join("");
+    return `
+      <option value="">None</option>
+      ${friendOptions}
+    `;
+  };
   document.querySelectorAll(".goal-points-col").forEach((cell) => {
     cell.hidden = !rewardPointsEnabled;
   });
@@ -2921,6 +3050,12 @@ function renderManageGoals() {
         </td>
         <td>
           <input data-field="tags" type="text" maxlength="140" value="${escapeHtml(formatGoalTags(tracker.tags))}" placeholder="fitness, finance" />
+        </td>
+        <td>
+          <select data-field="accountabilityPartner">
+            ${friendOptionsMarkup(tracker.accountabilityPartnerEmail || "")}
+          </select>
+          <p class="muted small">${escapeHtml(getAccountabilityStatusLabel(tracker.accountabilityStatus))}</p>
         </td>
         <td>
           <select data-field="archived">
@@ -3789,6 +3924,9 @@ function renderPeriodTabs() {
   renderPeriod("week", week, now, weekSummary, weekList, weekEmpty, (tracker) => tracker.weeklyGoal, index);
   renderPeriod("month", month, now, monthSummary, monthList, monthEmpty, (tracker) => tracker.monthlyGoal, index);
   renderPeriod("year", year, now, yearSummary, yearList, yearEmpty, (tracker) => tracker.yearlyGoal, index);
+  renderSharedGoalsSection("week", week, weekList);
+  renderSharedGoalsSection("month", month, monthList);
+  renderSharedGoalsSection("year", year, yearList);
   renderPeriodSnapshots("week", week);
   renderPeriodSnapshots("month", month);
   renderPeriodSnapshots("year", year);
@@ -4035,6 +4173,165 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
     ${createPeriodAccordionSectionMarkup(periodName, "goals", "Goals", goalCardsMarkup, "No goals configured.")}
     ${createPeriodAccordionSectionMarkup(periodName, "checkins", "Check-ins", checkInCardsMarkup, `No ${checkInPeriodLabel} check-ins configured.`)}
   `;
+}
+
+function normalizeGoalShareStatus(value) {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized === "approved") {
+    return "approved";
+  }
+  if (normalized === "rejected") {
+    return "rejected";
+  }
+  if (normalized === "removed") {
+    return "removed";
+  }
+  return "pending";
+}
+
+function normalizeAccountabilityStatus(value) {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized === "approved") {
+    return "approved";
+  }
+  if (normalized === "rejected") {
+    return "rejected";
+  }
+  if (normalized === "pending") {
+    return "pending";
+  }
+  return "none";
+}
+
+function getAccountabilityStatusLabel(value) {
+  const status = normalizeAccountabilityStatus(value);
+  if (status === "approved") {
+    return "Approved";
+  }
+  if (status === "rejected") {
+    return "Declined";
+  }
+  if (status === "pending") {
+    return "Pending approval";
+  }
+  return "None";
+}
+
+function normalizeGoalShareRecord(raw, id) {
+  const item = raw && typeof raw === "object" ? raw : {};
+  const createdAt = new Date(item.createdAt);
+  return {
+    id: String(id || createId()),
+    ownerId: typeof item.ownerId === "string" ? item.ownerId : "",
+    ownerGoalId: typeof item.ownerGoalId === "string" ? item.ownerGoalId : "",
+    ownerUsername: typeof item.ownerUsername === "string" ? item.ownerUsername : "",
+    ownerEmail: typeof item.ownerEmail === "string" ? item.ownerEmail : "",
+    partnerId: typeof item.partnerId === "string" ? item.partnerId : "",
+    partnerEmail: typeof item.partnerEmail === "string" ? item.partnerEmail : "",
+    partnerName: typeof item.partnerName === "string" ? item.partnerName : "",
+    goalName: typeof item.goalName === "string" ? item.goalName : "",
+    goalUnit: typeof item.goalUnit === "string" ? item.goalUnit : "units",
+    status: normalizeGoalShareStatus(item.status),
+    createdAt: Number.isNaN(createdAt.getTime()) ? new Date().toISOString() : createdAt.toISOString(),
+    approvedAt: typeof item.approvedAt === "string" ? item.approvedAt : "",
+    updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : ""
+  };
+}
+
+function getApprovedSharedGoalShares() {
+  return sharedGoalShares
+    .filter((item) => item && item.status === "approved")
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+}
+
+function renderSharedGoalsSection(periodName, range, listEl) {
+  if (!listEl || !currentUser) {
+    return;
+  }
+  const approvedShares = getApprovedSharedGoalShares();
+  if (approvedShares.length < 1) {
+    return;
+  }
+  const cardsMarkup = buildSharedGoalCardsMarkup(periodName, range, approvedShares);
+  listEl.insertAdjacentHTML(
+    "beforeend",
+    createPeriodAccordionSectionMarkup(
+      periodName,
+      "shared",
+      "Shared Goals",
+      cardsMarkup,
+      "No shared goals available."
+    )
+  );
+}
+
+function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
+  const todayKey = getDateKey(normalizeDate(new Date()));
+  return approvedShares
+    .map((share, indexPosition) => {
+      const ownerData = sharedGoalOwnerData.get(share.ownerId);
+      if (!ownerData) {
+        return `
+          <li class="metric-card" style="--stagger:${indexPosition}">
+            <div class="metric-top">
+              <h3>${escapeHtml(share.goalName || "Shared Goal")}</h3>
+              <span class="pace-chip">Loading</span>
+            </div>
+            <p class="metric-line">Shared by ${escapeHtml(share.ownerUsername || "friend")}.</p>
+          </li>
+        `;
+      }
+
+      const tracker = ownerData.trackers.find((item) => item.id === share.ownerGoalId);
+      if (!tracker) {
+        return `
+          <li class="metric-card" style="--stagger:${indexPosition}">
+            <div class="metric-top">
+              <h3>${escapeHtml(share.goalName || "Shared Goal")}</h3>
+              <span class="pace-chip pace-off">Unavailable</span>
+            </div>
+            <p class="metric-line">This shared goal is no longer available.</p>
+          </li>
+        `;
+      }
+
+      const index = buildEntryIndex(ownerData.entries);
+      const target = getTrackerTargetForPeriod(tracker, periodName);
+      const progress = sumTrackerRange(index, tracker.id, range);
+      const pct = percent(progress, target);
+      const goalHit = target > 0 && progress >= target;
+      const ownerLabel = share.ownerUsername || "Friend";
+      return `
+        <li class="metric-card" style="--stagger:${indexPosition}">
+          <div class="metric-top">
+            <h3>${escapeHtml(tracker.name)}</h3>
+            <span class="pace-chip">${escapeHtml(ownerLabel)}</span>
+          </div>
+          <p class="metric-line">${formatAmountWithUnit(progress, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)} (${pct}%)</p>
+          <div class="progress"><span class="${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span></div>
+          <form data-action="add-shared-goal-entry" data-share-id="${share.id}" data-owner-id="${share.ownerId}" data-goal-id="${tracker.id}" class="entry-edit-form">
+            <div class="form-grid form-grid-3">
+              <label>
+                Date
+                <input name="date" type="date" value="${todayKey}" required />
+              </label>
+              <label>
+                Amount
+                <input name="amount" type="number" min="0" step="0.01" value="1.00" required />
+              </label>
+              <label>
+                Notes
+                <input name="notes" type="text" maxlength="180" placeholder="Optional update note" />
+              </label>
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" type="submit">Add Update</button>
+            </div>
+          </form>
+        </li>
+      `;
+    })
+    .join("");
 }
 
 function closeOutPeriod(periodName) {
@@ -5450,7 +5747,8 @@ function resetPeriodAccordionState() {
   Object.keys(periodAccordionState).forEach((periodName) => {
     periodAccordionState[periodName] = {
       goals: true,
-      checkins: true
+      checkins: true,
+      shared: false
     };
   });
 }
@@ -5728,20 +6026,36 @@ function getNotificationMessage(item) {
     return "New notification";
   }
   const type = String(item.type || "");
+  const actorName = normalizeUsername(item.actorUsername) || "Someone";
   if (type === "friend-added") {
-    const actorName = normalizeUsername(item.actorUsername) || "Someone";
     return `${actorName} added you as a friend.`;
+  }
+  if (type === "goal-share-invite") {
+    const goalName = String(item.goalName || "a goal");
+    return `${actorName} invited you to be an accountability partner for "${goalName}".`;
+  }
+  if (type === "goal-share-approved") {
+    const goalName = String(item.goalName || "a goal");
+    return `${actorName} approved accountability access for "${goalName}".`;
+  }
+  if (type === "goal-share-rejected") {
+    const goalName = String(item.goalName || "a goal");
+    return `${actorName} declined accountability access for "${goalName}".`;
+  }
+  if (type === "goal-share-entry-update") {
+    const goalName = String(item.goalName || "a shared goal");
+    const amount = formatAmount(normalizePositiveAmount(item.entryAmount, 0));
+    const unit = normalizeGoalUnit(item.goalUnit || "units");
+    const dateLabel = isDateKey(item.entryDate) ? formatDate(parseDateKey(item.entryDate)) : "today";
+    return `${actorName} logged ${amount} ${unit} for "${goalName}" on ${dateLabel}.`;
   }
   return "New notification";
 }
 
-async function sendFriendAddedNotification(friendName, friendEmail) {
-  if (!firebaseConfigured || !firebaseDb || !currentUser) {
-    return;
-  }
-  const email = normalizeEmail(friendEmail);
-  if (!email) {
-    return;
+async function findUserProfileByEmail(emailValue) {
+  const email = normalizeEmail(emailValue);
+  if (!firebaseConfigured || !firebaseDb || !email) {
+    return null;
   }
   try {
     const profileQuery = query(
@@ -5751,26 +6065,55 @@ async function sendFriendAddedNotification(friendName, friendEmail) {
     );
     const snapshot = await getDocs(profileQuery);
     if (snapshot.empty) {
-      return;
+      return null;
     }
-    const targetProfileDoc = snapshot.docs[0];
-    const recipientId = String(targetProfileDoc.id || "");
-    if (!recipientId || recipientId === currentUser.id) {
-      return;
-    }
-    await addDoc(collection(firebaseDb, CLOUD_NOTIFICATION_COLLECTION), {
-      type: "friend-added",
-      recipientId,
-      actorId: currentUser.id,
-      actorUsername: getUserDisplayName(currentUser),
-      actorEmail: normalizeEmail(currentUser.email),
-      friendLabel: String(friendName || "").trim(),
-      createdAt: new Date().toISOString(),
-      read: false
-    });
+    const profileDoc = snapshot.docs[0];
+    const data = profileDoc.data() || {};
+    return {
+      id: profileDoc.id,
+      email: normalizeEmail(data.email || email),
+      username: normalizeUsername(data.username) || getEmailUsernameFallback(email),
+      firstName: normalizeProfileName(data.firstName),
+      lastName: normalizeProfileName(data.lastName)
+    };
   } catch {
-    // Keep local friend entry even if notification delivery fails.
+    return null;
   }
+}
+
+async function createNotificationDoc(payload) {
+  if (!firebaseConfigured || !firebaseDb || !payload || typeof payload !== "object") {
+    return null;
+  }
+  try {
+    const ref = await addDoc(collection(firebaseDb, CLOUD_NOTIFICATION_COLLECTION), {
+      ...payload,
+      createdAt: typeof payload.createdAt === "string" ? payload.createdAt : new Date().toISOString(),
+      read: payload.read === true
+    });
+    return ref.id;
+  } catch {
+    return null;
+  }
+}
+
+async function sendFriendAddedNotification(friendName, friendEmail) {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return;
+  }
+  const targetProfile = await findUserProfileByEmail(friendEmail);
+  if (!targetProfile || !targetProfile.id || targetProfile.id === currentUser.id) {
+    return;
+  }
+  await createNotificationDoc({
+    type: "friend-added",
+    recipientId: targetProfile.id,
+    actorId: currentUser.id,
+    actorUsername: getUserDisplayName(currentUser),
+    actorEmail: normalizeEmail(currentUser.email),
+    friendLabel: String(friendName || "").trim(),
+    read: false
+  });
 }
 
 function normalizeNotificationRecord(raw, id) {
@@ -5783,8 +6126,14 @@ function normalizeNotificationRecord(raw, id) {
     actorId: typeof item.actorId === "string" ? item.actorId : "",
     actorUsername: typeof item.actorUsername === "string" ? item.actorUsername : "",
     actorEmail: typeof item.actorEmail === "string" ? item.actorEmail : "",
+    shareId: typeof item.shareId === "string" ? item.shareId : "",
+    goalName: typeof item.goalName === "string" ? item.goalName : "",
+    goalUnit: typeof item.goalUnit === "string" ? item.goalUnit : "",
+    entryAmount: normalizePositiveAmount(item.entryAmount, 0),
+    entryDate: isDateKey(item.entryDate) ? item.entryDate : "",
     friendLabel: typeof item.friendLabel === "string" ? item.friendLabel : "",
     read: Boolean(item.read),
+    actioned: Boolean(item.actioned),
     createdAt: Number.isNaN(createdAt.getTime()) ? new Date().toISOString() : createdAt.toISOString()
   };
 }
@@ -5838,6 +6187,445 @@ async function markAllNotificationsRead() {
       // Keep trying on next action/listener refresh.
     }
   }));
+}
+
+async function respondToGoalShareInvite(notificationId, shareId, approve) {
+  if (!firebaseConfigured || !firebaseDb || !currentUser || !shareId) {
+    return { success: false, message: "Unable to process invite right now." };
+  }
+  const shareRef = doc(firebaseDb, CLOUD_GOAL_SHARE_COLLECTION, shareId);
+  let shareData = null;
+  try {
+    const snapshot = await getDoc(shareRef);
+    if (!snapshot.exists()) {
+      return { success: false, message: "This invite is no longer available." };
+    }
+    shareData = normalizeGoalShareRecord(snapshot.data(), snapshot.id);
+  } catch {
+    return { success: false, message: "Unable to load invite details." };
+  }
+
+  if (shareData.partnerId !== currentUser.id) {
+    return { success: false, message: "This invite belongs to a different account." };
+  }
+  const nextStatus = approve ? "approved" : "rejected";
+  try {
+    await updateDoc(shareRef, {
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+      approvedAt: approve ? new Date().toISOString() : ""
+    });
+  } catch {
+    return { success: false, message: "Unable to update invite status." };
+  }
+
+  if (notificationId) {
+    try {
+      await updateDoc(doc(firebaseDb, CLOUD_NOTIFICATION_COLLECTION, notificationId), {
+        read: true,
+        actioned: true,
+        actionedAt: new Date().toISOString()
+      });
+    } catch {
+      // Listener-driven refresh will still show latest share state.
+    }
+  }
+
+  await createNotificationDoc({
+    type: approve ? "goal-share-approved" : "goal-share-rejected",
+    recipientId: shareData.ownerId,
+    actorId: currentUser.id,
+    actorUsername: getUserDisplayName(currentUser),
+    actorEmail: normalizeEmail(currentUser.email),
+    shareId: shareData.id,
+    goalName: shareData.goalName,
+    goalUnit: shareData.goalUnit,
+    read: false
+  });
+  return { success: true, message: approve ? "Invite approved." : "Invite declined." };
+}
+
+function stopGoalShareListeners() {
+  if (typeof goalSharePartnerUnsubscribe === "function") {
+    goalSharePartnerUnsubscribe();
+  }
+  if (typeof goalShareOwnerUnsubscribe === "function") {
+    goalShareOwnerUnsubscribe();
+  }
+  goalSharePartnerUnsubscribe = null;
+  goalShareOwnerUnsubscribe = null;
+}
+
+function startGoalShareListeners() {
+  stopGoalShareListeners();
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    sharedGoalShares = [];
+    sharedGoalOwnerData = new Map();
+    return;
+  }
+
+  const partnerQuery = query(
+    collection(firebaseDb, CLOUD_GOAL_SHARE_COLLECTION),
+    where("partnerId", "==", currentUser.id),
+    limit(100)
+  );
+  goalSharePartnerUnsubscribe = onSnapshot(partnerQuery, (snapshot) => {
+    sharedGoalShares = snapshot.docs
+      .map((item) => normalizeGoalShareRecord(item.data(), item.id))
+      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+    refreshSharedGoalOwnerData().finally(() => {
+      if (currentUser) {
+        renderPeriodTabs();
+      }
+    });
+  }, () => {
+    sharedGoalShares = [];
+    sharedGoalOwnerData = new Map();
+    if (currentUser) {
+      renderPeriodTabs();
+    }
+  });
+
+  const ownerQuery = query(
+    collection(firebaseDb, CLOUD_GOAL_SHARE_COLLECTION),
+    where("ownerId", "==", currentUser.id),
+    limit(100)
+  );
+  goalShareOwnerUnsubscribe = onSnapshot(ownerQuery, (snapshot) => {
+    const ownerShares = snapshot.docs
+      .map((item) => normalizeGoalShareRecord(item.data(), item.id))
+      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+    let changed = false;
+    trackers = trackers.map((tracker) => {
+      const shareId = String(tracker.accountabilityShareId || "");
+      if (!shareId) {
+        return tracker;
+      }
+      const matchingShare = ownerShares.find((item) => item.id === shareId);
+      if (!matchingShare) {
+        return tracker;
+      }
+      const shareStatus = normalizeGoalShareStatus(matchingShare.status);
+      const nextStatus = normalizeAccountabilityStatus(shareStatus);
+      const nextTracker = {
+        ...tracker,
+        accountabilityStatus: nextStatus,
+        accountabilityPartnerId: matchingShare.partnerId || tracker.accountabilityPartnerId || "",
+        accountabilityPartnerEmail: matchingShare.partnerEmail || tracker.accountabilityPartnerEmail || "",
+        accountabilityPartnerName: matchingShare.partnerName || tracker.accountabilityPartnerName || ""
+      };
+      if (shareStatus === "removed") {
+        nextTracker.accountabilityStatus = "none";
+        nextTracker.accountabilityShareId = "";
+        nextTracker.accountabilityPartnerId = "";
+        nextTracker.accountabilityPartnerEmail = "";
+        nextTracker.accountabilityPartnerName = "";
+      }
+      const hasChanged = (
+        nextTracker.accountabilityStatus !== tracker.accountabilityStatus
+        || nextTracker.accountabilityPartnerId !== tracker.accountabilityPartnerId
+        || nextTracker.accountabilityPartnerEmail !== tracker.accountabilityPartnerEmail
+        || nextTracker.accountabilityPartnerName !== tracker.accountabilityPartnerName
+        || nextTracker.accountabilityShareId !== tracker.accountabilityShareId
+      );
+      if (hasChanged) {
+        changed = true;
+      }
+      return hasChanged ? nextTracker : tracker;
+    });
+    if (changed) {
+      saveTrackers();
+      render();
+    }
+  }, () => {
+    // Keep local tracker settings if listener fails.
+  });
+}
+
+async function loadSharedOwnerData(ownerId) {
+  const dataRef = getCloudDataRef(ownerId);
+  if (!dataRef) {
+    return { trackers: [], entries: [] };
+  }
+  try {
+    const snapshot = await getDoc(dataRef);
+    if (!snapshot.exists()) {
+      return { trackers: [], entries: [] };
+    }
+    const data = snapshot.data() || {};
+    const ownerTrackers = Array.isArray(data.trackers)
+      ? data.trackers
+        .filter((item) => item && typeof item.id === "string")
+        .map((item) => ({
+          id: item.id,
+          name: typeof item.name === "string" ? item.name : "Shared Goal",
+          goalType: normalizeGoalType(item.goalType),
+          unit: normalizeGoalUnit(item.unit),
+          weeklyGoal: normalizePositiveInt(item.weeklyGoal, 1),
+          monthlyGoal: normalizePositiveInt(item.monthlyGoal, 1),
+          yearlyGoal: normalizePositiveInt(item.yearlyGoal, 1)
+        }))
+      : [];
+    const trackerIds = new Set(ownerTrackers.map((item) => item.id));
+    const ownerEntries = Array.isArray(data.entries)
+      ? data.entries
+        .filter((item) => (
+          item
+          && typeof item.trackerId === "string"
+          && trackerIds.has(item.trackerId)
+          && isDateKey(item.date)
+        ))
+        .map((item) => ({
+          id: typeof item.id === "string" ? item.id : createId(),
+          trackerId: item.trackerId,
+          date: item.date,
+          amount: normalizePositiveAmount(item.amount, 0),
+          notes: typeof item.notes === "string" ? item.notes : "",
+          createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+        }))
+      : [];
+    return { trackers: ownerTrackers, entries: ownerEntries };
+  } catch {
+    return { trackers: [], entries: [] };
+  }
+}
+
+async function refreshSharedGoalOwnerData() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    sharedGoalOwnerData = new Map();
+    return;
+  }
+  const approvedShares = getApprovedSharedGoalShares();
+  const ownerIds = Array.from(new Set(approvedShares.map((item) => item.ownerId).filter(Boolean)));
+  const entries = await Promise.all(ownerIds.map(async (ownerId) => {
+    const ownerData = await loadSharedOwnerData(ownerId);
+    return [ownerId, ownerData];
+  }));
+  sharedGoalOwnerData = new Map(entries);
+}
+
+async function addSharedGoalEntryUpdate(shareId, ownerId, goalId, dateValue, amount, notes = "") {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return { success: false, message: "Cloud sync is not configured for shared updates." };
+  }
+  const share = sharedGoalShares.find((item) => item.id === shareId);
+  if (!share || share.status !== "approved" || share.partnerId !== currentUser.id) {
+    return { success: false, message: "This shared goal is not available for updates." };
+  }
+  if (share.ownerId !== ownerId || share.ownerGoalId !== goalId) {
+    return { success: false, message: "This shared goal update request is invalid." };
+  }
+  const dataRef = getCloudDataRef(ownerId);
+  if (!dataRef) {
+    return { success: false, message: "Unable to update this shared goal right now." };
+  }
+  try {
+    const snapshot = await getDoc(dataRef);
+    if (!snapshot.exists()) {
+      return { success: false, message: "Shared goal owner data is unavailable." };
+    }
+    const data = snapshot.data() || {};
+    const existingEntries = Array.isArray(data.entries) ? data.entries : [];
+    const nextEntries = [...existingEntries, {
+      id: createId(),
+      trackerId: goalId,
+      date: dateValue,
+      amount: normalizePositiveAmount(amount, 0),
+      notes: String(notes || "").trim(),
+      createdAt: new Date().toISOString(),
+      sharedBy: currentUser.id,
+      sharedByUsername: getUserDisplayName(currentUser)
+    }];
+    await setDoc(dataRef, {
+      entries: nextEntries,
+      updatedAt: new Date().toISOString(),
+      serverUpdatedAt: serverTimestamp()
+    }, { merge: true });
+
+    await createNotificationDoc({
+      type: "goal-share-entry-update",
+      recipientId: share.ownerId,
+      actorId: currentUser.id,
+      actorUsername: getUserDisplayName(currentUser),
+      actorEmail: normalizeEmail(currentUser.email),
+      shareId: share.id,
+      goalName: share.goalName,
+      goalUnit: share.goalUnit,
+      entryAmount: normalizePositiveAmount(amount, 0),
+      entryDate: dateValue,
+      read: false
+    });
+    return { success: true, message: "" };
+  } catch {
+    return { success: false, message: "Unable to save shared goal update right now." };
+  }
+}
+
+function notifyAccountabilityPartnerEntryUpdate(tracker, amount, dateValue) {
+  if (!tracker || !currentUser || !firebaseConfigured || !firebaseDb) {
+    return;
+  }
+  if (normalizeAccountabilityStatus(tracker.accountabilityStatus) !== "approved") {
+    return;
+  }
+  const recipientId = String(tracker.accountabilityPartnerId || "");
+  if (!recipientId || recipientId === currentUser.id) {
+    return;
+  }
+  void createNotificationDoc({
+    type: "goal-share-entry-update",
+    recipientId,
+    actorId: currentUser.id,
+    actorUsername: getUserDisplayName(currentUser),
+    actorEmail: normalizeEmail(currentUser.email),
+    shareId: tracker.accountabilityShareId || "",
+    goalName: tracker.name || "Goal",
+    goalUnit: tracker.unit || "units",
+    entryAmount: normalizePositiveAmount(amount, 0),
+    entryDate: isDateKey(dateValue) ? dateValue : getDateKey(normalizeDate(new Date())),
+    read: false
+  });
+}
+
+async function syncTrackerAccountabilityShares(previousTrackersById, deletedIds = new Set()) {
+  const errors = [];
+  if (!currentUser) {
+    return errors;
+  }
+  const removeShare = async (shareId) => {
+    if (!firebaseConfigured || !firebaseDb || !shareId) {
+      return;
+    }
+    try {
+      await updateDoc(doc(firebaseDb, CLOUD_GOAL_SHARE_COLLECTION, shareId), {
+        status: "removed",
+        updatedAt: new Date().toISOString()
+      });
+    } catch {
+      // Keep local model even if remote cleanup fails.
+    }
+  };
+
+  // Handle deleted goals that had active share links.
+  const removedSharePromises = [];
+  previousTrackersById.forEach((previous) => {
+    if (!previous || typeof previous !== "object") {
+      return;
+    }
+    const shareId = String(previous.accountabilityShareId || "");
+    if (!shareId) {
+      return;
+    }
+    const removed = deletedIds.has(previous.id) || !trackers.some((item) => item.id === previous.id);
+    if (removed) {
+      removedSharePromises.push(removeShare(shareId));
+    }
+  });
+  if (removedSharePromises.length > 0) {
+    await Promise.all(removedSharePromises);
+  }
+
+  for (const tracker of trackers) {
+    const previous = previousTrackersById.get(tracker.id) || {};
+    const prevEmail = normalizeEmail(previous.accountabilityPartnerEmail || "");
+    const nextEmail = normalizeEmail(tracker.accountabilityPartnerEmail || "");
+    const prevShareId = String(previous.accountabilityShareId || "");
+    const nextShareId = String(tracker.accountabilityShareId || "");
+    const unchangedShare = (
+      nextEmail
+      && prevEmail === nextEmail
+      && nextShareId
+      && normalizeAccountabilityStatus(tracker.accountabilityStatus) !== "rejected"
+    );
+    if (unchangedShare) {
+      continue;
+    }
+    if (!nextEmail) {
+      if (prevShareId) {
+        await removeShare(prevShareId);
+      }
+      tracker.accountabilityPartnerEmail = "";
+      tracker.accountabilityPartnerName = "";
+      tracker.accountabilityPartnerId = "";
+      tracker.accountabilityShareId = "";
+      tracker.accountabilityStatus = "none";
+      continue;
+    }
+    if (prevShareId && prevEmail !== nextEmail) {
+      await removeShare(prevShareId);
+    }
+    if (!firebaseConfigured || !firebaseDb) {
+      errors.push(`Cloud is not configured for "${tracker.name}".`);
+      tracker.accountabilityPartnerEmail = "";
+      tracker.accountabilityPartnerName = "";
+      tracker.accountabilityPartnerId = "";
+      tracker.accountabilityShareId = "";
+      tracker.accountabilityStatus = "none";
+      continue;
+    }
+    const partnerProfile = await findUserProfileByEmail(nextEmail);
+    if (!partnerProfile || !partnerProfile.id) {
+      errors.push(`No account found for ${nextEmail}.`);
+      tracker.accountabilityPartnerEmail = "";
+      tracker.accountabilityPartnerName = "";
+      tracker.accountabilityPartnerId = "";
+      tracker.accountabilityShareId = "";
+      tracker.accountabilityStatus = "none";
+      continue;
+    }
+    if (partnerProfile.id === currentUser.id) {
+      errors.push(`"${tracker.name}" cannot use your own account as partner.`);
+      tracker.accountabilityPartnerEmail = "";
+      tracker.accountabilityPartnerName = "";
+      tracker.accountabilityPartnerId = "";
+      tracker.accountabilityShareId = "";
+      tracker.accountabilityStatus = "none";
+      continue;
+    }
+    try {
+      const shareRef = await addDoc(collection(firebaseDb, CLOUD_GOAL_SHARE_COLLECTION), {
+        ownerId: currentUser.id,
+        ownerGoalId: tracker.id,
+        ownerUsername: getUserDisplayName(currentUser),
+        ownerEmail: normalizeEmail(currentUser.email),
+        partnerId: partnerProfile.id,
+        partnerEmail: partnerProfile.email,
+        partnerName: partnerProfile.username,
+        goalName: tracker.name,
+        goalUnit: tracker.unit,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        approvedAt: ""
+      });
+      tracker.accountabilityPartnerEmail = partnerProfile.email;
+      tracker.accountabilityPartnerName = partnerProfile.username;
+      tracker.accountabilityPartnerId = partnerProfile.id;
+      tracker.accountabilityShareId = shareRef.id;
+      tracker.accountabilityStatus = "pending";
+
+      await createNotificationDoc({
+        type: "goal-share-invite",
+        recipientId: partnerProfile.id,
+        actorId: currentUser.id,
+        actorUsername: getUserDisplayName(currentUser),
+        actorEmail: normalizeEmail(currentUser.email),
+        shareId: shareRef.id,
+        goalName: tracker.name,
+        goalUnit: tracker.unit,
+        read: false,
+        actioned: false
+      });
+    } catch {
+      errors.push(`Unable to send invite for "${tracker.name}".`);
+      tracker.accountabilityPartnerEmail = "";
+      tracker.accountabilityPartnerName = "";
+      tracker.accountabilityPartnerId = "";
+      tracker.accountabilityShareId = "";
+      tracker.accountabilityStatus = "none";
+    }
+  }
+  return errors;
 }
 
 function loadLocalDataUpdatedAt() {
@@ -6048,6 +6836,7 @@ async function loadCurrentUserProfile(authUser) {
 
 function resetStateForSignedOutUser() {
   stopNotificationsListener();
+  stopGoalShareListeners();
   if (cloudSyncTimer) {
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = null;
@@ -6068,6 +6857,8 @@ function resetStateForSignedOutUser() {
   pointTransactions = [];
   notifications = [];
   notificationsPanelOpen = false;
+  sharedGoalShares = [];
+  sharedGoalOwnerData = new Map();
   settings = getDefaultSettings();
   activeTab = "manage";
   entryMode = "solo";
@@ -6150,6 +6941,7 @@ function initializeAuth() {
       await syncCloudDataOnLogin();
       resetUiStateForLogin();
       startNotificationsListener();
+      startGoalShareListeners();
       render();
     } catch {
       resetStateForSignedOutUser();
@@ -6163,6 +6955,8 @@ function resetUiStateForLogin() {
   activeTab = "manage";
   entryMode = "solo";
   notificationsPanelOpen = false;
+  sharedGoalShares = [];
+  sharedGoalOwnerData = new Map();
   scheduleWeekAnchor = normalizeDate(new Date());
   weekEntryAnchor = normalizeDate(new Date());
   weekEntryStatusMessage = "";
@@ -6911,7 +7705,12 @@ function loadTrackers() {
         yearlyGoal,
         goalPointsWeekly: normalizeGoalPoints(item.goalPointsWeekly, legacyPoints === null ? 1 : legacyPoints),
         goalPointsMonthly: normalizeGoalPoints(item.goalPointsMonthly, legacyPoints === null ? 3 : legacyPoints),
-        goalPointsYearly: normalizeGoalPoints(item.goalPointsYearly, legacyPoints === null ? 10 : legacyPoints)
+        goalPointsYearly: normalizeGoalPoints(item.goalPointsYearly, legacyPoints === null ? 10 : legacyPoints),
+        accountabilityPartnerEmail: normalizeEmail(item.accountabilityPartnerEmail || ""),
+        accountabilityPartnerName: normalizeUsername(item.accountabilityPartnerName || ""),
+        accountabilityPartnerId: typeof item.accountabilityPartnerId === "string" ? item.accountabilityPartnerId : "",
+        accountabilityShareId: typeof item.accountabilityShareId === "string" ? item.accountabilityShareId : "",
+        accountabilityStatus: normalizeAccountabilityStatus(item.accountabilityStatus)
       });
       if (item.logs && typeof item.logs === "object") {
         legacyLogs.push({ trackerId: item.id, logs: item.logs });
