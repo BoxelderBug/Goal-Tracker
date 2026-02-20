@@ -3991,15 +3991,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
   const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
   const onPaceClass = onPace === null ? "" : onPace ? "pace-on" : "pace-off";
-  const goalPointsCard = rewardPointsEnabled
-    ? `
-    <article class="summary-card">
-      <p>Close-Out Points</p>
-      <strong>${formatAmount(goalPointsEarned)} pending (${completedGoalsCount} completed)</strong>
-    </article>
-  `
-    : "";
-
   summaryEl.innerHTML = `
     <article class="summary-card">
       <p>Completion</p>
@@ -4009,11 +4000,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       <p>On Pace</p>
       <strong class="${onPaceClass}">${onPaceLabel}</strong>
     </article>
-    <article class="summary-card">
-      <p>Items</p>
-      <strong>${filteredTrackers.length} goals + ${dueCheckIns.length} check-ins</strong>
-    </article>
-    ${goalPointsCard}
   `;
 
   const goalCardsMarkup = filteredTrackers
@@ -4585,7 +4571,6 @@ function renderPeriodSnapshots(periodName, range) {
         <p class="muted small">Pace: ${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</p>
         <p class="metric-line">Completion ${escapeHtml(String(Math.max(Math.round(Number(summary.completion) || 0), 0)))}% | Progress ${escapeHtml(formatAmount(summary.totalProgress || 0))}/${escapeHtml(formatAmount(summary.totalTarget || 0))}</p>
         <p class="muted small">${escapeHtml(String(Math.max(Math.floor(Number(summary.goalsCount) || 0), 0)))} goals + ${escapeHtml(String(Math.max(Math.floor(Number(summary.checkInsCount) || 0), 0)))} check-ins</p>
-        ${isRewardPointsEnabled() ? `<p class="muted small">Goal points ${escapeHtml(formatAmount(summary.goalPointsEarned || 0))} (${escapeHtml(String(Math.max(Math.floor(Number(summary.completedGoalsCount) || 0), 0)))} completed)</p>` : ""}
         ${filterLine}
         <div class="actions">
           <button class="btn" type="button" data-action="reopen-snapshot" data-id="${snapshot.id}">Reopen</button>
@@ -5244,10 +5229,6 @@ function renderBucketListViewTab() {
   const openCount = bucketTrackers.length - closedCount;
 
   bucketListSummary.innerHTML = `
-    <article class="summary-card">
-      <p>Total Items</p>
-      <strong>${bucketTrackers.length}</strong>
-    </article>
     <article class="summary-card">
       <p>Open</p>
       <strong>${openCount}</strong>

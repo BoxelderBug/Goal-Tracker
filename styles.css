@@ -721,6 +721,36 @@ h3 {
   color: var(--muted);
 }
 
+.view-filters-disclosure {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  padding: 5px 8px;
+}
+
+.view-filters-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.view-filters-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.view-filters-grid {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+}
+
+.view-filters-grid .inline-control {
+  min-width: 0;
+}
+
 .tab-panel.active {
   animation: reveal-up 0.25s ease both;
 }
@@ -2286,6 +2316,14 @@ strong.pace-off,
   .inline-control {
     width: 100%;
     min-width: 0;
+  }
+
+  .view-filters-disclosure {
+    width: 100%;
+  }
+
+  .view-filters-grid {
+    grid-template-columns: 1fr;
   }
 
   .hero-top {
