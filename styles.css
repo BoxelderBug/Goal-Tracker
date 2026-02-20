@@ -24,9 +24,9 @@
   --progress-fill-end: var(--brand-strong);
   --progress-fill-strong-start: var(--brand-strong);
   --progress-fill-strong-end: var(--brand);
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --success: #177a52;
   --success-soft: #e6f8ef;
   --warning: #8b6419;
@@ -50,9 +50,9 @@ body[data-theme="teal"] {
   --brand: #009f94;
   --brand-strong: #007e75;
   --brand-soft: #ddf9f5;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(0, 94, 86, 0.13);
 }
 
@@ -67,9 +67,9 @@ body[data-theme="ocean"] {
   --brand: #2d7ecf;
   --brand-strong: #1f68b2;
   --brand-soft: #dbeeff;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(21, 83, 145, 0.16);
 }
 
@@ -84,9 +84,9 @@ body[data-theme="forest"] {
   --brand: #2d9a58;
   --brand-strong: #1f7f46;
   --brand-soft: #ddf5e4;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(32, 104, 58, 0.14);
 }
 
@@ -101,9 +101,9 @@ body[data-theme="sunset"] {
   --brand: #e06a45;
   --brand-strong: #c05534;
   --brand-soft: #ffe4db;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(145, 63, 39, 0.15);
 }
 
@@ -118,9 +118,9 @@ body[data-theme="amber"] {
   --brand: #d99a1a;
   --brand-strong: #bd830f;
   --brand-soft: #fff0cb;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(130, 92, 20, 0.15);
 }
 
@@ -135,9 +135,9 @@ body[data-theme="berry"] {
   --brand: #b05390;
   --brand-strong: #984377;
   --brand-soft: #f4deec;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(109, 47, 87, 0.16);
 }
 
@@ -152,9 +152,9 @@ body[data-theme="slate"] {
   --brand: #4f7c9e;
   --brand-strong: #3c6685;
   --brand-soft: #dfeaf2;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(47, 69, 86, 0.15);
 }
 
@@ -169,9 +169,9 @@ body[data-theme="midnight"] {
   --brand: #4f6ad1;
   --brand-strong: #3f56b5;
   --brand-soft: #dde4fa;
-  --goal-hit-start: #cbb063;
-  --goal-hit-end: #a9873f;
-  --goal-hit-line: #b7964c;
+  --goal-hit-start: #a88adb;
+  --goal-hit-end: #7f5fbc;
+  --goal-hit-line: #8f6fd0;
   --shadow: 0 18px 50px rgba(44, 61, 120, 0.18);
 }
 
@@ -2462,3 +2462,4 @@ strong.pace-off,
     transition: none !important;
   }
 }
+

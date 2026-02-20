@@ -4062,9 +4062,11 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const isPastPeriod = range.end < now;
       const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
       const useFinalPaceLabel = isPastPeriod && hasAllEntriesLogged;
-      const paceLabel = useFinalPaceLabel
-        ? (isOnPace ? "Hit" : "Missed")
-        : (isOnPace ? "On pace" : "Off pace");
+      const paceLabel = goalHit
+        ? "Hit"
+        : useFinalPaceLabel
+          ? (isOnPace ? "Hit" : "Missed")
+          : (isOnPace ? "On pace" : "Off pace");
       const compareEnabled = isFloating ? false : getGoalCompareEnabled(periodName, tracker.id);
       const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
