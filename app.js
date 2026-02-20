@@ -8,7 +8,15 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 import {
   getFirestore,
+  collection,
   doc,
+  query,
+  where,
+  limit,
+  getDocs,
+  addDoc,
+  onSnapshot,
+  updateDoc,
   getDoc,
   setDoc,
   serverTimestamp
@@ -21,6 +29,7 @@ const CHECKIN_ENTRIES_STORAGE_KEY = "goal-tracker-checkin-entries-v1";
 const GOAL_JOURNAL_STORAGE_KEY = "goal-tracker-goal-journal-v1";
 const SCHEDULE_STORAGE_KEY = "goal-tracker-schedules-v1";
 const SETTINGS_STORAGE_KEY = "goal-tracker-settings-v1";
+const FRIENDS_STORAGE_KEY = "goal-tracker-friends-v1";
 const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
 const REWARDS_STORAGE_KEY = "goal-tracker-rewards-v1";
 const REWARD_PURCHASES_STORAGE_KEY = "goal-tracker-reward-purchases-v1";
@@ -32,6 +41,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const CLOUD_LOCAL_UPDATED_AT_KEY = "goal-tracker-cloud-local-updated-v1";
 const CLOUD_PROFILE_COLLECTION = "goalTrackerProfiles";
 const CLOUD_DATA_COLLECTION = "goalTrackerData";
+const CLOUD_NOTIFICATION_COLLECTION = "goalTrackerNotifications";
 
 const appShell = document.querySelector("#app-shell");
 const authPanel = document.querySelector("#auth-panel");
@@ -52,6 +62,12 @@ const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authForms = document.querySelectorAll("[data-auth-form]");
 const logoutButton = document.querySelector("#logout-btn");
 const activeUserLabel = document.querySelector("#active-user-label");
+const notificationsToggleButton = document.querySelector("#notifications-toggle-btn");
+const notificationsBadge = document.querySelector("#notifications-unread-count");
+const notificationsPanel = document.querySelector("#notifications-panel");
+const notificationsList = document.querySelector("#notifications-list");
+const notificationsEmpty = document.querySelector("#notifications-empty");
+const notificationsMarkReadButton = document.querySelector("#notifications-mark-read-btn");
 
 const menuButtons = document.querySelectorAll(".menu-btn");
 const dropdowns = document.querySelectorAll("[data-dropdown]");
@@ -160,6 +176,11 @@ const projectionAverageSelect = document.querySelector("#projection-average-sele
 const rewardPointsEnabledSelect = document.querySelector("#reward-points-enabled-select");
 const bucketListEnabledSelect = document.querySelector("#bucket-list-enabled-select");
 const themeSelect = document.querySelector("#theme-select");
+const friendForm = document.querySelector("#friend-form");
+const friendNameInput = document.querySelector("#friend-name");
+const friendEmailInput = document.querySelector("#friend-email");
+const friendList = document.querySelector("#friend-list");
+const friendEmpty = document.querySelector("#friend-empty");
 const pointStoreMenuButton = document.querySelector("#point-store-menu-btn");
 const pointStoreSettingsSection = document.querySelector("#point-store-settings-section");
 const rewardForm = document.querySelector("#reward-form");
@@ -239,6 +260,7 @@ let checkIns = [];
 let checkInEntries = [];
 let goalJournalEntries = [];
 let schedules = [];
+let friends = [];
 let periodSnapshots = [];
 let rewards = [];
 let rewardPurchases = [];
@@ -266,6 +288,9 @@ let bucketListGoalStatusFilter = "active";
 let bucketListItemStatusFilter = "all";
 let users = [];
 let currentUser = null;
+let notifications = [];
+let notificationsPanelOpen = false;
+let notificationsUnsubscribe = null;
 let firebaseApp = null;
 let firebaseAuth = null;
 let firebaseDb = null;
@@ -670,6 +695,26 @@ logoutButton.addEventListener("click", async () => {
   resetStateForSignedOutUser();
   render();
 });
+
+if (notificationsToggleButton) {
+  notificationsToggleButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!currentUser) {
+      return;
+    }
+    notificationsPanelOpen = !notificationsPanelOpen;
+    renderNotifications();
+  });
+}
+
+if (notificationsMarkReadButton) {
+  notificationsMarkReadButton.addEventListener("click", async () => {
+    if (!currentUser) {
+      return;
+    }
+    await markAllNotificationsRead();
+  });
+}
 
 if (goalType) {
   goalType.addEventListener("change", () => {
@@ -1401,6 +1446,11 @@ entryListAll.addEventListener("click", (event) => {
   if (!currentUser) {
     return;
   }
+  const snapshotButton = event.target.closest("button[data-action='reopen-snapshot'], button[data-action='delete-snapshot']");
+  if (snapshotButton) {
+    handleSnapshotActionClick(event);
+    return;
+  }
   const button = event.target.closest("button[data-action='delete-entry']");
   if (!button) {
     return;
@@ -1707,12 +1757,61 @@ if (pointStoreClearClosedButton) {
   });
 }
 
+if (friendForm) {
+  friendForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentUser || !friendNameInput) {
+      return;
+    }
+    const name = String(friendNameInput.value || "").trim();
+    const email = String(friendEmailInput ? friendEmailInput.value : "").trim();
+    if (!name) {
+      return;
+    }
+    friends.unshift({
+      id: createId(),
+      name,
+      email,
+      createdAt: new Date().toISOString()
+    });
+    saveFriends();
+    friendForm.reset();
+    renderFriendsSettings();
+    if (email) {
+      await sendFriendAddedNotification(name, email);
+    }
+  });
+}
+
+if (friendList) {
+  friendList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const deleteButton = event.target.closest("button[data-action='delete-friend']");
+    if (!deleteButton) {
+      return;
+    }
+    const friendId = String(deleteButton.dataset.id || "");
+    const friend = friends.find((item) => item.id === friendId);
+    if (!friend) {
+      return;
+    }
+    const shouldDelete = confirm(`Delete friend "${friend.name}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+    friends = friends.filter((item) => item.id !== friendId);
+    saveFriends();
+    renderFriendsSettings();
+  });
+}
+
 settingsForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!currentUser) {
     return;
   }
-  const priorCompareDefault = settings.compareToLastDefault;
   settings.weekStart = weekStartSelect.value === "sunday" ? "sunday" : "monday";
   settings.compareToLastDefault = compareDefaultSelect.value !== "off";
   settings.projectionAverageSource = normalizeProjectionAverageSource(
@@ -1721,9 +1820,6 @@ settingsForm.addEventListener("submit", (event) => {
   settings.rewardPointsEnabled = rewardPointsEnabledSelect ? rewardPointsEnabledSelect.value === "on" : false;
   settings.bucketListEnabled = bucketListEnabledSelect ? bucketListEnabledSelect.value !== "off" : true;
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
-  if (priorCompareDefault !== settings.compareToLastDefault) {
-    resetGoalCompareState();
-  }
   saveSettings();
   applyTheme();
   applyBucketListFeatureVisibility();
@@ -1826,6 +1922,12 @@ if (yearCloseoutButton) {
 weekList.addEventListener("click", handleGraphCardActions);
 monthList.addEventListener("click", handleGraphCardActions);
 yearList.addEventListener("click", handleGraphCardActions);
+[weekSnapshotList, monthSnapshotList, yearSnapshotList].forEach((listElement) => {
+  if (!listElement) {
+    return;
+  }
+  listElement.addEventListener("click", handleSnapshotActionClick);
+});
 [weekList, monthList, yearList].forEach((listElement) => {
   listElement.addEventListener("change", handleViewControlChange);
   listElement.addEventListener("click", (event) => {
@@ -1861,6 +1963,17 @@ if (graphModalBody) {
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".download-menu-wrap")) {
     hideAllDownloadMenus();
+  }
+  if (!event.target.closest(".pace-chip-wrap")) {
+    hideAllPaceDetailPopovers();
+  }
+  if (
+    notificationsPanelOpen
+    && !event.target.closest("#notifications-panel")
+    && !event.target.closest("#notifications-toggle-btn")
+  ) {
+    notificationsPanelOpen = false;
+    renderNotifications();
   }
 });
 
@@ -1938,6 +2051,19 @@ function handleGraphCardActions(event) {
   if (historyMetricButton) {
     graphModalState.historyMetric = normalizeHistoryMetric(historyMetricButton.dataset.metric);
     renderGraphModal();
+    return;
+  }
+
+  const paceDetailButton = event.target.closest("button[data-action='toggle-pace-detail']");
+  if (paceDetailButton) {
+    const wrap = paceDetailButton.closest(".pace-chip-wrap");
+    if (!wrap) {
+      return;
+    }
+    const shouldOpen = !wrap.classList.contains("show-pace-detail");
+    hideAllPaceDetailPopovers(event.currentTarget, wrap);
+    wrap.classList.toggle("show-pace-detail", shouldOpen);
+    paceDetailButton.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
     return;
   }
 
@@ -2223,7 +2349,7 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const currentWeekLabel = getPeriodRecordLabel("week", getWeekRange(today));
   const currentMonthLabel = getPeriodRecordLabel("month", getMonthRange(today));
   const currentYearLabel = getPeriodRecordLabel("year", getYearRange(today));
-  const historyTitle = selectedMetric === "total" ? "Total vs last 5 periods" : "Average/day vs last 5 periods";
+  const historyTitle = selectedMetric === "total" ? "Total vs last 4 periods" : "Average/day vs last 4 periods";
 
   return `
     <section class="deep-dive-insights">
@@ -2450,7 +2576,7 @@ function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, me
   const selectedMetric = normalizeHistoryMetric(metricType);
   const history = [];
   const firstEntryDate = getTrackerFirstEntryDate(tracker.id);
-  for (let offset = 0; offset <= 5; offset += 1) {
+  for (let offset = 0; offset <= 4; offset += 1) {
     const compareRange = shiftPeriodRange(periodName, currentRange, offset);
     if (offset > 0) {
       if (!firstEntryDate || compareRange.end < firstEntryDate) {
@@ -2511,19 +2637,6 @@ function getAverageBarLabel(periodName, offset) {
 
 function handleViewControlChange(event) {
   if (!currentUser) {
-    return;
-  }
-
-  const input = event.target.closest("input[data-action='toggle-compare']");
-  if (input) {
-    const period = input.dataset.period;
-    const id = input.dataset.id;
-    if (!period || !id || !goalCompareState[period]) {
-      return;
-    }
-    goalCompareState[period][id] = input.checked;
-    renderPeriodTabs();
-    renderGraphModal();
     return;
   }
 
@@ -2616,6 +2729,22 @@ function hideTooltipsInList(listElement) {
   });
 }
 
+function hideAllPaceDetailPopovers(scope = document, exceptWrap = null) {
+  if (!scope || !scope.querySelectorAll) {
+    return;
+  }
+  scope.querySelectorAll(".pace-chip-wrap.show-pace-detail").forEach((wrap) => {
+    if (exceptWrap && wrap === exceptWrap) {
+      return;
+    }
+    wrap.classList.remove("show-pace-detail");
+    const button = wrap.querySelector("button[data-action='toggle-pace-detail']");
+    if (button) {
+      button.setAttribute("aria-expanded", "false");
+    }
+  });
+}
+
 function render() {
   applyTheme();
   renderAuthState();
@@ -2636,6 +2765,7 @@ function render() {
   renderGoalScheduleTab();
   renderPeriodTabs();
   renderBucketListViewTab();
+  renderFriendsSettings();
   renderRewardsSettings();
   renderPointStoreTab();
 }
@@ -2671,12 +2801,68 @@ function renderAuthState() {
     ? ` | ${formatAmount(getPointBankBalance())} pts`
     : "";
   activeUserLabel.textContent = isAuthenticated ? `${username}${pointSuffix}` : "";
+  renderNotifications();
   if (isAuthenticated) {
     showAuthMessage("");
   } else if (graphModal) {
     graphModal.classList.add("hidden");
     graphModal.setAttribute("aria-hidden", "true");
   }
+}
+
+function renderNotifications() {
+  if (
+    !notificationsToggleButton
+    || !notificationsBadge
+    || !notificationsPanel
+    || !notificationsList
+    || !notificationsEmpty
+    || !notificationsMarkReadButton
+  ) {
+    return;
+  }
+  const isAuthenticated = Boolean(currentUser);
+  notificationsToggleButton.hidden = !isAuthenticated;
+  if (!isAuthenticated) {
+    notificationsPanelOpen = false;
+    notificationsBadge.hidden = true;
+    notificationsBadge.textContent = "0";
+    notificationsPanel.classList.add("hidden");
+    notificationsPanel.setAttribute("aria-hidden", "true");
+    notificationsToggleButton.setAttribute("aria-expanded", "false");
+    notificationsList.innerHTML = "";
+    notificationsEmpty.style.display = "none";
+    notificationsMarkReadButton.disabled = true;
+    return;
+  }
+
+  const unreadCount = notifications.reduce((count, item) => count + (item.read ? 0 : 1), 0);
+  notificationsBadge.textContent = String(unreadCount);
+  notificationsBadge.hidden = unreadCount < 1;
+  notificationsToggleButton.setAttribute("aria-expanded", notificationsPanelOpen ? "true" : "false");
+  notificationsPanel.classList.toggle("hidden", !notificationsPanelOpen);
+  notificationsPanel.setAttribute("aria-hidden", notificationsPanelOpen ? "false" : "true");
+  notificationsMarkReadButton.disabled = unreadCount < 1;
+
+  if (notifications.length < 1) {
+    notificationsList.innerHTML = "";
+    notificationsEmpty.style.display = "block";
+    return;
+  }
+
+  notificationsEmpty.style.display = "none";
+  notificationsList.innerHTML = notifications
+    .slice(0, 30)
+    .map((item, index) => `
+      <li class="quick-item" style="--stagger:${index}">
+        <div class="metric-top">
+          <strong>${escapeHtml(getNotificationMessage(item))}</strong>
+          <span class="pace-chip${item.read ? "" : " pace-on"}">${item.read ? "Read" : "New"}</span>
+        </div>
+        <p class="muted small">${escapeHtml(formatSnapshotClosedAt(item.createdAt))}</p>
+      </li>
+    `)
+    .join("");
 }
 
 function renderManageGoals() {
@@ -3246,10 +3432,19 @@ function renderEntryListTab() {
     entryListBucketFilterSelect.value = entryListBucketFilter;
   }
 
+  const snapshotCards = buildSnapshotEntryCardsMarkup(0);
+  const snapshotMarkup = snapshotCards.markup;
+  const snapshotCount = snapshotCards.count;
+
   if (entries.length < 1 || trackers.length < 1) {
-    entryListAll.innerHTML = "";
-    entryListEmpty.style.display = "block";
-    entryListEmpty.textContent = "No entries yet.";
+    if (snapshotCount < 1) {
+      entryListAll.innerHTML = "";
+      entryListEmpty.style.display = "block";
+      entryListEmpty.textContent = "No entries yet.";
+      return;
+    }
+    entryListEmpty.style.display = "none";
+    entryListAll.innerHTML = snapshotMarkup;
     return;
   }
 
@@ -3287,9 +3482,14 @@ function renderEntryListTab() {
   });
 
   if (filteredEntries.length < 1) {
-    entryListAll.innerHTML = "";
-    entryListEmpty.style.display = "block";
-    entryListEmpty.textContent = "No entries match your filters.";
+    if (snapshotCount < 1) {
+      entryListAll.innerHTML = "";
+      entryListEmpty.style.display = "block";
+      entryListEmpty.textContent = "No entries match your filters.";
+      return;
+    }
+    entryListEmpty.style.display = "none";
+    entryListAll.innerHTML = snapshotMarkup;
     return;
   }
 
@@ -3320,9 +3520,9 @@ function renderEntryListTab() {
 
   entryListEmpty.style.display = "none";
   entryListEmpty.textContent = "No entries yet.";
-  entryListAll.innerHTML = sortedEntries
+  const entryMarkup = sortedEntries
     .map((entry, index) => `
-      <li class="entry-card" style="--stagger:${index}">
+      <li class="entry-card" style="--stagger:${index + snapshotCount}">
         <form data-action="edit-entry" data-id="${entry.id}" class="entry-edit-form">
           <div class="form-grid form-grid-entry">
             <label>
@@ -3350,6 +3550,43 @@ function renderEntryListTab() {
       </li>
     `)
     .join("");
+  entryListAll.innerHTML = `${snapshotMarkup}${entryMarkup}`;
+}
+
+function buildSnapshotEntryCardsMarkup(startIndex = 0) {
+  const snapshotItems = [...periodSnapshots]
+    .sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+  if (snapshotItems.length < 1) {
+    return { count: 0, markup: "" };
+  }
+  const markup = snapshotItems
+    .map((snapshot, index) => {
+      const summary = snapshot.summary || {};
+      const rangeLabel = `${formatDate(parseDateKey(snapshot.rangeStart))} to ${formatDate(parseDateKey(snapshot.rangeEnd))}`;
+      const totalProgress = formatAmount(summary.totalProgress || 0);
+      const totalTarget = formatAmount(summary.totalTarget || 0);
+      const completion = String(Math.max(Math.round(Number(summary.completion) || 0), 0));
+      return `
+        <li class="entry-card" style="--stagger:${startIndex + index}">
+          <div class="snapshot-item-top">
+            <strong>Snapshot | ${escapeHtml(getSnapshotPeriodTitle(snapshot.period))}</strong>
+            <span class="pace-chip">${escapeHtml(rangeLabel)}</span>
+          </div>
+          <p class="muted small">Closed ${escapeHtml(formatSnapshotClosedAt(snapshot.closedAt))}</p>
+          <p class="metric-line">Completion ${escapeHtml(completion)}% | Progress ${escapeHtml(totalProgress)}/${escapeHtml(totalTarget)}</p>
+          <p class="muted small">Pace: ${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</p>
+          <div class="actions">
+            <button class="btn" type="button" data-action="reopen-snapshot" data-id="${snapshot.id}">Reopen</button>
+            <button class="btn btn-danger" type="button" data-action="delete-snapshot" data-id="${snapshot.id}">Delete</button>
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+  return {
+    count: snapshotItems.length,
+    markup
+  };
 }
 
 function renderGoalScheduleTab() {
@@ -3661,7 +3898,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const compareEnabled = isFloating ? false : getGoalCompareEnabled(periodName, tracker.id);
       const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
-      const compareLabel = getOverlayControlLabel(periodName);
       const projectionAllowed = !isFloating && shouldAllowProjectionLine(periodName, range, now);
       const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(periodName, tracker.id) : false;
 
@@ -3686,34 +3922,44 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         });
       }
 
-      const paceDetailLine = isFloating
-        ? `<p class="metric-line">Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} | Floating goal</p>`
-        : `<p class="metric-line">Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Needed/day ${formatAmountWithUnit(needed, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)}</p>`;
+      const paceDetailText = isFloating
+        ? `Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} | Floating goal`
+        : `Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Needed/day ${formatAmountWithUnit(needed, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)}`;
       const paceStatusChip = isFloating
-        ? `<span class="pace-chip">Floating</span>`
+        ? `
+            <span class="pace-chip-wrap">
+              <button
+                type="button"
+                class="pace-chip pace-chip-detail"
+                data-action="toggle-pace-detail"
+                data-detail="${escapeAttr(paceDetailText)}"
+                title="${escapeAttr(paceDetailText)}"
+                aria-expanded="false"
+              >Floating</button>
+              <span class="pace-detail-popover">${escapeHtml(paceDetailText)}</span>
+            </span>
+          `
         : `
-            <span class="pace-chip ${isOnPace ? "pace-on" : "pace-off"}">${paceLabel}</span>
+            <span class="pace-chip-wrap">
+              <button
+                type="button"
+                class="pace-chip pace-chip-detail ${isOnPace ? "pace-on" : "pace-off"}"
+                data-action="toggle-pace-detail"
+                data-detail="${escapeAttr(paceDetailText)}"
+                title="${escapeAttr(paceDetailText)}"
+                aria-expanded="false"
+              >${paceLabel}</button>
+              <span class="pace-detail-popover">${escapeHtml(paceDetailText)}</span>
+            </span>
         `;
-      const trackerControlMarkup = isFloating
-        ? ""
-        : `
-              <label class="check-inline check-compact compare-control">
-                <input type="checkbox" data-action="toggle-compare" data-period="${periodName}" data-id="${tracker.id}" ${compareEnabled ? "checked" : ""} />
-                ${compareLabel}
-              </label>
-          `;
 
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}</h3>
-            <div class="metric-controls">
-              ${trackerControlMarkup}
-            </div>
           </div>
           <p class="metric-line">${formatAmountWithUnit(progress, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)} (${pct}%)</p>
           <div class="progress"><span class="${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span></div>
-          ${paceDetailLine}
           <div class="pace-line">
             ${paceStatusChip}
             <span class="pace-actions">
@@ -3859,7 +4105,7 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
     const avgPerDay = safeDivide(progress, elapsedDays);
     const neededPerDay = safeDivide(target, totalDays);
     const projected = avgPerDay * totalDays;
-    const onPaceLabel = isFloating ? "N/A" : projected >= target ? "Yes" : "No";
+    const onPaceLabel = isFloating ? "N/A" : projected >= target ? "On pace" : "Off pace";
 
     goalsProgressTotal = addAmount(goalsProgressTotal, progress);
     goalsTargetTotal = addAmount(goalsTargetTotal, target);
@@ -3915,7 +4161,7 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   const projected = addAmount(projectedGoals, checkInProgressTotal);
   const paceTargetWithCheckIns = addAmount(paceTargetTotal, checkInTargetTotal);
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
-  const onPaceLabel = onPace === null ? "N/A" : onPace ? "Yes" : "No";
+  const onPaceLabel = onPace === null ? "N/A" : onPace ? "On pace" : "Off pace";
   const periodState = periodGoalFilterState[periodName] || { type: "all", status: "active", tag: "all" };
 
   return {
@@ -4036,13 +4282,18 @@ function renderPeriodSnapshots(periodName, range) {
       <li class="entry-card" style="--stagger:${index}">
         <div class="snapshot-item-top">
           <strong>${escapeHtml(rangeLabel)}</strong>
-          <span class="pace-chip">${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</span>
+          <span class="pace-chip">${escapeHtml(getSnapshotPeriodTitle(snapshot.period))}</span>
         </div>
         <p class="muted small">Closed ${escapeHtml(formatSnapshotClosedAt(snapshot.closedAt))}</p>
+        <p class="muted small">Pace: ${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</p>
         <p class="metric-line">Completion ${escapeHtml(String(Math.max(Math.round(Number(summary.completion) || 0), 0)))}% | Progress ${escapeHtml(formatAmount(summary.totalProgress || 0))}/${escapeHtml(formatAmount(summary.totalTarget || 0))}</p>
         <p class="muted small">${escapeHtml(String(Math.max(Math.floor(Number(summary.goalsCount) || 0), 0)))} goals + ${escapeHtml(String(Math.max(Math.floor(Number(summary.checkInsCount) || 0), 0)))} check-ins</p>
         ${isRewardPointsEnabled() ? `<p class="muted small">Goal points ${escapeHtml(formatAmount(summary.goalPointsEarned || 0))} (${escapeHtml(String(Math.max(Math.floor(Number(summary.completedGoalsCount) || 0), 0)))} completed)</p>` : ""}
         ${filterLine}
+        <div class="actions">
+          <button class="btn" type="button" data-action="reopen-snapshot" data-id="${snapshot.id}">Reopen</button>
+          <button class="btn btn-danger" type="button" data-action="delete-snapshot" data-id="${snapshot.id}">Delete</button>
+        </div>
       </li>
     `;
   }).join("");
@@ -4072,13 +4323,116 @@ function getPeriodSnapshotElements(periodName) {
 
 function normalizeSnapshotOnPaceLabel(value) {
   const normalized = String(value || "").toLowerCase();
-  if (normalized === "yes") {
-    return "Yes";
+  if (normalized === "yes" || normalized === "on pace") {
+    return "On pace";
   }
-  if (normalized === "no") {
-    return "No";
+  if (normalized === "no" || normalized === "off pace") {
+    return "Off pace";
+  }
+  if (normalized === "hit") {
+    return "Hit";
+  }
+  if (normalized === "missed") {
+    return "Missed";
   }
   return "N/A";
+}
+
+function getSnapshotPeriodTitle(periodName) {
+  if (periodName === "month") {
+    return "Month";
+  }
+  if (periodName === "year") {
+    return "Year";
+  }
+  return "Week";
+}
+
+function handleSnapshotActionClick(event) {
+  if (!currentUser) {
+    return;
+  }
+  const reopenButton = event.target.closest("button[data-action='reopen-snapshot']");
+  if (reopenButton) {
+    const snapshotId = String(reopenButton.dataset.id || "");
+    if (!snapshotId) {
+      return;
+    }
+    if (reopenPeriodSnapshot(snapshotId)) {
+      render();
+    }
+    return;
+  }
+
+  const deleteButton = event.target.closest("button[data-action='delete-snapshot']");
+  if (!deleteButton) {
+    return;
+  }
+  const snapshotId = String(deleteButton.dataset.id || "");
+  if (!snapshotId) {
+    return;
+  }
+  const snapshot = periodSnapshots.find((item) => item.id === snapshotId);
+  if (!snapshot) {
+    return;
+  }
+  const shouldDelete = confirm(
+    `Delete ${getSnapshotPeriodTitle(snapshot.period).toLowerCase()} snapshot for ${formatDate(parseDateKey(snapshot.rangeStart))} to ${formatDate(parseDateKey(snapshot.rangeEnd))}?`
+  );
+  if (!shouldDelete) {
+    return;
+  }
+  deletePeriodSnapshot(snapshotId);
+  render();
+}
+
+function reopenPeriodSnapshot(snapshotId) {
+  const snapshot = periodSnapshots.find((item) => item && item.id === snapshotId);
+  if (!snapshot) {
+    return false;
+  }
+  const rangeStartDate = parseDateKey(snapshot.rangeStart);
+  if (!rangeStartDate) {
+    return false;
+  }
+  if (snapshot.period === "month") {
+    monthViewAnchor = new Date(rangeStartDate.getFullYear(), rangeStartDate.getMonth(), 1);
+    activeTab = "month";
+  } else if (snapshot.period === "year") {
+    yearViewAnchor = new Date(rangeStartDate.getFullYear(), 0, 1);
+    activeTab = "year";
+  } else {
+    weekViewAnchor = normalizeDate(rangeStartDate);
+    activeTab = "week";
+  }
+  return true;
+}
+
+function deletePeriodSnapshot(snapshotId) {
+  const index = periodSnapshots.findIndex((item) => item && item.id === snapshotId);
+  if (index < 0) {
+    return;
+  }
+  const [removed] = periodSnapshots.splice(index, 1);
+  savePeriodSnapshots();
+  if (removed) {
+    removeCloseoutPointAward(removed);
+  }
+}
+
+function removeCloseoutPointAward(snapshot) {
+  if (!snapshot || !snapshot.period || !snapshot.rangeStart || !snapshot.rangeEnd) {
+    return;
+  }
+  const refKey = `${snapshot.period}|${snapshot.rangeStart}|${snapshot.rangeEnd}`;
+  const nextTransactions = pointTransactions.filter((item) => (
+    !(item && item.type === "earn-closeout" && item.refKey === refKey)
+  ));
+  if (nextTransactions.length === pointTransactions.length) {
+    return;
+  }
+  pointTransactions = nextTransactions;
+  savePointTransactions();
 }
 
 function formatSnapshotClosedAt(value) {
@@ -4149,6 +4503,41 @@ function getPointBankTotals() {
 
 function getPointBankBalance() {
   return getPointBankTotals().balance;
+}
+
+function renderFriendsSettings() {
+  if (!friendList || !friendEmpty) {
+    return;
+  }
+  if (!currentUser) {
+    friendList.innerHTML = "";
+    friendEmpty.style.display = "none";
+    return;
+  }
+  if (friends.length < 1) {
+    friendList.innerHTML = "";
+    friendEmpty.style.display = "block";
+    return;
+  }
+
+  friendEmpty.style.display = "none";
+  friendList.innerHTML = [...friends]
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .map((item, index) => {
+      const emailLine = item.email
+        ? `<p class="muted small">${escapeHtml(item.email)}</p>`
+        : `<p class="muted small">No email saved</p>`;
+      return `
+        <li class="quick-item" style="--stagger:${index}">
+          <div class="metric-top">
+            <strong>${escapeHtml(item.name)}</strong>
+            <button class="btn btn-danger" type="button" data-action="delete-friend" data-id="${item.id}">Delete</button>
+          </div>
+          ${emailLine}
+        </li>
+      `;
+    })
+    .join("");
 }
 
 function renderRewardsSettings() {
@@ -4967,24 +5356,8 @@ function getPeriodComparison(periodName, range, elapsedDays) {
   return null;
 }
 
-function getOverlayControlLabel(periodName) {
-  if (periodName === "week") {
-    return "Comp Last Wk";
-  }
-  if (periodName === "month") {
-    return "Comp Last Mo";
-  }
-  return "Comp Last Yr";
-}
-
 function getGoalCompareEnabled(periodName, trackerId) {
-  if (!goalCompareState[periodName]) {
-    return Boolean(settings.compareToLastDefault);
-  }
-  if (typeof goalCompareState[periodName][trackerId] !== "boolean") {
-    goalCompareState[periodName][trackerId] = Boolean(settings.compareToLastDefault);
-  }
-  return goalCompareState[periodName][trackerId];
+  return Boolean(settings && settings.compareToLastDefault);
 }
 
 function getGraphPointsEnabled(periodName, trackerId) {
@@ -5350,6 +5723,123 @@ function getCloudDataRef(userId) {
   return doc(firebaseDb, CLOUD_DATA_COLLECTION, userId);
 }
 
+function getNotificationMessage(item) {
+  if (!item || typeof item !== "object") {
+    return "New notification";
+  }
+  const type = String(item.type || "");
+  if (type === "friend-added") {
+    const actorName = normalizeUsername(item.actorUsername) || "Someone";
+    return `${actorName} added you as a friend.`;
+  }
+  return "New notification";
+}
+
+async function sendFriendAddedNotification(friendName, friendEmail) {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return;
+  }
+  const email = normalizeEmail(friendEmail);
+  if (!email) {
+    return;
+  }
+  try {
+    const profileQuery = query(
+      collection(firebaseDb, CLOUD_PROFILE_COLLECTION),
+      where("email", "==", email),
+      limit(1)
+    );
+    const snapshot = await getDocs(profileQuery);
+    if (snapshot.empty) {
+      return;
+    }
+    const targetProfileDoc = snapshot.docs[0];
+    const recipientId = String(targetProfileDoc.id || "");
+    if (!recipientId || recipientId === currentUser.id) {
+      return;
+    }
+    await addDoc(collection(firebaseDb, CLOUD_NOTIFICATION_COLLECTION), {
+      type: "friend-added",
+      recipientId,
+      actorId: currentUser.id,
+      actorUsername: getUserDisplayName(currentUser),
+      actorEmail: normalizeEmail(currentUser.email),
+      friendLabel: String(friendName || "").trim(),
+      createdAt: new Date().toISOString(),
+      read: false
+    });
+  } catch {
+    // Keep local friend entry even if notification delivery fails.
+  }
+}
+
+function normalizeNotificationRecord(raw, id) {
+  const item = raw && typeof raw === "object" ? raw : {};
+  const createdAt = new Date(item.createdAt);
+  return {
+    id: String(id || createId()),
+    type: typeof item.type === "string" ? item.type : "system",
+    recipientId: typeof item.recipientId === "string" ? item.recipientId : "",
+    actorId: typeof item.actorId === "string" ? item.actorId : "",
+    actorUsername: typeof item.actorUsername === "string" ? item.actorUsername : "",
+    actorEmail: typeof item.actorEmail === "string" ? item.actorEmail : "",
+    friendLabel: typeof item.friendLabel === "string" ? item.friendLabel : "",
+    read: Boolean(item.read),
+    createdAt: Number.isNaN(createdAt.getTime()) ? new Date().toISOString() : createdAt.toISOString()
+  };
+}
+
+function stopNotificationsListener() {
+  if (typeof notificationsUnsubscribe === "function") {
+    notificationsUnsubscribe();
+  }
+  notificationsUnsubscribe = null;
+}
+
+function startNotificationsListener() {
+  stopNotificationsListener();
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    notifications = [];
+    notificationsPanelOpen = false;
+    renderNotifications();
+    return;
+  }
+  const notificationsQuery = query(
+    collection(firebaseDb, CLOUD_NOTIFICATION_COLLECTION),
+    where("recipientId", "==", currentUser.id),
+    limit(100)
+  );
+  notificationsUnsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+    notifications = snapshot.docs
+      .map((item) => normalizeNotificationRecord(item.data(), item.id))
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    renderNotifications();
+  }, () => {
+    notifications = [];
+    renderNotifications();
+  });
+}
+
+async function markAllNotificationsRead() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return;
+  }
+  const unread = notifications.filter((item) => !item.read);
+  if (unread.length < 1) {
+    return;
+  }
+  await Promise.all(unread.map(async (item) => {
+    try {
+      await updateDoc(doc(firebaseDb, CLOUD_NOTIFICATION_COLLECTION, item.id), {
+        read: true,
+        readAt: new Date().toISOString()
+      });
+    } catch {
+      // Keep trying on next action/listener refresh.
+    }
+  }));
+}
+
 function loadLocalDataUpdatedAt() {
   if (!currentUser) {
     return "";
@@ -5375,6 +5865,7 @@ function buildCloudPayload() {
     checkInEntries,
     goalJournalEntries,
     schedules,
+    friends,
     periodSnapshots,
     rewards,
     rewardPurchases,
@@ -5428,11 +5919,12 @@ function isLocalDataEmpty() {
   const hasCheckIns = Array.isArray(checkIns) && checkIns.length > 0;
   const hasJournal = Array.isArray(goalJournalEntries) && goalJournalEntries.length > 0;
   const hasSchedules = Array.isArray(schedules) && schedules.length > 0;
+  const hasFriends = Array.isArray(friends) && friends.length > 0;
   const hasSnapshots = Array.isArray(periodSnapshots) && periodSnapshots.length > 0;
   const hasRewards = Array.isArray(rewards) && rewards.length > 0;
   const hasRewardPurchases = Array.isArray(rewardPurchases) && rewardPurchases.length > 0;
   const hasTransactions = Array.isArray(pointTransactions) && pointTransactions.length > 0;
-  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
+  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasFriends || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
 }
 
 function writeCloudPayloadToLocal(payload) {
@@ -5446,6 +5938,7 @@ function writeCloudPayloadToLocal(payload) {
     [CHECKIN_ENTRIES_STORAGE_KEY, Array.isArray(payload.checkInEntries) ? payload.checkInEntries : []],
     [GOAL_JOURNAL_STORAGE_KEY, Array.isArray(payload.goalJournalEntries) ? payload.goalJournalEntries : []],
     [SCHEDULE_STORAGE_KEY, Array.isArray(payload.schedules) ? payload.schedules : []],
+    [FRIENDS_STORAGE_KEY, Array.isArray(payload.friends) ? payload.friends : []],
     [PERIOD_SNAPSHOTS_STORAGE_KEY, Array.isArray(payload.periodSnapshots) ? payload.periodSnapshots : []],
     [REWARDS_STORAGE_KEY, Array.isArray(payload.rewards) ? payload.rewards : []],
     [REWARD_PURCHASES_STORAGE_KEY, Array.isArray(payload.rewardPurchases) ? payload.rewardPurchases : []],
@@ -5554,6 +6047,7 @@ async function loadCurrentUserProfile(authUser) {
 }
 
 function resetStateForSignedOutUser() {
+  stopNotificationsListener();
   if (cloudSyncTimer) {
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = null;
@@ -5567,10 +6061,13 @@ function resetStateForSignedOutUser() {
   checkInEntries = [];
   goalJournalEntries = [];
   schedules = [];
+  friends = [];
   periodSnapshots = [];
   rewards = [];
   rewardPurchases = [];
   pointTransactions = [];
+  notifications = [];
+  notificationsPanelOpen = false;
   settings = getDefaultSettings();
   activeTab = "manage";
   entryMode = "solo";
@@ -5652,6 +6149,7 @@ function initializeAuth() {
       initializeData();
       await syncCloudDataOnLogin();
       resetUiStateForLogin();
+      startNotificationsListener();
       render();
     } catch {
       resetStateForSignedOutUser();
@@ -5664,6 +6162,7 @@ function initializeAuth() {
 function resetUiStateForLogin() {
   activeTab = "manage";
   entryMode = "solo";
+  notificationsPanelOpen = false;
   scheduleWeekAnchor = normalizeDate(new Date());
   weekEntryAnchor = normalizeDate(new Date());
   weekEntryStatusMessage = "";
@@ -6298,6 +6797,7 @@ function migrateLegacyDataToUser() {
     GOAL_JOURNAL_STORAGE_KEY,
     SCHEDULE_STORAGE_KEY,
     SETTINGS_STORAGE_KEY,
+    FRIENDS_STORAGE_KEY,
     PERIOD_SNAPSHOTS_STORAGE_KEY,
     REWARDS_STORAGE_KEY,
     REWARD_PURCHASES_STORAGE_KEY,
@@ -6324,6 +6824,7 @@ function initializeData() {
     checkInEntries = [];
     goalJournalEntries = [];
     schedules = [];
+    friends = [];
     periodSnapshots = [];
     rewards = [];
     rewardPurchases = [];
@@ -6341,6 +6842,7 @@ function initializeData() {
   checkInEntries = loadCheckInEntries().filter((entry) => checkIns.some((item) => item.id === entry.checkInId));
   goalJournalEntries = loadGoalJournalEntries();
   schedules = loadSchedules().filter((item) => trackers.some((tracker) => tracker.id === item.trackerId));
+  friends = loadFriends();
   periodSnapshots = loadPeriodSnapshots();
   rewards = loadRewards();
   rewardPurchases = loadRewardPurchases();
@@ -6628,6 +7130,33 @@ function loadPeriodSnapshots() {
   }
 }
 
+function loadFriends() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(FRIENDS_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => ({
+        id: item.id,
+        name: typeof item.name === "string" ? item.name.trim() : "",
+        email: typeof item.email === "string" ? item.email.trim() : "",
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }))
+      .filter((item) => item.name);
+  } catch {
+    return [];
+  }
+}
+
 function loadRewards() {
   try {
     if (!currentUser) {
@@ -6822,6 +7351,15 @@ function saveSchedules() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(SCHEDULE_STORAGE_KEY), JSON.stringify(schedules));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
+}
+
+function saveFriends() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(FRIENDS_STORAGE_KEY), JSON.stringify(friends));
   markLocalDataUpdatedAt();
   queueCloudSync();
 }

@@ -81,6 +81,20 @@
           <p class="eyebrow">Goal System</p>
           <div class="hero-actions">
             <p id="active-user-label" class="muted small"></p>
+            <div class="notifications-wrap">
+              <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-expanded="false" aria-controls="notifications-panel" hidden>
+                Notifications
+                <span id="notifications-unread-count" class="notifications-badge" hidden>0</span>
+              </button>
+              <section id="notifications-panel" class="notifications-panel hidden" aria-hidden="true" aria-label="Notifications">
+                <div class="notifications-head">
+                  <h3>Notifications</h3>
+                  <button id="notifications-mark-read-btn" class="btn btn-nav-compact" type="button">Mark All Read</button>
+                </div>
+                <ul id="notifications-list" class="card-list compact-list"></ul>
+                <p id="notifications-empty" class="empty-state">No notifications yet.</p>
+              </section>
+            </div>
             <button id="logout-btn" class="btn" type="button">Logout</button>
           </div>
         </div>
@@ -494,9 +508,11 @@
       <div class="panel-head">
         <h2>Week View</h2>
         <div class="panel-actions">
-          <button id="week-prev" class="btn btn-nav-compact" type="button">Prev</button>
-          <button id="week-this" class="btn btn-nav-compact" type="button">This</button>
-          <button id="week-next" class="btn btn-nav-compact" type="button">Next</button>
+          <div class="period-nav" aria-label="Week navigation">
+            <button id="week-prev" class="btn btn-nav-pill" type="button" aria-label="Previous week">&lt;</button>
+            <button id="week-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current week">o</button>
+            <button id="week-next" class="btn btn-nav-pill" type="button" aria-label="Next week">&gt;</button>
+          </div>
           <button id="week-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <label class="inline-control">
             Goal Type
@@ -542,9 +558,11 @@
       <div class="panel-head">
         <h2>Month View</h2>
         <div class="panel-actions">
-          <button id="month-prev" class="btn btn-nav-compact" type="button">Prev</button>
-          <button id="month-this" class="btn btn-nav-compact" type="button">This</button>
-          <button id="month-next" class="btn btn-nav-compact" type="button">Next</button>
+          <div class="period-nav" aria-label="Month navigation">
+            <button id="month-prev" class="btn btn-nav-pill" type="button" aria-label="Previous month">&lt;</button>
+            <button id="month-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current month">o</button>
+            <button id="month-next" class="btn btn-nav-pill" type="button" aria-label="Next month">&gt;</button>
+          </div>
           <button id="month-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <label class="inline-control">
             Goal Type
@@ -590,9 +608,11 @@
       <div class="panel-head">
         <h2>Year View</h2>
         <div class="panel-actions">
-          <button id="year-prev" class="btn btn-nav-compact" type="button">Prev</button>
-          <button id="year-this" class="btn btn-nav-compact" type="button">This</button>
-          <button id="year-next" class="btn btn-nav-compact" type="button">Next</button>
+          <div class="period-nav" aria-label="Year navigation">
+            <button id="year-prev" class="btn btn-nav-pill" type="button" aria-label="Previous year">&lt;</button>
+            <button id="year-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current year">o</button>
+            <button id="year-next" class="btn btn-nav-pill" type="button" aria-label="Next year">&gt;</button>
+          </div>
           <button id="year-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <label class="inline-control">
             Goal Type
@@ -747,7 +767,7 @@
           </select>
         </label>
         <label>
-          Default Compare To Last Period
+          Compare Last Period In Views
           <select id="compare-default-select">
             <option value="on">On</option>
             <option value="off">Off</option>
@@ -789,7 +809,29 @@
         </label>
         <button class="btn" type="submit">Save Settings</button>
       </form>
-      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, projection behavior, reward points, bucket list visibility, and your saved color theme.</p>
+      <p id="settings-note" class="muted">This affects week boundaries, compare behavior in views, projection behavior, reward points, bucket list visibility, and your saved color theme.</p>
+
+      <section id="friends-settings-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Friends</h3>
+          <p class="muted small">Add friends to keep a quick list of people you track with. Add their account email to send a notification.</p>
+        </div>
+        <form id="friend-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Name
+              <input id="friend-name" type="text" maxlength="90" placeholder="Friend name" required />
+            </label>
+            <label>
+              Email (optional)
+              <input id="friend-email" type="email" maxlength="140" placeholder="friend@email.com" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Friend</button>
+        </form>
+        <ul id="friend-list" class="card-list compact-list"></ul>
+        <p id="friend-empty" class="empty-state">No friends added yet.</p>
+      </section>
 
       <section id="point-store-settings-section" class="snapshot-panel" hidden>
         <div class="snapshot-panel-head">
