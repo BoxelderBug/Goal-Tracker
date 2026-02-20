@@ -184,6 +184,12 @@ const friendList = document.querySelector("#friend-list");
 const friendEmpty = document.querySelector("#friend-empty");
 const pointStoreMenuButton = document.querySelector("#point-store-menu-btn");
 const pointStoreSettingsSection = document.querySelector("#point-store-settings-section");
+const pointStoreToggleForm = document.querySelector("#point-store-toggle-form");
+const pointStoreEnabledSelect = document.querySelector("#point-store-enabled-select");
+const pointAdjustForm = document.querySelector("#point-adjust-form");
+const pointAdjustDirectionSelect = document.querySelector("#point-adjust-direction");
+const pointAdjustAmount = document.querySelector("#point-adjust-amount");
+const pointAdjustNote = document.querySelector("#point-adjust-note");
 const rewardForm = document.querySelector("#reward-form");
 const rewardName = document.querySelector("#reward-name");
 const rewardCost = document.querySelector("#reward-cost");
@@ -502,7 +508,7 @@ menuButtons.forEach((button) => {
       renderTabs();
       return;
     }
-    if (!isRewardPointsEnabled() && activeTab === "point-store") {
+    if (!isPointStoreRewardsEnabled() && activeTab === "point-store") {
       activeTab = "manage";
       renderTabs();
       return;
@@ -1664,10 +1670,61 @@ if (goalJournalList) {
   });
 }
 
+if (pointStoreToggleForm) {
+  pointStoreToggleForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser || !isRewardPointsEnabled() || !pointStoreEnabledSelect) {
+      return;
+    }
+    settings.pointStoreRewardsEnabled = pointStoreEnabledSelect.value !== "off";
+    saveSettings();
+    applyRewardPointsFeatureVisibility();
+    renderTabs();
+    renderRewardsSettings();
+    renderPointStoreTab();
+  });
+}
+
+if (pointAdjustForm) {
+  pointAdjustForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser || !isRewardPointsEnabled()) {
+      return;
+    }
+    const direction = pointAdjustDirectionSelect && pointAdjustDirectionSelect.value === "remove"
+      ? "remove"
+      : "add";
+    const amount = normalizePositiveAmount(pointAdjustAmount ? pointAdjustAmount.value : 0, 0);
+    if (amount <= 0) {
+      alert("Enter an amount greater than zero.");
+      return;
+    }
+    if (direction === "remove" && getPointBankBalance() < amount) {
+      alert("You cannot remove more points than are in your point bank.");
+      return;
+    }
+    const signedAmount = direction === "remove" ? -amount : amount;
+    const note = String(pointAdjustNote ? pointAdjustNote.value : "").trim();
+    pointTransactions.unshift({
+      id: createId(),
+      type: "adjustment",
+      amount: signedAmount,
+      createdAt: new Date().toISOString(),
+      note: note || (direction === "remove" ? "Manual point removal" : "Manual point addition")
+    });
+    savePointTransactions();
+    if (pointAdjustNote) {
+      pointAdjustNote.value = "";
+    }
+    renderPointStoreTab();
+    renderAuthState();
+  });
+}
+
 if (rewardForm) {
   rewardForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (!currentUser || !isRewardPointsEnabled()) {
+    if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
     const name = String(rewardName ? rewardName.value : "").trim();
@@ -1695,7 +1752,7 @@ if (rewardForm) {
 
 if (rewardSettingsList) {
   rewardSettingsList.addEventListener("click", (event) => {
-    if (!currentUser || !isRewardPointsEnabled()) {
+    if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
     const saveButton = event.target.closest("button[data-action='save-reward']");
@@ -1749,7 +1806,7 @@ if (rewardSettingsList) {
 
 if (pointStoreRewardList) {
   pointStoreRewardList.addEventListener("click", (event) => {
-    if (!currentUser || !isRewardPointsEnabled()) {
+    if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
     const redeemButton = event.target.closest("button[data-action='redeem-reward']");
@@ -1771,7 +1828,7 @@ if (pointStoreRewardList) {
 
 if (pointStoreActiveList) {
   pointStoreActiveList.addEventListener("click", (event) => {
-    if (!currentUser || !isRewardPointsEnabled()) {
+    if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
     const closeButton = event.target.closest("button[data-action='close-active-reward']");
@@ -1805,7 +1862,7 @@ if (pointStoreActiveList) {
 
 if (pointStoreClearClosedButton) {
   pointStoreClearClosedButton.addEventListener("click", () => {
-    if (!currentUser || !isRewardPointsEnabled()) {
+    if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
     const closedCount = rewardPurchases.filter((item) => item && item.status !== "active").length;
@@ -4817,10 +4874,41 @@ function renderRewardsSettings() {
     return;
   }
   if (!currentUser || !isRewardPointsEnabled()) {
+    if (pointStoreToggleForm) {
+      pointStoreToggleForm.style.display = "none";
+    }
+    if (pointAdjustForm) {
+      pointAdjustForm.style.display = "none";
+    }
+    if (rewardForm) {
+      rewardForm.style.display = "none";
+    }
     rewardSettingsList.innerHTML = "";
     rewardSettingsEmpty.style.display = "none";
     return;
   }
+  if (pointStoreToggleForm) {
+    pointStoreToggleForm.style.display = "grid";
+  }
+  if (pointAdjustForm) {
+    pointAdjustForm.style.display = "grid";
+  }
+  if (pointStoreEnabledSelect) {
+    pointStoreEnabledSelect.value = isPointStoreRewardsEnabled() ? "on" : "off";
+  }
+  if (!isPointStoreRewardsEnabled()) {
+    if (rewardForm) {
+      rewardForm.style.display = "none";
+    }
+    rewardSettingsList.innerHTML = "";
+    rewardSettingsEmpty.textContent = "Point Store rewards are turned off.";
+    rewardSettingsEmpty.style.display = "block";
+    return;
+  }
+  if (rewardForm) {
+    rewardForm.style.display = "grid";
+  }
+  rewardSettingsEmpty.textContent = "No rewards configured yet.";
 
   if (rewards.length < 1) {
     rewardSettingsList.innerHTML = "";
@@ -4873,7 +4961,7 @@ function renderPointStoreTab() {
     return;
   }
 
-  if (!currentUser || !isRewardPointsEnabled()) {
+  if (!currentUser || !isPointStoreRewardsEnabled()) {
     pointBankBalance.textContent = "0";
     pointBankEarned.textContent = "0";
     pointBankSpent.textContent = "0";
@@ -5011,8 +5099,8 @@ function redeemReward(rewardId) {
   if (!currentUser) {
     return { success: false, message: "Sign in before redeeming rewards." };
   }
-  if (!isRewardPointsEnabled()) {
-    return { success: false, message: "Reward points are turned off in Settings." };
+  if (!isPointStoreRewardsEnabled()) {
+    return { success: false, message: "Point Store rewards are turned off in Settings." };
   }
   const reward = rewards.find((item) => item.id === rewardId);
   if (!reward) {
@@ -5051,8 +5139,8 @@ function closeRewardPurchase(purchaseId) {
   if (!currentUser) {
     return { success: false, message: "Sign in before closing rewards." };
   }
-  if (!isRewardPointsEnabled()) {
-    return { success: false, message: "Reward points are turned off in Settings." };
+  if (!isPointStoreRewardsEnabled()) {
+    return { success: false, message: "Point Store rewards are turned off in Settings." };
   }
   const purchase = rewardPurchases.find((item) => item && item.id === purchaseId);
   if (!purchase || purchase.status !== "active") {
@@ -5068,8 +5156,8 @@ function refundRewardPurchase(purchaseId) {
   if (!currentUser) {
     return { success: false, message: "Sign in before refunding rewards." };
   }
-  if (!isRewardPointsEnabled()) {
-    return { success: false, message: "Reward points are turned off in Settings." };
+  if (!isPointStoreRewardsEnabled()) {
+    return { success: false, message: "Point Store rewards are turned off in Settings." };
   }
   const purchase = rewardPurchases.find((item) => item && item.id === purchaseId);
   if (!purchase || purchase.status !== "active") {
@@ -6975,6 +7063,18 @@ function resetUiStateForLogin() {
   if (rewardPointsEnabledSelect) {
     rewardPointsEnabledSelect.value = isRewardPointsEnabled() ? "on" : "off";
   }
+  if (pointStoreEnabledSelect) {
+    pointStoreEnabledSelect.value = isPointStoreRewardsEnabled() ? "on" : "off";
+  }
+  if (pointAdjustDirectionSelect) {
+    pointAdjustDirectionSelect.value = "add";
+  }
+  if (pointAdjustAmount) {
+    pointAdjustAmount.value = "10.00";
+  }
+  if (pointAdjustNote) {
+    pointAdjustNote.value = "";
+  }
   if (bucketListEnabledSelect) {
     bucketListEnabledSelect.value = isBucketListEnabled() ? "on" : "off";
   }
@@ -7271,6 +7371,7 @@ function getDefaultSettings() {
     compareToLastDefault: true,
     projectionAverageSource: "period",
     rewardPointsEnabled: false,
+    pointStoreRewardsEnabled: true,
     bucketListEnabled: true,
     theme: "teal"
   };
@@ -7329,6 +7430,10 @@ function isRewardPointsEnabled() {
   return Boolean(settings && settings.rewardPointsEnabled === true);
 }
 
+function isPointStoreRewardsEnabled() {
+  return isRewardPointsEnabled() && !(settings && settings.pointStoreRewardsEnabled === false);
+}
+
 function applyBucketListFeatureVisibility() {
   const enabled = isBucketListEnabled();
   document.querySelectorAll("[data-tab='bucket-entry'], [data-tab='bucket-list']").forEach((button) => {
@@ -7354,18 +7459,19 @@ function applyBucketListFeatureVisibility() {
 
 function applyRewardPointsFeatureVisibility() {
   const enabled = isRewardPointsEnabled();
+  const pointStoreEnabled = isPointStoreRewardsEnabled();
   if (pointStoreMenuButton) {
-    pointStoreMenuButton.hidden = !enabled;
-    if (!enabled) {
+    pointStoreMenuButton.hidden = !pointStoreEnabled;
+    if (!pointStoreEnabled) {
       pointStoreMenuButton.classList.remove("active");
       pointStoreMenuButton.setAttribute("aria-current", "false");
     }
   }
   document.querySelectorAll("[data-tab='point-store']").forEach((button) => {
-    button.hidden = !enabled;
+    button.hidden = !pointStoreEnabled;
   });
   document.querySelectorAll("[data-tab-panel='point-store']").forEach((panel) => {
-    if (!enabled) {
+    if (!pointStoreEnabled) {
       panel.hidden = true;
       panel.classList.remove("active");
     }
@@ -7388,7 +7494,7 @@ function applyRewardPointsFeatureVisibility() {
   document.querySelectorAll(".goal-points-col").forEach((cell) => {
     cell.hidden = !enabled;
   });
-  if (!enabled && activeTab === "point-store") {
+  if (!pointStoreEnabled && activeTab === "point-store") {
     activeTab = "manage";
   }
 }
@@ -8048,6 +8154,7 @@ function loadSettings() {
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
       projectionAverageSource: normalizeProjectionAverageSource(parsed && parsed.projectionAverageSource),
       rewardPointsEnabled: Boolean(parsed && (parsed.rewardPointsEnabled === true || parsed.rewardPointsEnabled === "on")),
+      pointStoreRewardsEnabled: !(parsed && (parsed.pointStoreRewardsEnabled === false || parsed.pointStoreRewardsEnabled === "off")),
       bucketListEnabled: !(parsed && parsed.bucketListEnabled === false),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
