@@ -254,7 +254,22 @@ body::before {
 .btn-notifications {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 999px;
+  position: relative;
+}
+
+.notifications-icon {
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.btn-notifications[aria-expanded="true"] .notifications-icon {
+  color: var(--brand-strong);
 }
 
 .notifications-badge {
@@ -269,6 +284,9 @@ body::before {
   font-weight: 700;
   color: #ffffff;
   background: linear-gradient(180deg, var(--brand), var(--brand-strong));
+  position: absolute;
+  top: -5px;
+  right: -5px;
 }
 
 .notifications-panel {

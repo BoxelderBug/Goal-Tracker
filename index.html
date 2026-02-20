@@ -82,8 +82,9 @@
           <div class="hero-actions">
             <p id="active-user-label" class="muted small"></p>
             <div class="notifications-wrap">
-              <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-expanded="false" aria-controls="notifications-panel" hidden>
-                Notifications
+              <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel" hidden>
+                <span class="notifications-icon" aria-hidden="true">&#128276;</span>
+                <span class="visually-hidden">Notifications</span>
                 <span id="notifications-unread-count" class="notifications-badge" hidden>0</span>
               </button>
               <section id="notifications-panel" class="notifications-panel hidden" aria-hidden="true" aria-label="Notifications">
