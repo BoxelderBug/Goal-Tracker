@@ -233,15 +233,6 @@ const yearList = document.querySelector("#year-list");
 const weekEmpty = document.querySelector("#week-empty");
 const monthEmpty = document.querySelector("#month-empty");
 const yearEmpty = document.querySelector("#year-empty");
-const weekSnapshotCurrent = document.querySelector("#week-snapshot-current");
-const monthSnapshotCurrent = document.querySelector("#month-snapshot-current");
-const yearSnapshotCurrent = document.querySelector("#year-snapshot-current");
-const weekSnapshotList = document.querySelector("#week-snapshot-list");
-const monthSnapshotList = document.querySelector("#month-snapshot-list");
-const yearSnapshotList = document.querySelector("#year-snapshot-list");
-const weekSnapshotEmpty = document.querySelector("#week-snapshot-empty");
-const monthSnapshotEmpty = document.querySelector("#month-snapshot-empty");
-const yearSnapshotEmpty = document.querySelector("#year-snapshot-empty");
 const weekGoalTypeFilterSelect = document.querySelector("#week-goal-type-filter");
 const weekGoalStatusFilterSelect = document.querySelector("#week-goal-status-filter");
 const weekGoalTagFilterSelect = document.querySelector("#week-goal-tag-filter");
@@ -330,9 +321,9 @@ const inlineGraphState = {
   year: {}
 };
 const periodAccordionState = {
-  week: { goals: true, checkins: true, shared: false },
-  month: { goals: true, checkins: true, shared: false },
-  year: { goals: true, checkins: true, shared: false }
+  week: { goals: true, checkins: true, shared: false, snapshots: false },
+  month: { goals: true, checkins: true, shared: false, snapshots: false },
+  year: { goals: true, checkins: true, shared: false, snapshots: false }
 };
 const flippedScheduleDays = {};
 const graphModalState = {
@@ -2043,12 +2034,6 @@ if (yearCloseoutButton) {
 weekList.addEventListener("click", handleGraphCardActions);
 monthList.addEventListener("click", handleGraphCardActions);
 yearList.addEventListener("click", handleGraphCardActions);
-[weekSnapshotList, monthSnapshotList, yearSnapshotList].forEach((listElement) => {
-  if (!listElement) {
-    return;
-  }
-  listElement.addEventListener("click", handleSnapshotActionClick);
-});
 [weekList, monthList, yearList].forEach((listElement) => {
   listElement.addEventListener("change", handleViewControlChange);
   listElement.addEventListener("submit", handleSharedGoalEntrySubmit);
@@ -2121,6 +2106,11 @@ if (graphModal) {
 
 function handleGraphCardActions(event) {
   if (!currentUser) {
+    return;
+  }
+  const snapshotButton = event.target.closest("button[data-action='reopen-snapshot'], button[data-action='delete-snapshot']");
+  if (snapshotButton) {
+    handleSnapshotActionClick(event);
     return;
   }
 
@@ -3973,9 +3963,9 @@ function renderPeriodTabs() {
   renderSharedGoalsSection("week", week, weekList);
   renderSharedGoalsSection("month", month, monthList);
   renderSharedGoalsSection("year", year, yearList);
-  renderPeriodSnapshots("week", week);
-  renderPeriodSnapshots("month", month);
-  renderPeriodSnapshots("year", year);
+  renderPeriodSnapshots("week", week, weekList, weekEmpty);
+  renderPeriodSnapshots("month", month, monthList, monthEmpty);
+  renderPeriodSnapshots("year", year, yearList, yearEmpty);
   renderGraphModal();
   renderAuthState();
 }
@@ -4571,36 +4561,43 @@ function getTrackerGoalPointsForPeriod(tracker, periodName) {
   return normalizeGoalPoints(tracker && tracker.goalPointsWeekly, legacyPoints);
 }
 
-function renderPeriodSnapshots(periodName, range) {
-  const elements = getPeriodSnapshotElements(periodName);
-  if (!elements.list || !elements.empty || !elements.current) {
+function renderPeriodSnapshots(periodName, range, listEl, emptyEl = null) {
+  if (!listEl || !currentUser) {
     return;
   }
-  if (!currentUser) {
-    elements.current.textContent = "";
-    elements.list.innerHTML = "";
-    elements.empty.style.display = "none";
-    return;
-  }
-
   const periodItems = periodSnapshots
     .filter((item) => item && item.period === periodName)
     .sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
   const currentRangeStart = getDateKey(range.start);
   const currentRangeEnd = getDateKey(range.end);
   const currentSnapshot = periodItems.find((item) => item.rangeStart === currentRangeStart && item.rangeEnd === currentRangeEnd);
-  elements.current.textContent = currentSnapshot
+  const currentSummaryText = currentSnapshot
     ? `Current range closed on ${formatSnapshotClosedAt(currentSnapshot.closedAt)}.`
     : "Current range not closed out yet.";
 
   if (periodItems.length < 1) {
-    elements.list.innerHTML = "";
-    elements.empty.style.display = "block";
+    if (emptyEl) {
+      emptyEl.style.display = "none";
+    }
+    listEl.insertAdjacentHTML(
+      "beforeend",
+      createPeriodAccordionSectionMarkup(
+        periodName,
+        "snapshots",
+        "Snapshots",
+        "",
+        `${currentSummaryText} No ${periodName} snapshots saved yet.`
+      )
+    );
     return;
   }
 
-  elements.empty.style.display = "none";
-  elements.list.innerHTML = periodItems.slice(0, 8).map((snapshot, index) => {
+  const summaryCardMarkup = `
+    <li class="quick-item" style="--stagger:0">
+      <p class="muted small">${escapeHtml(currentSummaryText)}</p>
+    </li>
+  `;
+  const cardsMarkup = periodItems.slice(0, 8).map((snapshot, index) => {
     const summary = snapshot.summary || {};
     const rangeLabel = `${formatDate(parseDateKey(snapshot.rangeStart))} to ${formatDate(parseDateKey(snapshot.rangeEnd))}`;
     const filterType = normalizeGoalTypeFilterValue(snapshot.filters && snapshot.filters.type);
@@ -4611,7 +4608,7 @@ function renderPeriodSnapshots(periodName, range) {
       : `<p class="muted small">Filters: ${escapeHtml(filterType)} | ${escapeHtml(filterStatus)} | ${escapeHtml(filterTag === "all" ? "all tags" : filterTag)}</p>`;
 
     return `
-      <li class="entry-card" style="--stagger:${index}">
+      <li class="entry-card" style="--stagger:${index + 1}">
         <div class="snapshot-item-top">
           <strong>${escapeHtml(rangeLabel)}</strong>
           <span class="pace-chip">${escapeHtml(getSnapshotPeriodTitle(snapshot.period))}</span>
@@ -4628,28 +4625,19 @@ function renderPeriodSnapshots(periodName, range) {
       </li>
     `;
   }).join("");
-}
-
-function getPeriodSnapshotElements(periodName) {
-  if (periodName === "month") {
-    return {
-      current: monthSnapshotCurrent,
-      list: monthSnapshotList,
-      empty: monthSnapshotEmpty
-    };
+  if (emptyEl) {
+    emptyEl.style.display = "none";
   }
-  if (periodName === "year") {
-    return {
-      current: yearSnapshotCurrent,
-      list: yearSnapshotList,
-      empty: yearSnapshotEmpty
-    };
-  }
-  return {
-    current: weekSnapshotCurrent,
-    list: weekSnapshotList,
-    empty: weekSnapshotEmpty
-  };
+  listEl.insertAdjacentHTML(
+    "beforeend",
+    createPeriodAccordionSectionMarkup(
+      periodName,
+      "snapshots",
+      "Snapshots",
+      `${summaryCardMarkup}${cardsMarkup}`,
+      `No ${periodName} snapshots saved yet.`
+    )
+  );
 }
 
 function normalizeSnapshotOnPaceLabel(value) {
@@ -5822,7 +5810,8 @@ function resetPeriodAccordionState() {
     periodAccordionState[periodName] = {
       goals: true,
       checkins: true,
-      shared: false
+      shared: false,
+      snapshots: false
     };
   });
 }
