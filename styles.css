@@ -740,18 +740,54 @@ h3 {
 }
 
 .view-filters-disclosure {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
-  padding: 5px 8px;
+  position: relative;
+  z-index: 5;
 }
 
 .view-filters-disclosure > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   cursor: pointer;
   list-style: none;
   font-size: 0.84rem;
   font-weight: 700;
   color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  padding: 6px 11px;
+  user-select: none;
+}
+
+.view-filters-disclosure > summary::after {
+  content: "▾";
+  font-size: 0.72rem;
+  transition: transform 0.18s ease;
+}
+
+.view-filters-disclosure[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.view-filters-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(560px, calc(100vw - 40px));
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  box-shadow: var(--shadow-soft);
+}
+
+.view-filters-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .view-filters-disclosure > summary::-webkit-details-marker {
@@ -759,7 +795,6 @@ h3 {
 }
 
 .view-filters-grid {
-  margin-top: 8px;
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(3, minmax(170px, 1fr));
@@ -2352,6 +2387,17 @@ strong.pace-off,
 
   .view-filters-disclosure {
     width: 100%;
+  }
+
+  .view-filters-disclosure > summary {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .view-filters-popover {
+    width: 100%;
+    right: auto;
+    left: 0;
   }
 
   .view-filters-grid {

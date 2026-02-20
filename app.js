@@ -416,6 +416,12 @@ function closeAllDropdownMenus() {
   });
 }
 
+function closeAllViewFilterDisclosures() {
+  document.querySelectorAll(".view-filters-disclosure[open]").forEach((item) => {
+    item.open = false;
+  });
+}
+
 function isMobileMenuMode() {
   return window.matchMedia("(max-width: 760px)").matches;
 }
@@ -483,6 +489,7 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAllDropdownMenus();
+    closeAllViewFilterDisclosures();
     setMobileMenuOpen(false);
   }
 });
@@ -2068,16 +2075,28 @@ if (graphModalBody) {
   graphModalBody.addEventListener("mouseleave", () => hideTooltipsInList(graphModalBody));
 }
 document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const closeFiltersButton = target ? target.closest("button[data-action='close-view-filters']") : null;
+  if (closeFiltersButton) {
+    const disclosure = closeFiltersButton.closest(".view-filters-disclosure");
+    if (disclosure) {
+      disclosure.open = false;
+    }
+    return;
+  }
   if (!event.target.closest(".download-menu-wrap")) {
     hideAllDownloadMenus();
   }
   if (!event.target.closest(".pace-chip-wrap")) {
     hideAllPaceDetailPopovers();
   }
+  if (!target || !target.closest(".view-filters-disclosure")) {
+    closeAllViewFilterDisclosures();
+  }
   if (
     notificationsPanelOpen
-    && !event.target.closest("#notifications-panel")
-    && !event.target.closest("#notifications-toggle-btn")
+    && !target?.closest("#notifications-panel")
+    && !target?.closest("#notifications-toggle-btn")
   ) {
     notificationsPanelOpen = false;
     renderNotifications();

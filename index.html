@@ -512,37 +512,43 @@
         <div class="panel-actions">
           <div class="period-nav" aria-label="Week navigation">
             <button id="week-prev" class="btn btn-nav-pill" type="button" aria-label="Previous week">&lt;</button>
-            <button id="week-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current week">o</button>
+            <button id="week-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current week">&#9679;</button>
             <button id="week-next" class="btn btn-nav-pill" type="button" aria-label="Next week">&gt;</button>
           </div>
           <button id="week-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <details class="view-filters-disclosure">
             <summary>Filters</summary>
-            <div class="view-filters-grid">
-              <label class="inline-control">
-                Goal Type
-                <select id="week-goal-type-filter">
-                  <option value="all">All Types</option>
-                  <option value="quantity">Quantity</option>
-                  <option value="yesno">Yes/No</option>
-                  <option value="bucket">Bucket List</option>
-                  <option value="floating">Floating</option>
-                </select>
-              </label>
-              <label class="inline-control">
-                Goal Status
-                <select id="week-goal-status-filter">
-                  <option value="active">Active</option>
-                  <option value="all">All</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
-              <label class="inline-control">
-                Tag
-                <select id="week-goal-tag-filter">
-                  <option value="all">All Tags</option>
-                </select>
-              </label>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="week-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="week-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="week-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
             </div>
           </details>
           <p id="week-range" class="muted"></p>
@@ -559,37 +565,43 @@
         <div class="panel-actions">
           <div class="period-nav" aria-label="Month navigation">
             <button id="month-prev" class="btn btn-nav-pill" type="button" aria-label="Previous month">&lt;</button>
-            <button id="month-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current month">o</button>
+            <button id="month-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current month">&#9679;</button>
             <button id="month-next" class="btn btn-nav-pill" type="button" aria-label="Next month">&gt;</button>
           </div>
           <button id="month-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <details class="view-filters-disclosure">
             <summary>Filters</summary>
-            <div class="view-filters-grid">
-              <label class="inline-control">
-                Goal Type
-                <select id="month-goal-type-filter">
-                  <option value="all">All Types</option>
-                  <option value="quantity">Quantity</option>
-                  <option value="yesno">Yes/No</option>
-                  <option value="bucket">Bucket List</option>
-                  <option value="floating">Floating</option>
-                </select>
-              </label>
-              <label class="inline-control">
-                Goal Status
-                <select id="month-goal-status-filter">
-                  <option value="active">Active</option>
-                  <option value="all">All</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
-              <label class="inline-control">
-                Tag
-                <select id="month-goal-tag-filter">
-                  <option value="all">All Tags</option>
-                </select>
-              </label>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="month-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="month-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="month-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
             </div>
           </details>
           <p id="month-range" class="muted"></p>
@@ -606,37 +618,43 @@
         <div class="panel-actions">
           <div class="period-nav" aria-label="Year navigation">
             <button id="year-prev" class="btn btn-nav-pill" type="button" aria-label="Previous year">&lt;</button>
-            <button id="year-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current year">o</button>
+            <button id="year-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current year">&#9679;</button>
             <button id="year-next" class="btn btn-nav-pill" type="button" aria-label="Next year">&gt;</button>
           </div>
           <button id="year-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
           <details class="view-filters-disclosure">
             <summary>Filters</summary>
-            <div class="view-filters-grid">
-              <label class="inline-control">
-                Goal Type
-                <select id="year-goal-type-filter">
-                  <option value="all">All Types</option>
-                  <option value="quantity">Quantity</option>
-                  <option value="yesno">Yes/No</option>
-                  <option value="bucket">Bucket List</option>
-                  <option value="floating">Floating</option>
-                </select>
-              </label>
-              <label class="inline-control">
-                Goal Status
-                <select id="year-goal-status-filter">
-                  <option value="active">Active</option>
-                  <option value="all">All</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
-              <label class="inline-control">
-                Tag
-                <select id="year-goal-tag-filter">
-                  <option value="all">All Tags</option>
-                </select>
-              </label>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="year-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="year-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="year-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
             </div>
           </details>
           <p id="year-range" class="muted"></p>
