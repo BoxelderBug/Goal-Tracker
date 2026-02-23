@@ -34,6 +34,7 @@ const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
 const REWARDS_STORAGE_KEY = "goal-tracker-rewards-v1";
 const REWARD_PURCHASES_STORAGE_KEY = "goal-tracker-reward-purchases-v1";
 const POINT_TRANSACTIONS_STORAGE_KEY = "goal-tracker-point-transactions-v1";
+const GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-goal-hit-notification-keys-v1";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
@@ -293,6 +294,9 @@ let goalSharePartnerUnsubscribe = null;
 let goalShareOwnerUnsubscribe = null;
 let sharedGoalShares = [];
 let sharedGoalOwnerData = new Map();
+let goalHitNotificationKeys = new Set();
+let goalHitNotificationCheckTimer = null;
+let goalHitNotificationCheckInFlight = false;
 let firebaseApp = null;
 let firebaseAuth = null;
 let firebaseDb = null;
@@ -2888,6 +2892,7 @@ function render() {
   renderFriendsSettings();
   renderRewardsSettings();
   renderPointStoreTab();
+  queueGoalHitNotificationCheck();
 }
 
 function renderTabs() {
@@ -6131,6 +6136,18 @@ function getNotificationMessage(item) {
     const dateLabel = isDateKey(item.entryDate) ? formatDate(parseDateKey(item.entryDate)) : "today";
     return `${actorName} logged ${amount} ${unit} for "${goalName}" on ${dateLabel}.`;
   }
+  if (type === "goal-hit") {
+    const goalName = String(item.goalName || "Goal");
+    const progress = formatAmount(normalizePositiveAmount(item.progress, 0));
+    const target = formatAmount(normalizePositiveAmount(item.target, 0));
+    const unit = normalizeGoalUnit(item.goalUnit || "units");
+    const periodLabel = item.period === "month"
+      ? "monthly"
+      : item.period === "year"
+      ? "yearly"
+      : "weekly";
+    return `Goal hit: "${goalName}" ${periodLabel} target (${progress}/${target} ${unit}).`;
+  }
   return "New notification";
 }
 
@@ -6179,6 +6196,158 @@ async function createNotificationDoc(payload) {
   }
 }
 
+function normalizeGoalHitNotificationKeys(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((item) => String(item || "").trim())
+    .filter((item) => item.length > 0)
+    .slice(-600);
+}
+
+function loadGoalHitNotificationKeys() {
+  if (!currentUser) {
+    return new Set();
+  }
+  try {
+    const raw = localStorage.getItem(getScopedStorageKey(GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY));
+    if (!raw) {
+      return new Set();
+    }
+    const parsed = JSON.parse(raw);
+    return new Set(normalizeGoalHitNotificationKeys(parsed));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveGoalHitNotificationKeys() {
+  if (!currentUser) {
+    return;
+  }
+  const values = normalizeGoalHitNotificationKeys(Array.from(goalHitNotificationKeys));
+  localStorage.setItem(getScopedStorageKey(GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY), JSON.stringify(values));
+}
+
+function getGoalHitNotificationCandidates(now = new Date()) {
+  if (!currentUser) {
+    return [];
+  }
+  const normalizedNow = normalizeDate(now);
+  const index = buildEntryIndex(entries);
+  const periods = [
+    { key: "week", range: getWeekRange(normalizedNow), target: (tracker) => tracker.weeklyGoal },
+    { key: "month", range: getMonthRange(normalizedNow), target: (tracker) => tracker.monthlyGoal },
+    { key: "year", range: getYearRange(normalizedNow), target: (tracker) => tracker.yearlyGoal }
+  ];
+  const items = [];
+  trackers.forEach((tracker) => {
+    if (!tracker || tracker.archived) {
+      return;
+    }
+    if (normalizeGoalType(tracker.goalType) === "bucket") {
+      return;
+    }
+    periods.forEach((period) => {
+      const target = normalizePositiveInt(period.target(tracker), 0);
+      if (target < 1) {
+        return;
+      }
+      const progress = sumTrackerRange(index, tracker.id, period.range);
+      if (progress < target) {
+        return;
+      }
+      const rangeStart = getDateKey(period.range.start);
+      const rangeEnd = getDateKey(period.range.end);
+      const hitKey = `${tracker.id}|${period.key}|${rangeStart}|${rangeEnd}`;
+      items.push({
+        hitKey,
+        period: period.key,
+        rangeStart,
+        rangeEnd,
+        goalName: tracker.name,
+        goalUnit: tracker.unit,
+        progress,
+        target
+      });
+    });
+  });
+  return items;
+}
+
+function primeGoalHitNotificationKeys() {
+  if (!currentUser || goalHitNotificationKeys.size > 0 || entries.length < 1) {
+    return;
+  }
+  const candidates = getGoalHitNotificationCandidates(new Date());
+  if (candidates.length < 1) {
+    return;
+  }
+  candidates.forEach((item) => {
+    goalHitNotificationKeys.add(item.hitKey);
+  });
+  saveGoalHitNotificationKeys();
+}
+
+async function sendGoalHitNotifications() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return;
+  }
+  if (goalHitNotificationCheckInFlight) {
+    return;
+  }
+  goalHitNotificationCheckInFlight = true;
+  try {
+    const candidates = getGoalHitNotificationCandidates(new Date());
+    let changed = false;
+    for (const item of candidates) {
+      if (goalHitNotificationKeys.has(item.hitKey)) {
+        continue;
+      }
+      const createdId = await createNotificationDoc({
+        type: "goal-hit",
+        recipientId: currentUser.id,
+        actorId: currentUser.id,
+        actorUsername: getUserDisplayName(currentUser),
+        actorEmail: normalizeEmail(currentUser.email),
+        goalName: item.goalName,
+        goalUnit: item.goalUnit,
+        period: item.period,
+        rangeStart: item.rangeStart,
+        rangeEnd: item.rangeEnd,
+        progress: item.progress,
+        target: item.target,
+        hitKey: item.hitKey,
+        read: false
+      });
+      if (!createdId) {
+        continue;
+      }
+      goalHitNotificationKeys.add(item.hitKey);
+      changed = true;
+    }
+    if (changed) {
+      saveGoalHitNotificationKeys();
+    }
+  } finally {
+    goalHitNotificationCheckInFlight = false;
+  }
+}
+
+function queueGoalHitNotificationCheck() {
+  if (!currentUser) {
+    return;
+  }
+  if (goalHitNotificationCheckTimer) {
+    clearTimeout(goalHitNotificationCheckTimer);
+  }
+  goalHitNotificationCheckTimer = setTimeout(() => {
+    goalHitNotificationCheckTimer = null;
+    void sendGoalHitNotifications();
+  }, 350);
+}
+
 async function sendFriendAddedNotification(friendName, friendEmail) {
   if (!firebaseConfigured || !firebaseDb || !currentUser) {
     return;
@@ -6211,6 +6380,12 @@ function normalizeNotificationRecord(raw, id) {
     shareId: typeof item.shareId === "string" ? item.shareId : "",
     goalName: typeof item.goalName === "string" ? item.goalName : "",
     goalUnit: typeof item.goalUnit === "string" ? item.goalUnit : "",
+    period: normalizePeriodMode(item.period),
+    rangeStart: isDateKey(item.rangeStart) ? item.rangeStart : "",
+    rangeEnd: isDateKey(item.rangeEnd) ? item.rangeEnd : "",
+    progress: normalizePositiveAmount(item.progress, 0),
+    target: normalizePositiveAmount(item.target, 0),
+    hitKey: typeof item.hitKey === "string" ? item.hitKey : "",
     entryAmount: normalizePositiveAmount(item.entryAmount, 0),
     entryDate: isDateKey(item.entryDate) ? item.entryDate : "",
     friendLabel: typeof item.friendLabel === "string" ? item.friendLabel : "",
@@ -6923,7 +7098,12 @@ function resetStateForSignedOutUser() {
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = null;
   }
+  if (goalHitNotificationCheckTimer) {
+    clearTimeout(goalHitNotificationCheckTimer);
+    goalHitNotificationCheckTimer = null;
+  }
   cloudSyncInFlight = false;
+  goalHitNotificationCheckInFlight = false;
   suppressCloudSync = false;
   currentUser = null;
   trackers = [];
@@ -6941,6 +7121,7 @@ function resetStateForSignedOutUser() {
   notificationsPanelOpen = false;
   sharedGoalShares = [];
   sharedGoalOwnerData = new Map();
+  goalHitNotificationKeys = new Set();
   settings = getDefaultSettings();
   activeTab = "manage";
   entryMode = "solo";
@@ -7189,6 +7370,7 @@ function resetUiStateForLogin() {
   if (csvUploadStatus) {
     csvUploadStatus.textContent = "";
   }
+  primeGoalHitNotificationKeys();
   updateGoalTypeFields();
   updateEntryFormMode();
 }
@@ -7723,6 +7905,7 @@ function initializeData() {
     rewards = [];
     rewardPurchases = [];
     pointTransactions = [];
+    goalHitNotificationKeys = new Set();
     settings = getDefaultSettings();
     return;
   }
@@ -7741,6 +7924,7 @@ function initializeData() {
   rewards = loadRewards();
   rewardPurchases = loadRewardPurchases();
   pointTransactions = loadPointTransactions();
+  goalHitNotificationKeys = loadGoalHitNotificationKeys();
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
     entries = migrateLegacyLogs(loadedTrackers.legacyLogs, trackers);
