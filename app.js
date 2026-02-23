@@ -2447,26 +2447,26 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
 
 function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric, historyGraphType) {
   const unit = normalizeGoalUnit(tracker.unit);
-  const today = normalizeDate(new Date());
-  const todayKey = getDateKey(today);
+  const focusDate = normalizeDate(range && range.start ? range.start : new Date());
+  const focusDateKey = getDateKey(focusDate);
   const dailyTotals = getTrackerDailyTotals(index, tracker.id);
   const bestDay = getBestDay(dailyTotals);
   const lastEnteredDay = dailyTotals.length > 0 ? dailyTotals[dailyTotals.length - 1] : null;
-  const streakStats = getStreakStats(dailyTotals, todayKey);
+  const streakStats = getStreakStats(dailyTotals, focusDateKey);
 
   const bestWeek = getBestPeriodRecord(index, tracker.id, "week");
   const bestMonth = getBestPeriodRecord(index, tracker.id, "month");
   const bestYear = getBestPeriodRecord(index, tracker.id, "year");
 
-  const currentWeek = sumTrackerRange(index, tracker.id, getWeekRange(today));
-  const currentMonth = sumTrackerRange(index, tracker.id, getMonthRange(today));
-  const currentYear = sumTrackerRange(index, tracker.id, getYearRange(today));
+  const selectedWeek = sumTrackerRange(index, tracker.id, getWeekRange(focusDate));
+  const selectedMonth = sumTrackerRange(index, tracker.id, getMonthRange(focusDate));
+  const selectedYear = sumTrackerRange(index, tracker.id, getYearRange(focusDate));
 
   const selectedMode = normalizePeriodMode(averageMode || periodName);
   const selectedMetric = normalizeHistoryMetric(historyMetric);
   const selectedGraphType = normalizeHistoryGraphType(historyGraphType);
   const lookbackCount = getHistoryLookbackCount(selectedMetric);
-  const averageRange = getCurrentRangeForMode(selectedMode, today);
+  const averageRange = getCurrentRangeForMode(selectedMode, focusDate);
   const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric);
   const maxMetricValue = Math.max(...history.map((item) => item.value), 1);
   const barsMarkup = history.map((item) => {
@@ -2493,9 +2493,9 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
 
   const longestStreakText = formatStreakLabel(streakStats.longest);
   const currentStreakText = formatStreakLabel(streakStats.current);
-  const currentWeekLabel = getPeriodRecordLabel("week", getWeekRange(today));
-  const currentMonthLabel = getPeriodRecordLabel("month", getMonthRange(today));
-  const currentYearLabel = getPeriodRecordLabel("year", getYearRange(today));
+  const selectedWeekLabel = getPeriodRecordLabel("week", getWeekRange(focusDate));
+  const selectedMonthLabel = getPeriodRecordLabel("month", getMonthRange(focusDate));
+  const selectedYearLabel = getPeriodRecordLabel("year", getYearRange(focusDate));
   const modeLabel = selectedMode === "month" ? "Months" : selectedMode === "year" ? "Years" : "Weeks";
   const historyTitle = selectedMetric === "hit"
     ? `Goal Hit vs last ${lookbackCount} ${modeLabel.toLowerCase()}`
@@ -2519,15 +2519,15 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
             <p class="best-kpi-best">Best Streak: ${escapeHtml(longestStreakText)}</p>
           </div>
           <div class="best-kpi-item">
-            <p class="best-kpi-current"><strong>Current Week</strong>: ${escapeHtml(formatCurrentPeriodText(currentWeek, unit, currentWeekLabel))}</p>
+            <p class="best-kpi-current"><strong>Selected Week</strong>: ${escapeHtml(formatCurrentPeriodText(selectedWeek, unit, selectedWeekLabel))}</p>
             <p class="best-kpi-best">Best Week: ${escapeHtml(formatBestPeriodText(bestWeek, unit))}</p>
           </div>
           <div class="best-kpi-item">
-            <p class="best-kpi-current"><strong>Current Month</strong>: ${escapeHtml(formatCurrentPeriodText(currentMonth, unit, currentMonthLabel))}</p>
+            <p class="best-kpi-current"><strong>Selected Month</strong>: ${escapeHtml(formatCurrentPeriodText(selectedMonth, unit, selectedMonthLabel))}</p>
             <p class="best-kpi-best">Best Month: ${escapeHtml(formatBestPeriodText(bestMonth, unit))}</p>
           </div>
           <div class="best-kpi-item">
-            <p class="best-kpi-current"><strong>Current Year</strong>: ${escapeHtml(formatCurrentPeriodText(currentYear, unit, currentYearLabel))}</p>
+            <p class="best-kpi-current"><strong>Selected Year</strong>: ${escapeHtml(formatCurrentPeriodText(selectedYear, unit, selectedYearLabel))}</p>
             <p class="best-kpi-best">Best Year: ${escapeHtml(formatBestPeriodText(bestYear, unit))}</p>
           </div>
         </article>
@@ -4219,6 +4219,10 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const progress = sumTrackerRange(index, tracker.id, range);
       const target = targetFn(tracker);
       const goalHit = target > 0 && progress >= target;
+      const updatedThroughKey = getLastLoggedDateKey(index, tracker.id, range);
+      const updatedThroughLabel = updatedThroughKey
+        ? `Updated through ${formatDate(parseDateKey(updatedThroughKey))}`
+        : "Updated through -";
       const pct = percent(progress, target);
       const avg = safeDivide(progress, elapsedDays);
       const needed = safeDivide(target, totalDays);
@@ -4298,6 +4302,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}</h3>
+            <p class="metric-updated-through">${escapeHtml(updatedThroughLabel)}</p>
           </div>
           <div class="progress progress-with-label">
             <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
@@ -4320,7 +4325,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
               >${graphVisible ? "-" : "+"}</button>
             </span>
           </div>
-          <div class="graph-wrap ${graphVisible ? "" : "hidden"}">
+          <div class="graph-wrap ${graphVisible ? "graph-wrap-expanded" : "hidden"}">
             ${graphMarkup}
             <div class="graph-inline-controls graph-inline-controls-bottom">
               <label class="check-inline check-compact graph-check">
@@ -5735,6 +5740,8 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
     return padLeft + (index / (domainDays - 1)) * innerWidth;
   };
   const toY = (value) => axisY - (value / maxValue) * innerHeight;
+  const currentPointRadius = large ? 5.2 : 4.6;
+  const comparisonPointRadius = large ? 5.0 : 4.4;
 
   const linePoints = cumulative.map((value, index) => `${toX(index).toFixed(2)},${toY(value).toFixed(2)}`).join(" ");
   const targetY = toY(target).toFixed(2);
@@ -5791,7 +5798,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
             class="graph-point${goalHit ? " graph-point-hit" : ""}"
             cx="${cx}"
             cy="${cy}"
-            r="${large ? "3.8" : "3.4"}"
+            r="${currentPointRadius.toFixed(1)}"
             data-date-label="${escapeAttr(dateLabel)}"
             data-amount="${escapeAttr(formatAmount(point.amount))}"
             data-cumulative="${escapeAttr(formatAmount(cumulative[index]))}"
@@ -5813,7 +5820,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
             class="graph-point graph-point-overlay"
             cx="${cx}"
             cy="${cy}"
-            r="${large ? "3.6" : "3.2"}"
+            r="${comparisonPointRadius.toFixed(1)}"
             data-date-label="${escapeAttr(dateLabel)}"
             data-amount="${escapeAttr(formatAmount(point.amount))}"
             data-cumulative="${escapeAttr(formatAmount(overlayCumulative[index]))}"
@@ -5835,7 +5842,7 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
             class="graph-point graph-point-projection${goalHit ? " graph-point-hit" : ""}"
             cx="${cx}"
             cy="${cy}"
-            r="${large ? "3.6" : "3.2"}"
+            r="${comparisonPointRadius.toFixed(1)}"
             data-date-label="${escapeAttr(dateLabel)}"
             data-amount="${escapeAttr(formatAmount(point.amount))}"
             data-cumulative="${escapeAttr(formatAmount(point.cumulative))}"

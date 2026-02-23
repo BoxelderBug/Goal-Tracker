@@ -1525,6 +1525,16 @@ textarea {
   gap: 6px;
 }
 
+.metric-updated-through {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
 .metric-controls {
   display: grid;
   justify-items: end;
@@ -1794,6 +1804,10 @@ strong.pace-off,
   display: none;
 }
 
+.graph-wrap.graph-wrap-expanded {
+  padding: 12px;
+}
+
 .graph-inline-controls {
   margin-bottom: 8px;
   display: flex;
@@ -1828,6 +1842,10 @@ strong.pace-off,
   display: block;
   width: 100%;
   height: 240px;
+}
+
+.graph-wrap.graph-wrap-expanded .graph-svg {
+  height: 320px;
 }
 
 .graph-svg-large {
@@ -2619,6 +2637,10 @@ strong.pace-off,
 
   .graph-svg-large {
     height: 280px;
+  }
+
+  .graph-wrap.graph-wrap-expanded .graph-svg {
+    height: 260px;
   }
 
   .graph-inline-controls {
