@@ -4,7 +4,10 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut
+  signOut,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 import {
   getFirestore,
@@ -187,6 +190,12 @@ const projectionAverageSelect = document.querySelector("#projection-average-sele
 const rewardPointsEnabledSelect = document.querySelector("#reward-points-enabled-select");
 const bucketListEnabledSelect = document.querySelector("#bucket-list-enabled-select");
 const themeSelect = document.querySelector("#theme-select");
+const changePasswordForm = document.querySelector("#change-password-form");
+const changePasswordCurrent = document.querySelector("#change-password-current");
+const changePasswordNew = document.querySelector("#change-password-new");
+const changePasswordConfirm = document.querySelector("#change-password-confirm");
+const changePasswordShow = document.querySelector("#change-password-show");
+const changePasswordMessage = document.querySelector("#change-password-message");
 const friendForm = document.querySelector("#friend-form");
 const friendNameInput = document.querySelector("#friend-name");
 const friendEmailInput = document.querySelector("#friend-email");
@@ -620,12 +629,37 @@ function applyPasswordVisibilityToggle() {
   }
 }
 
+function applyChangePasswordVisibility() {
+  const visible = Boolean(changePasswordShow && changePasswordShow.checked);
+  if (changePasswordCurrent) {
+    changePasswordCurrent.type = visible ? "text" : "password";
+  }
+  if (changePasswordNew) {
+    changePasswordNew.type = visible ? "text" : "password";
+  }
+  if (changePasswordConfirm) {
+    changePasswordConfirm.type = visible ? "text" : "password";
+  }
+}
+
+function showChangePasswordMessage(message, isError = false) {
+  if (!changePasswordMessage) {
+    return;
+  }
+  changePasswordMessage.textContent = String(message || "");
+  changePasswordMessage.classList.toggle("auth-error", Boolean(isError && message));
+}
+
 if (loginShowPassword) {
   loginShowPassword.addEventListener("change", applyPasswordVisibilityToggle);
 }
 
 if (registerShowPassword) {
   registerShowPassword.addEventListener("change", applyPasswordVisibilityToggle);
+}
+
+if (changePasswordShow) {
+  changePasswordShow.addEventListener("change", applyChangePasswordVisibility);
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -2098,6 +2132,63 @@ settingsForm.addEventListener("submit", (event) => {
   resetScheduleTileFlips();
   render();
 });
+
+if (changePasswordForm) {
+  changePasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentUser) {
+      return;
+    }
+    const currentPassword = String(changePasswordCurrent ? changePasswordCurrent.value : "");
+    const newPassword = String(changePasswordNew ? changePasswordNew.value : "");
+    const confirmPassword = String(changePasswordConfirm ? changePasswordConfirm.value : "");
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showChangePasswordMessage("Enter current password, new password, and confirmation.", true);
+      return;
+    }
+    if (newPassword.length < 6) {
+      showChangePasswordMessage("New password must be at least 6 characters.", true);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showChangePasswordMessage("New password and confirmation do not match.", true);
+      return;
+    }
+    if (newPassword === currentPassword) {
+      showChangePasswordMessage("New password must be different from your current password.", true);
+      return;
+    }
+    if (!firebaseConfigured || !firebaseAuth) {
+      showChangePasswordMessage("Firebase is not configured yet. Add your config in firebase-config.js.", true);
+      return;
+    }
+    const authUser = firebaseAuth.currentUser;
+    const authEmail = normalizeEmail(authUser && authUser.email);
+    if (!authUser || !authEmail) {
+      showChangePasswordMessage("Unable to verify your signed-in account. Sign in again and retry.", true);
+      return;
+    }
+    try {
+      const credential = EmailAuthProvider.credential(authEmail, currentPassword);
+      await reauthenticateWithCredential(authUser, credential);
+      await updatePassword(authUser, newPassword);
+      changePasswordForm.reset();
+      applyChangePasswordVisibility();
+      showChangePasswordMessage("Password updated.", false);
+    } catch (error) {
+      const code = getFirebaseErrorCode(error);
+      if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        showChangePasswordMessage("Current password is incorrect.", true);
+        return;
+      }
+      if (code === "auth/requires-recent-login") {
+        showChangePasswordMessage("Please sign out, sign back in, and try changing your password again.", true);
+        return;
+      }
+      showChangePasswordMessage(getFirebaseAuthErrorMessage(error, "Unable to change password right now."), true);
+    }
+  });
+}
 
 weekPrevButton.addEventListener("click", () => {
   if (!currentUser) {
@@ -7519,8 +7610,13 @@ function resetStateForSignedOutUser() {
   if (registerForm) {
     registerForm.reset();
   }
+  if (changePasswordForm) {
+    changePasswordForm.reset();
+  }
   setMobileMenuOpen(false);
   applyPasswordVisibilityToggle();
+  applyChangePasswordVisibility();
+  showChangePasswordMessage("");
   showAuthMessage(
     firebaseConfigured ? "" : "Add your Firebase config in firebase-config.js to enable cloud sync.",
     !firebaseConfigured
@@ -7682,6 +7778,11 @@ function resetUiStateForLogin() {
   if (goalJournalContent) {
     goalJournalContent.value = "";
   }
+  if (changePasswordForm) {
+    changePasswordForm.reset();
+  }
+  applyChangePasswordVisibility();
+  showChangePasswordMessage("");
   if (entryListSort) {
     entryListSort.value = entryListSortMode;
   }

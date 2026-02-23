@@ -844,6 +844,35 @@
       </form>
       <p id="settings-note" class="muted">This affects week boundaries, compare behavior in views, projection behavior, reward points, bucket list visibility, and your saved color theme.</p>
 
+      <section id="account-security-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Account Security</h3>
+          <p class="muted small">Change your password for this account.</p>
+        </div>
+        <form id="change-password-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Current Password
+              <input id="change-password-current" type="password" maxlength="120" autocomplete="current-password" required />
+            </label>
+            <label>
+              New Password
+              <input id="change-password-new" type="password" maxlength="120" autocomplete="new-password" required />
+            </label>
+            <label>
+              Confirm New Password
+              <input id="change-password-confirm" type="password" maxlength="120" autocomplete="new-password" required />
+            </label>
+          </div>
+          <label class="check-inline">
+            <input id="change-password-show" type="checkbox" />
+            Show passwords
+          </label>
+          <button class="btn" type="submit">Update Password</button>
+        </form>
+        <p id="change-password-message" class="muted small"></p>
+      </section>
+
       <section id="friends-settings-section" class="snapshot-panel">
         <div class="snapshot-panel-head">
           <h3>Friends</h3>
