@@ -33,11 +33,16 @@ const GOAL_JOURNAL_STORAGE_KEY = "goal-tracker-goal-journal-v1";
 const SCHEDULE_STORAGE_KEY = "goal-tracker-schedules-v1";
 const SETTINGS_STORAGE_KEY = "goal-tracker-settings-v1";
 const FRIENDS_STORAGE_KEY = "goal-tracker-friends-v1";
+const SQUADS_STORAGE_KEY = "goal-tracker-squads-v1";
+const TRASH_STORAGE_KEY = "goal-tracker-trash-v1";
 const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
 const REWARDS_STORAGE_KEY = "goal-tracker-rewards-v1";
 const REWARD_PURCHASES_STORAGE_KEY = "goal-tracker-reward-purchases-v1";
 const POINT_TRANSACTIONS_STORAGE_KEY = "goal-tracker-point-transactions-v1";
 const GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-goal-hit-notification-keys-v1";
+const MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-milestone-notification-keys-v1";
+const SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-smart-reminder-notification-keys-v1";
+const ONBOARDING_DISMISSED_STORAGE_KEY = "goal-tracker-onboarding-dismissed-v1";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
@@ -82,6 +87,7 @@ const dropdowns = document.querySelectorAll("[data-dropdown]");
 const tabPanels = document.querySelectorAll(".tab-panel");
 const tabStripPanel = document.querySelector(".tab-strip-panel");
 const mobileMenuToggle = document.querySelector("#mobile-menu-toggle");
+const mobileQuickActions = document.querySelector("#mobile-quick-actions");
 
 const goalForm = document.querySelector("#goal-form");
 const goalName = document.querySelector("#goal-name");
@@ -106,6 +112,11 @@ const manageList = document.querySelector("#manage-list");
 const manageEmpty = document.querySelector("#manage-empty");
 const manageTable = document.querySelector("#manage-table");
 const manageGoalsForm = document.querySelector("#manage-goals-form");
+const homeSummary = document.querySelector("#home-summary");
+const homeMissedList = document.querySelector("#home-missed-list");
+const homeMissedEmpty = document.querySelector("#home-missed-empty");
+const homeRemindersList = document.querySelector("#home-reminders-list");
+const homeRemindersEmpty = document.querySelector("#home-reminders-empty");
 
 const entryForm = document.querySelector("#entry-form");
 const entryModeSelect = document.querySelector("#entry-mode-select");
@@ -269,6 +280,44 @@ const graphModal = document.querySelector("#graph-modal");
 const graphModalBody = document.querySelector("#graph-modal-body");
 const graphModalTitle = document.querySelector("#graph-modal-title");
 const graphModalClose = document.querySelector("#graph-modal-close");
+const onboardingModal = document.querySelector("#onboarding-modal");
+const onboardingClose = document.querySelector("#onboarding-close");
+
+const quarterRangeLabel = document.querySelector("#quarter-range");
+const quarterSummary = document.querySelector("#quarter-summary");
+const quarterPrevButton = document.querySelector("#quarter-prev");
+const quarterThisButton = document.querySelector("#quarter-this");
+const quarterNextButton = document.querySelector("#quarter-next");
+const quarterCloseoutButton = document.querySelector("#quarter-closeout");
+const quarterList = document.querySelector("#quarter-list");
+const quarterEmpty = document.querySelector("#quarter-empty");
+const quarterGoalTypeFilterSelect = document.querySelector("#quarter-goal-type-filter");
+const quarterGoalStatusFilterSelect = document.querySelector("#quarter-goal-status-filter");
+const quarterGoalTagFilterSelect = document.querySelector("#quarter-goal-tag-filter");
+
+const trendsWindowSelect = document.querySelector("#trends-window-select");
+const trendsMetricSelect = document.querySelector("#trends-metric-select");
+const trendsTagFilterSelect = document.querySelector("#trends-tag-filter");
+const trendsSummary = document.querySelector("#trends-summary");
+const trendsList = document.querySelector("#trends-list");
+const trendsEmpty = document.querySelector("#trends-empty");
+
+const quartersEnabledSelect = document.querySelector("#quarters-enabled-select");
+const smartRemindersEnabledSelect = document.querySelector("#smart-reminders-enabled-select");
+const missedEntryDaysInput = document.querySelector("#missed-entry-days-input");
+const milestoneNotificationsEnabledSelect = document.querySelector("#milestone-notifications-enabled-select");
+const milestoneStepSelect = document.querySelector("#milestone-step-select");
+const mobileQuickActionsEnabledSelect = document.querySelector("#mobile-quick-actions-enabled-select");
+const onboardingEnabledSelect = document.querySelector("#onboarding-enabled-select");
+const performanceModeSelect = document.querySelector("#performance-mode-select");
+
+const squadForm = document.querySelector("#squad-form");
+const squadNameInput = document.querySelector("#squad-name");
+const squadNotesInput = document.querySelector("#squad-notes");
+const squadList = document.querySelector("#squad-list");
+const squadEmpty = document.querySelector("#squad-empty");
+const trashList = document.querySelector("#trash-list");
+const trashEmpty = document.querySelector("#trash-empty");
 
 let trackers = [];
 let entries = [];
@@ -277,6 +326,8 @@ let checkInEntries = [];
 let goalJournalEntries = [];
 let schedules = [];
 let friends = [];
+let squads = [];
+let deletedItems = [];
 let periodSnapshots = [];
 let rewards = [];
 let rewardPurchases = [];
@@ -295,10 +346,12 @@ let weekEntryStatusMessage = "";
 let weekViewAnchor = normalizeDate(new Date());
 let monthViewAnchor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let yearViewAnchor = new Date(new Date().getFullYear(), 0, 1);
+let quarterViewAnchor = new Date(new Date().getFullYear(), Math.floor(new Date().getMonth() / 3) * 3, 1);
 const periodGoalFilterState = {
   week: { type: "all", status: "active", tag: "all" },
   month: { type: "all", status: "active", tag: "all" },
-  year: { type: "all", status: "active", tag: "all" }
+  year: { type: "all", status: "active", tag: "all" },
+  quarter: { type: "all", status: "active", tag: "all" }
 };
 let bucketListGoalStatusFilter = "active";
 let bucketListItemStatusFilter = "all";
@@ -312,8 +365,13 @@ let goalShareOwnerUnsubscribe = null;
 let sharedGoalShares = [];
 let sharedGoalOwnerData = new Map();
 let goalHitNotificationKeys = new Set();
+let milestoneNotificationKeys = new Set();
+let smartReminderNotificationKeys = new Set();
 let goalHitNotificationCheckTimer = null;
 let goalHitNotificationCheckInFlight = false;
+let milestoneNotificationCheckTimer = null;
+let smartReminderCheckTimer = null;
+let smartReminderCheckInFlight = false;
 let firebaseApp = null;
 let firebaseAuth = null;
 let firebaseDb = null;
@@ -324,27 +382,32 @@ let firebaseConfigured = false;
 const goalCompareState = {
   week: {},
   month: {},
-  year: {}
+  year: {},
+  quarter: {}
 };
 const graphPointsState = {
   week: {},
   month: {},
-  year: {}
+  year: {},
+  quarter: {}
 };
 const projectionLineState = {
   week: {},
   month: {},
-  year: {}
+  year: {},
+  quarter: {}
 };
 const inlineGraphState = {
   week: {},
   month: {},
-  year: {}
+  year: {},
+  quarter: {}
 };
 const periodAccordionState = {
   week: { goals: true, checkins: true, shared: false, snapshots: false },
   month: { goals: true, checkins: true, shared: false, snapshots: false },
-  year: { goals: true, checkins: true, shared: false, snapshots: false }
+  year: { goals: true, checkins: true, shared: false, snapshots: false },
+  quarter: { goals: true, checkins: true, shared: false, snapshots: false }
 };
 const flippedScheduleDays = {};
 const graphModalState = {
@@ -426,6 +489,15 @@ if (yearGoalStatusFilterSelect) {
 if (yearGoalTagFilterSelect) {
   yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
 }
+if (quarterGoalTypeFilterSelect) {
+  quarterGoalTypeFilterSelect.value = periodGoalFilterState.quarter.type;
+}
+if (quarterGoalStatusFilterSelect) {
+  quarterGoalStatusFilterSelect.value = periodGoalFilterState.quarter.status;
+}
+if (quarterGoalTagFilterSelect) {
+  quarterGoalTagFilterSelect.value = periodGoalFilterState.quarter.tag;
+}
 if (bucketListGoalStatusFilterSelect) {
   bucketListGoalStatusFilterSelect.value = bucketListGoalStatusFilter;
 }
@@ -434,6 +506,12 @@ if (bucketListItemStatusFilterSelect) {
 }
 if (csvUploadStatus) {
   csvUploadStatus.textContent = "";
+}
+if (trendsWindowSelect) {
+  trendsWindowSelect.value = "8";
+}
+if (trendsMetricSelect) {
+  trendsMetricSelect.value = "consistency";
 }
 updateGoalTypeFields();
 setAuthMode("signin");
@@ -486,6 +564,7 @@ window.addEventListener("resize", () => {
   if (!isMobileMenuMode()) {
     setMobileMenuOpen(false);
   }
+  applyMobileQuickActionsVisibility();
 });
 
 dropdowns.forEach((dropdown) => {
@@ -526,6 +605,9 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAllDropdownMenus();
     closeAllViewFilterDisclosures();
+    if (onboardingModal && !onboardingModal.classList.contains("hidden")) {
+      closeOnboardingModal();
+    }
     setMobileMenuOpen(false);
   }
 });
@@ -536,29 +618,23 @@ menuButtons.forEach((button) => {
       return;
     }
     closeAllDropdownMenus();
-    activeTab = button.dataset.tab;
-    if (!isBucketListEnabled() && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
-      activeTab = "entry";
-      renderTabs();
-      return;
-    }
-    if (!isPointStoreRewardsEnabled() && activeTab === "point-store") {
-      activeTab = "manage";
-      renderTabs();
-      return;
-    }
-    if (activeTab === "goal-schedule") {
-      scheduleWeekAnchor = normalizeDate(new Date());
-      resetScheduleTileFlips();
-    }
-    renderTabs();
-    if (activeTab === "goal-schedule") {
-      renderGoalScheduleTab();
-    }
+    setActiveTabSafe(button.dataset.tab, { renderImmediate: true });
     if (isMobileMenuMode()) {
       setMobileMenuOpen(false);
     }
   });
+});
+
+document.addEventListener("click", (event) => {
+  const jumpButton = event.target.closest("button[data-action='jump-tab']");
+  if (!jumpButton || !currentUser) {
+    return;
+  }
+  const tabTarget = String(jumpButton.dataset.tabTarget || "");
+  if (!tabTarget) {
+    return;
+  }
+  setActiveTabSafe(tabTarget, { renderImmediate: true });
 });
 
 authModeButtons.forEach((button) => {
@@ -626,6 +702,30 @@ function applyPasswordVisibilityToggle() {
   }
   if (registerPasswordConfirm) {
     registerPasswordConfirm.type = registerVisible ? "text" : "password";
+  }
+}
+
+function setActiveTabSafe(tabName, options = {}) {
+  const normalizedTab = String(tabName || "").trim() || "manage";
+  activeTab = normalizedTab;
+  if (!isBucketListEnabled() && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
+    activeTab = "entry";
+  }
+  if (!isPointStoreRewardsEnabled() && activeTab === "point-store") {
+    activeTab = "manage";
+  }
+  if (!isQuartersEnabled() && activeTab === "quarter") {
+    activeTab = "week";
+  }
+  if (activeTab === "goal-schedule") {
+    scheduleWeekAnchor = normalizeDate(new Date());
+    resetScheduleTileFlips();
+  }
+  if (options && options.renderImmediate) {
+    renderTabs();
+    if (activeTab === "goal-schedule") {
+      renderGoalScheduleTab();
+    }
   }
 }
 
@@ -1165,6 +1265,16 @@ if (manageGoalsForm) {
 }
 
 function removeGoalWithRelatedData(id) {
+  const tracker = trackers.find((item) => item.id === id);
+  const relatedEntries = entries.filter((entry) => entry.trackerId === id);
+  const relatedSchedules = schedules.filter((item) => item.trackerId === id);
+  if (tracker) {
+    saveDeletedItem("goal", tracker.name, {
+      tracker: { ...tracker },
+      entries: relatedEntries.map((entry) => ({ ...entry })),
+      schedules: relatedSchedules.map((item) => ({ ...item }))
+    });
+  }
   trackers = trackers.filter((item) => item.id !== id);
   entries = entries.filter((entry) => entry.trackerId !== id);
   schedules = schedules.filter((item) => item.trackerId !== id);
@@ -1311,6 +1421,11 @@ if (checkinList) {
     if (!confirmed) {
       return;
     }
+    const relatedEntries = checkInEntries.filter((item) => item.checkInId === id);
+    saveDeletedItem("checkin", checkIn.name, {
+      checkIn: { ...checkIn },
+      checkInEntries: relatedEntries.map((item) => ({ ...item }))
+    });
     checkIns = checkIns.filter((item) => item.id !== id);
     checkInEntries = checkInEntries.filter((item) => item.checkInId !== id);
     saveCheckIns();
@@ -1708,6 +1823,13 @@ entryListAll.addEventListener("click", (event) => {
   if (!button) {
     return;
   }
+  const entryToDelete = entries.find((item) => item.id === button.dataset.id);
+  if (entryToDelete) {
+    const tracker = trackers.find((item) => item.id === entryToDelete.trackerId);
+    saveDeletedItem("entry", tracker ? `${tracker.name} entry` : "Entry", {
+      entry: { ...entryToDelete }
+    });
+  }
   entries = entries.filter((item) => item.id !== button.dataset.id);
   saveEntries();
   render();
@@ -1744,6 +1866,7 @@ if (entryListBucketFilterSelect) {
 bindPeriodGoalFilters("week", weekGoalTypeFilterSelect, weekGoalStatusFilterSelect, weekGoalTagFilterSelect);
 bindPeriodGoalFilters("month", monthGoalTypeFilterSelect, monthGoalStatusFilterSelect, monthGoalTagFilterSelect);
 bindPeriodGoalFilters("year", yearGoalTypeFilterSelect, yearGoalStatusFilterSelect, yearGoalTagFilterSelect);
+bindPeriodGoalFilters("quarter", quarterGoalTypeFilterSelect, quarterGoalStatusFilterSelect, quarterGoalTagFilterSelect);
 
 if (bucketListGoalStatusFilterSelect) {
   bucketListGoalStatusFilterSelect.addEventListener("change", () => {
@@ -2105,9 +2228,103 @@ if (friendList) {
     if (!shouldDelete) {
       return;
     }
+    saveDeletedItem("friend", friend.name, { friend: { ...friend } });
     friends = friends.filter((item) => item.id !== friendId);
     saveFriends();
     renderFriendsSettings();
+  });
+}
+
+if (squadForm) {
+  squadForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser || !squadNameInput) {
+      return;
+    }
+    const name = String(squadNameInput.value || "").trim();
+    const notes = String(squadNotesInput ? squadNotesInput.value : "").trim();
+    if (!name) {
+      return;
+    }
+    squads.unshift({
+      id: createId(),
+      name,
+      notes,
+      memberEmails: [],
+      goalIds: [],
+      createdAt: new Date().toISOString()
+    });
+    saveSquads();
+    squadForm.reset();
+    renderSocialTab();
+  });
+}
+
+if (squadList) {
+  squadList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const deleteButton = event.target.closest("button[data-action='delete-squad']");
+    if (deleteButton) {
+      const squadId = String(deleteButton.dataset.id || "");
+      const squad = squads.find((item) => item.id === squadId);
+      if (!squad) {
+        return;
+      }
+      if (!confirm(`Delete squad "${squad.name}"?`)) {
+        return;
+      }
+      saveDeletedItem("squad", squad.name, { squad: { ...squad } });
+      squads = squads.filter((item) => item.id !== squadId);
+      saveSquads();
+      renderSocialTab();
+      return;
+    }
+
+    const addGoalButton = event.target.closest("button[data-action='add-goal-to-squad']");
+    if (!addGoalButton) {
+      return;
+    }
+    const squadId = String(addGoalButton.dataset.id || "");
+    const select = squadList.querySelector(`select[data-squad-goal-select='${escapeCssSelector(squadId)}']`);
+    const trackerId = select ? String(select.value || "") : "";
+    if (!trackerId) {
+      return;
+    }
+    const squad = squads.find((item) => item.id === squadId);
+    if (!squad) {
+      return;
+    }
+    const nextGoalIds = Array.isArray(squad.goalIds) ? [...squad.goalIds] : [];
+    if (!nextGoalIds.includes(trackerId)) {
+      nextGoalIds.push(trackerId);
+      squad.goalIds = nextGoalIds;
+      saveSquads();
+      renderSocialTab();
+    }
+  });
+}
+
+if (trashList) {
+  trashList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const restoreButton = event.target.closest("button[data-action='restore-trash-item']");
+    if (!restoreButton) {
+      return;
+    }
+    const itemId = String(restoreButton.dataset.id || "");
+    if (!itemId) {
+      return;
+    }
+    const restored = restoreDeletedItem(itemId);
+    if (!restored) {
+      alert("Unable to restore this item.");
+      return;
+    }
+    render();
   });
 }
 
@@ -2116,6 +2333,7 @@ settingsForm.addEventListener("submit", (event) => {
   if (!currentUser) {
     return;
   }
+  const onboardingWasEnabled = isOnboardingEnabled();
   settings.weekStart = weekStartSelect.value === "sunday" ? "sunday" : "monday";
   settings.compareToLastDefault = compareDefaultSelect.value !== "off";
   settings.projectionAverageSource = normalizeProjectionAverageSource(
@@ -2123,11 +2341,29 @@ settingsForm.addEventListener("submit", (event) => {
   );
   settings.rewardPointsEnabled = rewardPointsEnabledSelect ? rewardPointsEnabledSelect.value === "on" : false;
   settings.bucketListEnabled = bucketListEnabledSelect ? bucketListEnabledSelect.value !== "off" : true;
+  settings.quartersEnabled = quartersEnabledSelect ? quartersEnabledSelect.value === "on" : false;
+  settings.smartRemindersEnabled = smartRemindersEnabledSelect ? smartRemindersEnabledSelect.value !== "off" : true;
+  settings.missedEntryDays = normalizePositiveInt(missedEntryDaysInput ? missedEntryDaysInput.value : settings.missedEntryDays, 2);
+  settings.milestoneNotificationsEnabled = milestoneNotificationsEnabledSelect
+    ? milestoneNotificationsEnabledSelect.value !== "off"
+    : true;
+  settings.milestoneStep = normalizeMilestoneStep(milestoneStepSelect ? milestoneStepSelect.value : settings.milestoneStep);
+  settings.mobileQuickActionsEnabled = mobileQuickActionsEnabledSelect
+    ? mobileQuickActionsEnabledSelect.value !== "off"
+    : true;
+  settings.onboardingEnabled = onboardingEnabledSelect ? onboardingEnabledSelect.value !== "off" : true;
+  settings.performanceMode = normalizePerformanceMode(performanceModeSelect ? performanceModeSelect.value : settings.performanceMode);
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
+  if (settings.onboardingEnabled && !onboardingWasEnabled) {
+    setOnboardingDismissed(false);
+    openOnboardingModal();
+  }
   saveSettings();
   applyTheme();
   applyBucketListFeatureVisibility();
   applyRewardPointsFeatureVisibility();
+  applyQuarterFeatureVisibility();
+  applyMobileQuickActionsVisibility();
   scheduleWeekAnchor = normalizeDate(new Date());
   resetScheduleTileFlips();
   render();
@@ -2262,6 +2498,36 @@ yearNextButton.addEventListener("click", () => {
   renderPeriodTabs();
 });
 
+if (quarterPrevButton) {
+  quarterPrevButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    quarterViewAnchor = addMonths(quarterViewAnchor, -3);
+    renderPeriodTabs();
+  });
+}
+
+if (quarterThisButton) {
+  quarterThisButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    quarterViewAnchor = getQuarterRange(new Date()).start;
+    renderPeriodTabs();
+  });
+}
+
+if (quarterNextButton) {
+  quarterNextButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    quarterViewAnchor = addMonths(quarterViewAnchor, 3);
+    renderPeriodTabs();
+  });
+}
+
 if (weekCloseoutButton) {
   weekCloseoutButton.addEventListener("click", () => {
     closeOutPeriod("week");
@@ -2280,10 +2546,14 @@ if (yearCloseoutButton) {
   });
 }
 
-weekList.addEventListener("click", handleGraphCardActions);
-monthList.addEventListener("click", handleGraphCardActions);
-yearList.addEventListener("click", handleGraphCardActions);
-[weekList, monthList, yearList].forEach((listElement) => {
+if (quarterCloseoutButton) {
+  quarterCloseoutButton.addEventListener("click", () => {
+    closeOutPeriod("quarter");
+  });
+}
+
+[weekList, monthList, yearList, quarterList].filter(Boolean).forEach((listElement) => {
+  listElement.addEventListener("click", handleGraphCardActions);
   listElement.addEventListener("change", handleViewControlChange);
   listElement.addEventListener("submit", handleSharedGoalEntrySubmit);
   listElement.addEventListener("click", (event) => {
@@ -2306,7 +2576,7 @@ yearList.addEventListener("click", handleGraphCardActions);
   });
 });
 
-[weekList, monthList, yearList].forEach((listElement) => {
+[weekList, monthList, yearList, quarterList].filter(Boolean).forEach((listElement) => {
   listElement.addEventListener("mousemove", handleGraphHover);
   listElement.addEventListener("mouseleave", () => hideTooltipsInList(listElement));
 });
@@ -2362,6 +2632,38 @@ if (graphModal) {
         renderPeriodTabs();
       }
     }
+  });
+}
+
+if (onboardingClose) {
+  onboardingClose.addEventListener("click", () => {
+    closeOnboardingModal();
+  });
+}
+
+if (onboardingModal) {
+  onboardingModal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action='close-onboarding-modal']")) {
+      closeOnboardingModal();
+    }
+  });
+}
+
+if (trendsWindowSelect) {
+  trendsWindowSelect.addEventListener("change", () => {
+    renderTrendsTab();
+  });
+}
+
+if (trendsMetricSelect) {
+  trendsMetricSelect.addEventListener("change", () => {
+    renderTrendsTab();
+  });
+}
+
+if (trendsTagFilterSelect) {
+  trendsTagFilterSelect.addEventListener("change", () => {
+    renderTrendsTab();
   });
 }
 
@@ -2464,7 +2766,7 @@ function handleGraphCardActions(event) {
   graphModalState.open = true;
   graphModalState.period = period;
   graphModalState.trackerId = id;
-  graphModalState.avgMode = period;
+  graphModalState.avgMode = normalizeAverageMode(period);
   graphModalState.historyMetric = "avg";
   graphModalState.historyGraphType = "bar";
   renderPeriodTabs();
@@ -2556,7 +2858,7 @@ function renderGraphModal() {
     range,
     series,
     index,
-    normalizePeriodMode(graphModalState.avgMode || graphModalState.period),
+    normalizeAverageMode(graphModalState.avgMode || graphModalState.period),
     normalizeHistoryMetric(graphModalState.historyMetric),
     normalizeHistoryGraphType(graphModalState.historyGraphType)
   );
@@ -2591,11 +2893,19 @@ function getPeriodMeta(periodName) {
       targetFn: (tracker) => getTrackerTargetForPeriod(tracker, "year", range)
     };
   }
+  if (periodName === "quarter") {
+    const range = getQuarterRange(quarterViewAnchor);
+    return {
+      title: "Quarter",
+      range,
+      targetFn: (tracker) => getTrackerTargetForPeriod(tracker, "quarter", range)
+    };
+  }
   return null;
 }
 
 function createExpandedTargetStatusMarkup(tracker, index, now) {
-  const periods = ["week", "month", "year"];
+  const periods = ["week", "month", "quarter", "year"];
   const items = periods.map((periodName) => {
     const status = getTrackerPeriodStatus(tracker, periodName, index, now);
     if (!status) {
@@ -2616,7 +2926,7 @@ function createExpandedTargetStatusMarkup(tracker, index, now) {
 
   return `
     <section class="target-status-grid-wrap">
-      <h4 class="target-status-title">Week/Month/Year Target Status</h4>
+      <h4 class="target-status-title">Period Target Status</h4>
       <div class="target-status-grid">${items}</div>
     </section>
   `;
@@ -2638,6 +2948,10 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
     range = getYearRange(yearViewAnchor);
     target = getTrackerTargetForPeriod(tracker, "year", range);
     title = "Year";
+  } else if (periodName === "quarter") {
+    range = getQuarterRange(quarterViewAnchor);
+    target = getTrackerTargetForPeriod(tracker, "quarter", range);
+    title = "Quarter";
   } else {
     return null;
   }
@@ -2785,10 +3099,18 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
 }
 
 function normalizePeriodMode(value) {
-  if (value === "month" || value === "year") {
+  if (value === "month" || value === "year" || value === "quarter") {
     return value;
   }
   return "week";
+}
+
+function normalizeAverageMode(value) {
+  const mode = normalizePeriodMode(value);
+  if (mode === "quarter") {
+    return "month";
+  }
+  return mode;
 }
 
 function normalizeHistoryMetric(value) {
@@ -2819,6 +3141,9 @@ function getHistoryLookbackCount(metricType) {
 function getCurrentRangeForMode(mode, date) {
   if (mode === "month") {
     return getMonthRange(date);
+  }
+  if (mode === "quarter") {
+    return getQuarterRange(date);
   }
   if (mode === "year") {
     return getYearRange(date);
@@ -3061,7 +3386,7 @@ function handleViewControlChange(event) {
 
   const avgModeSelect = event.target.closest("select[data-action='set-avg-mode-select']");
   if (avgModeSelect) {
-    graphModalState.avgMode = normalizePeriodMode(avgModeSelect.value);
+    graphModalState.avgMode = normalizeAverageMode(avgModeSelect.value);
     renderGraphModal();
     return;
   }
@@ -3175,6 +3500,7 @@ function hideAllPaceDetailPopovers(scope = document, exceptWrap = null) {
 
 function render() {
   applyTheme();
+  applyPerformanceMode();
   renderAuthState();
   if (!currentUser) {
     return;
@@ -3182,7 +3508,10 @@ function render() {
   updateGoalTypeFields();
   applyBucketListFeatureVisibility();
   applyRewardPointsFeatureVisibility();
+  applyQuarterFeatureVisibility();
+  applyMobileQuickActionsVisibility();
   renderTabs();
+  renderHomeTab();
   renderManageGoals();
   renderCheckinsTab();
   renderEntryTab();
@@ -3192,11 +3521,14 @@ function render() {
   renderEntryListTab();
   renderGoalScheduleTab();
   renderPeriodTabs();
+  renderTrendsTab();
   renderBucketListViewTab();
-  renderFriendsSettings();
+  renderSocialTab();
   renderRewardsSettings();
   renderPointStoreTab();
   queueGoalHitNotificationCheck();
+  queueMilestoneNotificationCheck();
+  queueSmartReminderCheck();
 }
 
 function createHistoryLineGraphMarkup(history, maxMetricValue, selectedMetric) {
@@ -3393,6 +3725,337 @@ function renderNotifications() {
         </li>
       `;
     })
+    .join("");
+}
+
+function getLatestEntryDateMap() {
+  const latestMap = new Map();
+  entries.forEach((entry) => {
+    if (!entry || !entry.trackerId || !isDateKey(entry.date)) {
+      return;
+    }
+    const prior = latestMap.get(entry.trackerId);
+    if (!prior || entry.date > prior) {
+      latestMap.set(entry.trackerId, entry.date);
+    }
+  });
+  return latestMap;
+}
+
+function getMissedEntryItems(now = new Date()) {
+  const thresholdDays = Math.max(Math.floor(Number(settings && settings.missedEntryDays) || 2), 1);
+  const today = normalizeDate(now);
+  const latestDateByTracker = getLatestEntryDateMap();
+  return trackers
+    .filter((tracker) => tracker && !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket")
+    .map((tracker) => {
+      const latestDateKey = latestDateByTracker.get(tracker.id) || "";
+      const latestDate = latestDateKey ? parseDateKey(latestDateKey) : null;
+      const daysWithout = latestDate
+        ? Math.max(Math.floor((today - normalizeDate(latestDate)) / DAY_MS), 0)
+        : thresholdDays;
+      return {
+        tracker,
+        latestDateKey,
+        daysWithout,
+        missed: daysWithout >= thresholdDays
+      };
+    })
+    .filter((item) => item.missed)
+    .sort((a, b) => b.daysWithout - a.daysWithout);
+}
+
+function renderHomeTab() {
+  if (!homeSummary || !homeMissedList || !homeMissedEmpty || !homeRemindersList || !homeRemindersEmpty) {
+    return;
+  }
+  if (!currentUser) {
+    homeSummary.innerHTML = "";
+    homeMissedList.innerHTML = "";
+    homeMissedEmpty.style.display = "none";
+    homeRemindersList.innerHTML = "";
+    homeRemindersEmpty.style.display = "none";
+    return;
+  }
+
+  const now = normalizeDate(new Date());
+  const activeGoals = trackers.filter((item) => !item.archived).length;
+  const weekRange = getWeekRange(now);
+  const weekIndex = buildEntryIndex(entries);
+  let hitThisWeek = 0;
+  trackers.forEach((tracker) => {
+    if (tracker.archived || normalizeGoalType(tracker.goalType) === "bucket") {
+      return;
+    }
+    const target = getTrackerTargetForPeriod(tracker, "week", weekRange);
+    const progress = sumTrackerRange(weekIndex, tracker.id, weekRange);
+    if (target > 0 && progress >= target) {
+      hitThisWeek += 1;
+    }
+  });
+  const hitPct = activeGoals > 0 ? Math.round((hitThisWeek / activeGoals) * 100) : 0;
+
+  homeSummary.innerHTML = `
+    <article class="summary-card">
+      <p>Active Goals</p>
+      <strong>${activeGoals}</strong>
+    </article>
+    <article class="summary-card">
+      <p>Week Hit Rate</p>
+      <strong>${hitPct}%</strong>
+    </article>
+    <article class="summary-card">
+      <p>Open Squads</p>
+      <strong>${squads.length}</strong>
+    </article>
+  `;
+
+  const missedItems = getMissedEntryItems(now).slice(0, 8);
+  if (missedItems.length < 1) {
+    homeMissedList.innerHTML = "";
+    homeMissedEmpty.style.display = "block";
+  } else {
+    homeMissedEmpty.style.display = "none";
+    homeMissedList.innerHTML = missedItems
+      .map((item, index) => `
+        <li class="quick-item" style="--stagger:${index}">
+          <div>
+            <strong>${escapeHtml(item.tracker.name)}</strong>
+            <p class="muted small">${item.latestDateKey ? `Last entry ${formatDate(parseDateKey(item.latestDateKey))}` : "No entries yet"}</p>
+          </div>
+          <span class="pace-chip pace-off">${item.daysWithout}d</span>
+        </li>
+      `)
+      .join("");
+  }
+
+  const reminderItems = getSmartReminderCandidates(now).slice(0, 8);
+  if (reminderItems.length < 1) {
+    homeRemindersList.innerHTML = "";
+    homeRemindersEmpty.style.display = "block";
+  } else {
+    homeRemindersEmpty.style.display = "none";
+    homeRemindersList.innerHTML = reminderItems
+      .map((item, index) => `
+        <li class="quick-item" style="--stagger:${index}">
+          <div>
+            <strong>${escapeHtml(item.goalName)}</strong>
+            <p class="muted small">No recent updates</p>
+          </div>
+          <span class="pace-chip">${item.reminderDays}d</span>
+        </li>
+      `)
+      .join("");
+  }
+}
+
+function openOnboardingModal() {
+  if (!onboardingModal || !isOnboardingEnabled()) {
+    return;
+  }
+  onboardingModal.classList.remove("hidden");
+  onboardingModal.setAttribute("aria-hidden", "false");
+}
+
+function closeOnboardingModal() {
+  if (!onboardingModal) {
+    return;
+  }
+  onboardingModal.classList.add("hidden");
+  onboardingModal.setAttribute("aria-hidden", "true");
+  setOnboardingDismissed(true);
+}
+
+function renderTrendsTab() {
+  if (!trendsSummary || !trendsList || !trendsEmpty || !trendsTagFilterSelect) {
+    return;
+  }
+  if (!currentUser) {
+    trendsSummary.innerHTML = "";
+    trendsList.innerHTML = "";
+    trendsEmpty.style.display = "none";
+    return;
+  }
+
+  const sortedTags = getSortedGoalTagOptions(trackers);
+  const selectedTag = normalizeGoalTagFilterValue(trendsTagFilterSelect.value || "all");
+  trendsTagFilterSelect.innerHTML = `
+    <option value="all">All Tags</option>
+    ${sortedTags.map(([key, label]) => `<option value="${escapeAttr(key)}">${escapeHtml(label)}</option>`).join("")}
+  `;
+  trendsTagFilterSelect.value = selectedTag === "all" || sortedTags.some(([key]) => key === selectedTag) ? selectedTag : "all";
+
+  const windowCount = Math.max(Math.min(Number(trendsWindowSelect ? trendsWindowSelect.value : 8) || 8, 26), 4);
+  const metric = String(trendsMetricSelect ? trendsMetricSelect.value : "consistency");
+  const now = normalizeDate(new Date());
+  const currentWeek = getWeekRange(now).start;
+  const index = buildEntryIndex(entries);
+
+  const filteredTrackers = trackers
+    .filter((tracker) => !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket")
+    .filter((tracker) => {
+      if (trendsTagFilterSelect.value === "all") {
+        return true;
+      }
+      return normalizeGoalTags(tracker.tags).some((tag) => getGoalTagKey(tag) === trendsTagFilterSelect.value);
+    });
+
+  if (filteredTrackers.length < 1) {
+    trendsSummary.innerHTML = "";
+    trendsList.innerHTML = "";
+    trendsEmpty.style.display = "block";
+    return;
+  }
+
+  const cards = filteredTrackers.map((tracker) => {
+    let hitWeeks = 0;
+    let activeWeeks = 0;
+    let volume = 0;
+    for (let offset = 0; offset < windowCount; offset += 1) {
+      const weekStart = addDays(currentWeek, -7 * offset);
+      const range = getWeekRange(weekStart);
+      const progress = sumTrackerRange(index, tracker.id, range);
+      const target = getTrackerTargetForPeriod(tracker, "week", range);
+      volume = addAmount(volume, progress);
+      if (progress > 0) {
+        activeWeeks += 1;
+      }
+      if (target > 0 && progress >= target) {
+        hitWeeks += 1;
+      }
+    }
+    const consistency = Math.round((activeWeeks / windowCount) * 100);
+    const hitRate = Math.round((hitWeeks / windowCount) * 100);
+    const score = metric === "volume" ? volume : metric === "hit-rate" ? hitRate : consistency;
+    return { tracker, consistency, hitRate, volume, score };
+  }).sort((a, b) => b.score - a.score);
+
+  const avgConsistency = Math.round(cards.reduce((sum, item) => sum + item.consistency, 0) / cards.length);
+  const avgHitRate = Math.round(cards.reduce((sum, item) => sum + item.hitRate, 0) / cards.length);
+  trendsSummary.innerHTML = `
+    <article class="summary-card">
+      <p>Tracked Goals</p>
+      <strong>${cards.length}</strong>
+    </article>
+    <article class="summary-card">
+      <p>Avg Consistency</p>
+      <strong>${avgConsistency}%</strong>
+    </article>
+    <article class="summary-card">
+      <p>Avg Hit Rate</p>
+      <strong>${avgHitRate}%</strong>
+    </article>
+  `;
+
+  trendsEmpty.style.display = "none";
+  trendsList.innerHTML = cards
+    .map((item, index) => `
+      <li class="metric-card" style="--stagger:${index}">
+        <div class="metric-top">
+          <h3>${escapeHtml(item.tracker.name)}</h3>
+          <span class="pace-chip">${metric === "volume" ? formatAmount(item.volume) : `${formatAmount(item.score)}%`}</span>
+        </div>
+        <p class="metric-line">Consistency ${item.consistency}% | Hit rate ${item.hitRate}% | Volume ${formatAmountWithUnit(item.volume, item.tracker.unit)}</p>
+      </li>
+    `)
+    .join("");
+}
+
+function renderSocialTab() {
+  renderFriendsSettings();
+  renderSquadList();
+  renderTrashSection();
+}
+
+function renderSquadList() {
+  if (!squadList || !squadEmpty) {
+    return;
+  }
+  if (!currentUser) {
+    squadList.innerHTML = "";
+    squadEmpty.style.display = "none";
+    return;
+  }
+  if (squads.length < 1) {
+    squadList.innerHTML = "";
+    squadEmpty.style.display = "block";
+    return;
+  }
+  const activeTrackers = trackers.filter((item) => !item.archived && normalizeGoalType(item.goalType) !== "bucket");
+  const trackerOptions = activeTrackers
+    .map((tracker) => `<option value="${tracker.id}">${escapeHtml(tracker.name)}</option>`)
+    .join("");
+  squadEmpty.style.display = "none";
+  squadList.innerHTML = squads
+    .map((squad, index) => {
+      const goalIds = Array.isArray(squad.goalIds) ? squad.goalIds : [];
+      const squadGoalTrackers = goalIds
+        .map((goalId) => trackers.find((tracker) => tracker.id === goalId))
+        .filter(Boolean);
+      const goalCount = squadGoalTrackers.length;
+      const latestEntryByGoal = squadGoalTrackers.map((tracker) => {
+        const latest = entries
+          .filter((entry) => entry.trackerId === tracker.id && isDateKey(entry.date))
+          .sort((a, b) => b.date.localeCompare(a.date))[0];
+        if (!latest) {
+          return `${tracker.name}: no entries yet`;
+        }
+        return `${tracker.name}: ${formatAmount(latest.amount)} ${normalizeGoalUnit(tracker.unit)} on ${formatDate(parseDateKey(latest.date))}`;
+      }).slice(0, 4);
+      const latestMarkup = latestEntryByGoal.length > 0
+        ? `<ul class="simple-list">${latestEntryByGoal.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`
+        : "<p class=\"muted small\">No goals added yet.</p>";
+      return `
+        <li class="entry-card" style="--stagger:${index}">
+          <div class="metric-top">
+            <strong>${escapeHtml(squad.name)}</strong>
+            <button class="btn btn-danger" type="button" data-action="delete-squad" data-id="${squad.id}">Delete</button>
+          </div>
+          <p class="metric-line">${escapeHtml(squad.notes || "No squad notes")} | ${goalCount} goal${goalCount === 1 ? "" : "s"}</p>
+          ${latestMarkup}
+          <div class="actions">
+            <label class="inline-control">
+              Add Goal
+              <select data-squad-goal-select="${escapeAttr(squad.id)}">
+                <option value="">Choose goal</option>
+                ${trackerOptions}
+              </select>
+            </label>
+            <button class="btn" type="button" data-action="add-goal-to-squad" data-id="${squad.id}">Add</button>
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function renderTrashSection() {
+  if (!trashList || !trashEmpty) {
+    return;
+  }
+  if (!currentUser) {
+    trashList.innerHTML = "";
+    trashEmpty.style.display = "none";
+    return;
+  }
+  if (deletedItems.length < 1) {
+    trashList.innerHTML = "";
+    trashEmpty.style.display = "block";
+    return;
+  }
+  trashEmpty.style.display = "none";
+  trashList.innerHTML = deletedItems
+    .sort((a, b) => String(b.deletedAt || "").localeCompare(String(a.deletedAt || "")))
+    .slice(0, 24)
+    .map((item, index) => `
+      <li class="quick-item" style="--stagger:${index}">
+        <div>
+          <strong>${escapeHtml(item.label || "Item")}</strong>
+          <p class="muted small">Deleted ${escapeHtml(formatSnapshotClosedAt(item.deletedAt))}</p>
+        </div>
+        <button class="btn" type="button" data-action="restore-trash-item" data-id="${item.id}">Restore</button>
+      </li>
+    `)
     .join("");
 }
 
@@ -4294,10 +4957,14 @@ function renderPeriodTabs() {
   const week = getWeekRange(weekViewAnchor);
   const month = getMonthRange(monthViewAnchor);
   const year = getYearRange(yearViewAnchor);
+  const quarter = getQuarterRange(quarterViewAnchor);
 
   weekRangeLabel.textContent = `${formatDate(week.start)} to ${formatDate(week.end)}`;
   monthRangeLabel.textContent = `${formatDate(month.start)} to ${formatDate(month.end)}`;
   yearRangeLabel.textContent = `${year.start.getFullYear()}`;
+  if (quarterRangeLabel) {
+    quarterRangeLabel.textContent = `${formatDate(quarter.start)} to ${formatDate(quarter.end)}`;
+  }
 
   periodGoalFilterState.week.type = normalizeGoalTypeFilterValue(periodGoalFilterState.week.type);
   periodGoalFilterState.week.status = normalizeGoalStatusFilterValue(periodGoalFilterState.week.status);
@@ -4308,6 +4975,9 @@ function renderPeriodTabs() {
   periodGoalFilterState.year.type = normalizeGoalTypeFilterValue(periodGoalFilterState.year.type);
   periodGoalFilterState.year.status = normalizeGoalStatusFilterValue(periodGoalFilterState.year.status);
   periodGoalFilterState.year.tag = normalizeGoalTagFilterValue(periodGoalFilterState.year.tag);
+  periodGoalFilterState.quarter.type = normalizeGoalTypeFilterValue(periodGoalFilterState.quarter.type);
+  periodGoalFilterState.quarter.status = normalizeGoalStatusFilterValue(periodGoalFilterState.quarter.status);
+  periodGoalFilterState.quarter.tag = normalizeGoalTagFilterValue(periodGoalFilterState.quarter.tag);
 
   if (weekGoalTypeFilterSelect) {
     weekGoalTypeFilterSelect.value = periodGoalFilterState.week.type;
@@ -4339,17 +5009,40 @@ function renderPeriodTabs() {
     syncPeriodTagFilterOptions("year", yearGoalTagFilterSelect);
     yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
   }
+  if (quarterGoalTypeFilterSelect) {
+    quarterGoalTypeFilterSelect.value = periodGoalFilterState.quarter.type;
+  }
+  if (quarterGoalStatusFilterSelect) {
+    quarterGoalStatusFilterSelect.value = periodGoalFilterState.quarter.status;
+  }
+  if (quarterGoalTagFilterSelect) {
+    syncPeriodTagFilterOptions("quarter", quarterGoalTagFilterSelect);
+    quarterGoalTagFilterSelect.value = periodGoalFilterState.quarter.tag;
+  }
 
   const index = buildEntryIndex(entries);
   renderPeriod("week", week, now, weekSummary, weekList, weekEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "week", week), index);
   renderPeriod("month", month, now, monthSummary, monthList, monthEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "month", month), index);
   renderPeriod("year", year, now, yearSummary, yearList, yearEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "year", year), index);
+  if (isQuartersEnabled() && quarterSummary && quarterList && quarterEmpty) {
+    renderPeriod("quarter", quarter, now, quarterSummary, quarterList, quarterEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "quarter", quarter), index);
+  } else if (quarterSummary && quarterList && quarterEmpty) {
+    quarterSummary.innerHTML = "";
+    quarterList.innerHTML = "";
+    quarterEmpty.style.display = "none";
+  }
   renderSharedGoalsSection("week", week, weekList);
   renderSharedGoalsSection("month", month, monthList);
   renderSharedGoalsSection("year", year, yearList);
+  if (isQuartersEnabled() && quarterList) {
+    renderSharedGoalsSection("quarter", quarter, quarterList);
+  }
   renderPeriodSnapshots("week", week, weekList, weekEmpty);
   renderPeriodSnapshots("month", month, monthList, monthEmpty);
   renderPeriodSnapshots("year", year, yearList, yearEmpty);
+  if (isQuartersEnabled() && quarterList && quarterEmpty) {
+    renderPeriodSnapshots("quarter", quarter, quarterList, quarterEmpty);
+  }
   renderGraphModal();
   renderAuthState();
 }
@@ -4936,6 +5629,9 @@ function getPeriodRange(periodName) {
   if (periodName === "month") {
     return getMonthRange(monthViewAnchor);
   }
+  if (periodName === "quarter") {
+    return getQuarterRange(quarterViewAnchor);
+  }
   if (periodName === "year") {
     return getYearRange(yearViewAnchor);
   }
@@ -4985,6 +5681,26 @@ function getTrackerTargetForPeriod(tracker, periodName, range = null) {
     }
     return monthlyGoal;
   }
+  if (periodName === "quarter") {
+    const quarterRange = range || getQuarterRange(new Date());
+    if (customMonthlyEnabled) {
+      const monthlyTargets = normalizeCustomTargetList(tracker && tracker.customMonthlyTargets, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal);
+      const startMonth = quarterRange.start.getMonth();
+      const endMonth = quarterRange.end.getMonth();
+      let total = 0;
+      for (let month = startMonth; month <= endMonth; month += 1) {
+        total = addAmount(total, monthlyTargets[month] || 0);
+      }
+      return total;
+    }
+    if (monthlyGoal > 0) {
+      return monthlyGoal * 3;
+    }
+    if (yearlyGoal > 0) {
+      return Math.ceil(yearlyGoal / 4);
+    }
+    return 0;
+  }
   if (periodName === "year") {
     if (customMonthlyEnabled) {
       const monthlyTargets = normalizeCustomTargetList(tracker && tracker.customMonthlyTargets, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal);
@@ -5005,10 +5721,14 @@ function getTrackerTargetForPeriod(tracker, periodName, range = null) {
 function getTrackerGoalPointsForPeriod(tracker, periodName) {
   const normalizedPeriod = periodName === "month"
     ? "month"
+    : periodName === "quarter"
+    ? "quarter"
     : periodName === "year"
     ? "year"
     : "week";
   const fallbackByPeriod = normalizedPeriod === "month"
+    ? 3
+    : normalizedPeriod === "quarter"
     ? 3
     : normalizedPeriod === "year"
     ? 10
@@ -5027,6 +5747,9 @@ function getTrackerGoalPointsForPeriod(tracker, periodName) {
   }
   if (normalizedPeriod === "year") {
     return normalizeGoalPoints(tracker && tracker.goalPointsYearly, legacyPoints);
+  }
+  if (normalizedPeriod === "quarter") {
+    return normalizeGoalPoints(tracker && tracker.goalPointsMonthly, legacyPoints);
   }
   return normalizeGoalPoints(tracker && tracker.goalPointsWeekly, legacyPoints);
 }
@@ -5131,6 +5854,9 @@ function getSnapshotPeriodTitle(periodName) {
   if (periodName === "month") {
     return "Month";
   }
+  if (periodName === "quarter") {
+    return "Quarter";
+  }
   if (periodName === "year") {
     return "Year";
   }
@@ -5187,6 +5913,9 @@ function reopenPeriodSnapshot(snapshotId) {
   if (snapshot.period === "month") {
     monthViewAnchor = new Date(rangeStartDate.getFullYear(), rangeStartDate.getMonth(), 1);
     activeTab = "month";
+  } else if (snapshot.period === "quarter") {
+    quarterViewAnchor = getQuarterRange(rangeStartDate).start;
+    activeTab = "quarter";
   } else if (snapshot.period === "year") {
     yearViewAnchor = new Date(rangeStartDate.getFullYear(), 0, 1);
     activeTab = "year";
@@ -6348,7 +7077,7 @@ function getLastLoggedDateKey(index, trackerId, range) {
 }
 
 function shouldAllowProjectionLine(periodName, range, now) {
-  return (periodName === "week" || periodName === "month" || periodName === "year")
+  return (periodName === "week" || periodName === "month" || periodName === "quarter" || periodName === "year")
     && range.start <= now
     && now <= range.end;
 }
@@ -6416,6 +7145,11 @@ function getOverlayRange(periodName, range) {
     const start = new Date(range.start.getFullYear(), range.start.getMonth() - 1, 1);
     const end = new Date(range.start.getFullYear(), range.start.getMonth(), 0);
     return { start, end };
+  }
+  if (periodName === "quarter") {
+    const start = addMonths(range.start, -3);
+    const prior = getQuarterRange(start);
+    return { start: prior.start, end: prior.end };
   }
   if (periodName === "year") {
     const start = new Date(range.start.getFullYear() - 1, 0, 1);
@@ -6487,6 +7221,14 @@ function getMonthRange(date) {
 function getYearRange(date) {
   const start = new Date(date.getFullYear(), 0, 1);
   const end = new Date(date.getFullYear(), 11, 31);
+  return { start, end };
+}
+
+function getQuarterRange(date) {
+  const normalizedDate = normalizeDate(date || new Date());
+  const quarterStartMonth = Math.floor(normalizedDate.getMonth() / 3) * 3;
+  const start = new Date(normalizedDate.getFullYear(), quarterStartMonth, 1);
+  const end = new Date(normalizedDate.getFullYear(), quarterStartMonth + 3, 0);
   return { start, end };
 }
 
@@ -6589,12 +7331,32 @@ function getNotificationMessage(item) {
     const progress = formatAmount(normalizePositiveAmount(item.progress, 0));
     const target = formatAmount(normalizePositiveAmount(item.target, 0));
     const unit = normalizeGoalUnit(item.goalUnit || "units");
-    const periodLabel = item.period === "month"
+    const periodLabel = item.period === "quarter"
+      ? "quarterly"
+      : item.period === "month"
       ? "monthly"
       : item.period === "year"
       ? "yearly"
       : "weekly";
     return `Goal hit: "${goalName}" ${periodLabel} target (${progress}/${target} ${unit}).`;
+  }
+  if (type === "goal-milestone") {
+    const goalName = String(item.goalName || "Goal");
+    const milestonePercent = Math.max(Math.min(Math.floor(Number(item.milestonePercent) || 0), 100), 0);
+    const periodLabel = item.period === "quarter"
+      ? "quarterly"
+      : item.period === "month"
+      ? "monthly"
+      : item.period === "year"
+      ? "yearly"
+      : "weekly";
+    return `Milestone: "${goalName}" reached ${milestonePercent}% of ${periodLabel} target.`;
+  }
+  if (type === "smart-reminder") {
+    const goalName = String(item.goalName || "Goal");
+    const reminderDays = Math.max(Math.floor(Number(item.reminderDays) || 0), 0);
+    const dayLabel = reminderDays === 1 ? "day" : "days";
+    return `Reminder: "${goalName}" has no recent entry for ${reminderDays} ${dayLabel}.`;
   }
   return "New notification";
 }
@@ -6678,6 +7440,59 @@ function saveGoalHitNotificationKeys() {
   localStorage.setItem(getScopedStorageKey(GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY), JSON.stringify(values));
 }
 
+function loadNotificationKeySet(storageKey) {
+  if (!currentUser) {
+    return new Set();
+  }
+  try {
+    const raw = localStorage.getItem(getScopedStorageKey(storageKey));
+    if (!raw) {
+      return new Set();
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return new Set();
+    }
+    return new Set(
+      parsed
+        .map((item) => String(item || "").trim())
+        .filter((item) => item.length > 0)
+        .slice(-900)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function saveNotificationKeySet(storageKey, keySet) {
+  if (!currentUser) {
+    return;
+  }
+  const values = Array.from(keySet || [])
+    .map((item) => String(item || "").trim())
+    .filter((item) => item.length > 0)
+    .slice(-900);
+  localStorage.setItem(getScopedStorageKey(storageKey), JSON.stringify(values));
+}
+
+function isOnboardingDismissed() {
+  if (!currentUser) {
+    return true;
+  }
+  return localStorage.getItem(getScopedStorageKey(ONBOARDING_DISMISSED_STORAGE_KEY)) === "1";
+}
+
+function setOnboardingDismissed(value) {
+  if (!currentUser) {
+    return;
+  }
+  if (value) {
+    localStorage.setItem(getScopedStorageKey(ONBOARDING_DISMISSED_STORAGE_KEY), "1");
+    return;
+  }
+  localStorage.removeItem(getScopedStorageKey(ONBOARDING_DISMISSED_STORAGE_KEY));
+}
+
 function getGoalHitNotificationCandidates(now = new Date()) {
   if (!currentUser) {
     return [];
@@ -6689,6 +7504,9 @@ function getGoalHitNotificationCandidates(now = new Date()) {
     { key: "month", range: getMonthRange(normalizedNow) },
     { key: "year", range: getYearRange(normalizedNow) }
   ];
+  if (isQuartersEnabled()) {
+    periods.push({ key: "quarter", range: getQuarterRange(normalizedNow) });
+  }
   const items = [];
   trackers.forEach((tracker) => {
     if (!tracker || tracker.archived) {
@@ -6796,6 +7614,199 @@ function queueGoalHitNotificationCheck() {
   }, 350);
 }
 
+function getMilestoneNotificationCandidates(now = new Date()) {
+  if (!currentUser || !isMilestoneNotificationsEnabled()) {
+    return [];
+  }
+  const step = normalizeMilestoneStep(settings && settings.milestoneStep);
+  if (step < 1) {
+    return [];
+  }
+  const normalizedNow = normalizeDate(now);
+  const index = buildEntryIndex(entries);
+  const periods = [
+    { key: "week", range: getWeekRange(normalizedNow) },
+    { key: "month", range: getMonthRange(normalizedNow) },
+    { key: "year", range: getYearRange(normalizedNow) }
+  ];
+  if (isQuartersEnabled()) {
+    periods.push({ key: "quarter", range: getQuarterRange(normalizedNow) });
+  }
+  const items = [];
+  trackers.forEach((tracker) => {
+    if (!tracker || tracker.archived || normalizeGoalType(tracker.goalType) === "bucket") {
+      return;
+    }
+    periods.forEach((period) => {
+      const target = normalizeGoalTargetInt(getTrackerTargetForPeriod(tracker, period.key, period.range), 0);
+      if (target < 1) {
+        return;
+      }
+      const progress = sumTrackerRange(index, tracker.id, period.range);
+      const pct = percent(progress, target);
+      const reached = Math.floor(Math.min(pct, 99) / step) * step;
+      if (reached < step) {
+        return;
+      }
+      const rangeStart = getDateKey(period.range.start);
+      const rangeEnd = getDateKey(period.range.end);
+      const milestoneKey = `${tracker.id}|${period.key}|${rangeStart}|${rangeEnd}|${reached}`;
+      items.push({
+        milestoneKey,
+        goalName: tracker.name,
+        goalUnit: tracker.unit,
+        period: period.key,
+        rangeStart,
+        rangeEnd,
+        progress,
+        target,
+        milestonePercent: reached
+      });
+    });
+  });
+  return items;
+}
+
+async function sendMilestoneNotifications() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser || !isMilestoneNotificationsEnabled()) {
+    return;
+  }
+  const candidates = getMilestoneNotificationCandidates(new Date());
+  if (candidates.length < 1) {
+    return;
+  }
+  let changed = false;
+  for (const item of candidates) {
+    if (milestoneNotificationKeys.has(item.milestoneKey)) {
+      continue;
+    }
+    const createdId = await createNotificationDoc({
+      type: "goal-milestone",
+      recipientId: currentUser.id,
+      actorId: currentUser.id,
+      actorUsername: getUserDisplayName(currentUser),
+      actorEmail: normalizeEmail(currentUser.email),
+      goalName: item.goalName,
+      goalUnit: item.goalUnit,
+      period: item.period,
+      rangeStart: item.rangeStart,
+      rangeEnd: item.rangeEnd,
+      progress: item.progress,
+      target: item.target,
+      milestonePercent: item.milestonePercent,
+      hitKey: item.milestoneKey,
+      read: false
+    });
+    if (!createdId) {
+      continue;
+    }
+    milestoneNotificationKeys.add(item.milestoneKey);
+    changed = true;
+  }
+  if (changed) {
+    saveNotificationKeySet(MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY, milestoneNotificationKeys);
+  }
+}
+
+function queueMilestoneNotificationCheck() {
+  if (!currentUser) {
+    return;
+  }
+  if (milestoneNotificationCheckTimer) {
+    clearTimeout(milestoneNotificationCheckTimer);
+  }
+  milestoneNotificationCheckTimer = setTimeout(() => {
+    milestoneNotificationCheckTimer = null;
+    void sendMilestoneNotifications();
+  }, 260);
+}
+
+function getSmartReminderCandidates(now = new Date()) {
+  if (!currentUser || !isSmartRemindersEnabled()) {
+    return [];
+  }
+  const thresholdDays = Math.max(Math.floor(Number(settings && settings.missedEntryDays) || 2), 1);
+  const today = normalizeDate(now);
+  const todayKey = getDateKey(today);
+  const latestDateByTracker = getLatestEntryDateMap();
+  const items = [];
+  trackers.forEach((tracker) => {
+    if (!tracker || tracker.archived || normalizeGoalType(tracker.goalType) === "bucket") {
+      return;
+    }
+    const latestDateKey = latestDateByTracker.get(tracker.id) || "";
+    const latestDate = latestDateKey ? parseDateKey(latestDateKey) : null;
+    const daysWithout = latestDate
+      ? Math.max(Math.floor((today - normalizeDate(latestDate)) / DAY_MS), 0)
+      : thresholdDays;
+    if (daysWithout < thresholdDays) {
+      return;
+    }
+    const reminderKey = `${tracker.id}|${todayKey}|${daysWithout}`;
+    items.push({
+      reminderKey,
+      goalName: tracker.name,
+      goalUnit: tracker.unit,
+      reminderDays: daysWithout
+    });
+  });
+  return items;
+}
+
+async function sendSmartReminderNotifications() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser || !isSmartRemindersEnabled()) {
+    return;
+  }
+  if (smartReminderCheckInFlight) {
+    return;
+  }
+  smartReminderCheckInFlight = true;
+  try {
+    const candidates = getSmartReminderCandidates(new Date());
+    let changed = false;
+    for (const item of candidates) {
+      if (smartReminderNotificationKeys.has(item.reminderKey)) {
+        continue;
+      }
+      const createdId = await createNotificationDoc({
+        type: "smart-reminder",
+        recipientId: currentUser.id,
+        actorId: currentUser.id,
+        actorUsername: getUserDisplayName(currentUser),
+        actorEmail: normalizeEmail(currentUser.email),
+        goalName: item.goalName,
+        goalUnit: item.goalUnit,
+        reminderDays: item.reminderDays,
+        hitKey: item.reminderKey,
+        read: false
+      });
+      if (!createdId) {
+        continue;
+      }
+      smartReminderNotificationKeys.add(item.reminderKey);
+      changed = true;
+    }
+    if (changed) {
+      saveNotificationKeySet(SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY, smartReminderNotificationKeys);
+    }
+  } finally {
+    smartReminderCheckInFlight = false;
+  }
+}
+
+function queueSmartReminderCheck() {
+  if (!currentUser) {
+    return;
+  }
+  if (smartReminderCheckTimer) {
+    clearTimeout(smartReminderCheckTimer);
+  }
+  smartReminderCheckTimer = setTimeout(() => {
+    smartReminderCheckTimer = null;
+    void sendSmartReminderNotifications();
+  }, 550);
+}
+
 async function sendFriendAddedNotification(friendName, friendEmail) {
   if (!firebaseConfigured || !firebaseDb || !currentUser) {
     return;
@@ -6837,6 +7848,8 @@ function normalizeNotificationRecord(raw, id) {
     entryAmount: normalizePositiveAmount(item.entryAmount, 0),
     entryDate: isDateKey(item.entryDate) ? item.entryDate : "",
     friendLabel: typeof item.friendLabel === "string" ? item.friendLabel : "",
+    milestonePercent: Math.max(Math.min(Math.floor(Number(item.milestonePercent) || 0), 100), 0),
+    reminderDays: Math.max(Math.floor(Number(item.reminderDays) || 0), 0),
     read: Boolean(item.read),
     actioned: Boolean(item.actioned),
     createdAt: Number.isNaN(createdAt.getTime()) ? new Date().toISOString() : createdAt.toISOString()
@@ -7363,6 +8376,8 @@ function buildCloudPayload() {
     goalJournalEntries,
     schedules,
     friends,
+    squads,
+    deletedItems,
     periodSnapshots,
     rewards,
     rewardPurchases,
@@ -7417,11 +8432,13 @@ function isLocalDataEmpty() {
   const hasJournal = Array.isArray(goalJournalEntries) && goalJournalEntries.length > 0;
   const hasSchedules = Array.isArray(schedules) && schedules.length > 0;
   const hasFriends = Array.isArray(friends) && friends.length > 0;
+  const hasSquads = Array.isArray(squads) && squads.length > 0;
+  const hasTrash = Array.isArray(deletedItems) && deletedItems.length > 0;
   const hasSnapshots = Array.isArray(periodSnapshots) && periodSnapshots.length > 0;
   const hasRewards = Array.isArray(rewards) && rewards.length > 0;
   const hasRewardPurchases = Array.isArray(rewardPurchases) && rewardPurchases.length > 0;
   const hasTransactions = Array.isArray(pointTransactions) && pointTransactions.length > 0;
-  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasFriends || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
+  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasFriends || hasSquads || hasTrash || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
 }
 
 function writeCloudPayloadToLocal(payload) {
@@ -7436,6 +8453,8 @@ function writeCloudPayloadToLocal(payload) {
     [GOAL_JOURNAL_STORAGE_KEY, Array.isArray(payload.goalJournalEntries) ? payload.goalJournalEntries : []],
     [SCHEDULE_STORAGE_KEY, Array.isArray(payload.schedules) ? payload.schedules : []],
     [FRIENDS_STORAGE_KEY, Array.isArray(payload.friends) ? payload.friends : []],
+    [SQUADS_STORAGE_KEY, Array.isArray(payload.squads) ? payload.squads : []],
+    [TRASH_STORAGE_KEY, Array.isArray(payload.deletedItems) ? payload.deletedItems : []],
     [PERIOD_SNAPSHOTS_STORAGE_KEY, Array.isArray(payload.periodSnapshots) ? payload.periodSnapshots : []],
     [REWARDS_STORAGE_KEY, Array.isArray(payload.rewards) ? payload.rewards : []],
     [REWARD_PURCHASES_STORAGE_KEY, Array.isArray(payload.rewardPurchases) ? payload.rewardPurchases : []],
@@ -7554,8 +8573,17 @@ function resetStateForSignedOutUser() {
     clearTimeout(goalHitNotificationCheckTimer);
     goalHitNotificationCheckTimer = null;
   }
+  if (milestoneNotificationCheckTimer) {
+    clearTimeout(milestoneNotificationCheckTimer);
+    milestoneNotificationCheckTimer = null;
+  }
+  if (smartReminderCheckTimer) {
+    clearTimeout(smartReminderCheckTimer);
+    smartReminderCheckTimer = null;
+  }
   cloudSyncInFlight = false;
   goalHitNotificationCheckInFlight = false;
+  smartReminderCheckInFlight = false;
   suppressCloudSync = false;
   currentUser = null;
   trackers = [];
@@ -7565,6 +8593,8 @@ function resetStateForSignedOutUser() {
   goalJournalEntries = [];
   schedules = [];
   friends = [];
+  squads = [];
+  deletedItems = [];
   periodSnapshots = [];
   rewards = [];
   rewardPurchases = [];
@@ -7574,6 +8604,8 @@ function resetStateForSignedOutUser() {
   sharedGoalShares = [];
   sharedGoalOwnerData = new Map();
   goalHitNotificationKeys = new Set();
+  milestoneNotificationKeys = new Set();
+  smartReminderNotificationKeys = new Set();
   settings = getDefaultSettings();
   activeTab = "manage";
   entryMode = "solo";
@@ -7590,6 +8622,9 @@ function resetStateForSignedOutUser() {
   periodGoalFilterState.year.type = "all";
   periodGoalFilterState.year.status = "active";
   periodGoalFilterState.year.tag = "all";
+  periodGoalFilterState.quarter.type = "all";
+  periodGoalFilterState.quarter.status = "active";
+  periodGoalFilterState.quarter.tag = "all";
   bucketListGoalStatusFilter = "active";
   bucketListItemStatusFilter = "all";
   scheduleWeekAnchor = normalizeDate(new Date());
@@ -7603,6 +8638,10 @@ function resetStateForSignedOutUser() {
   resetPeriodAccordionState();
   resetInlineGraphState();
   closeGraphModal();
+  if (onboardingModal) {
+    onboardingModal.classList.add("hidden");
+    onboardingModal.setAttribute("aria-hidden", "true");
+  }
   setAuthMode("signin");
   if (loginForm) {
     loginForm.reset();
@@ -7635,6 +8674,15 @@ function resetStateForSignedOutUser() {
   }
   if (yearGoalTagFilterSelect) {
     yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
+  }
+  if (quarterGoalTypeFilterSelect) {
+    quarterGoalTypeFilterSelect.value = periodGoalFilterState.quarter.type;
+  }
+  if (quarterGoalStatusFilterSelect) {
+    quarterGoalStatusFilterSelect.value = periodGoalFilterState.quarter.status;
+  }
+  if (quarterGoalTagFilterSelect) {
+    quarterGoalTagFilterSelect.value = periodGoalFilterState.quarter.tag;
   }
 }
 
@@ -7672,7 +8720,7 @@ function initializeAuth() {
 }
 
 function resetUiStateForLogin() {
-  activeTab = "manage";
+  activeTab = "home";
   entryMode = "solo";
   notificationsPanelOpen = false;
   sharedGoalShares = [];
@@ -7693,6 +8741,9 @@ function resetUiStateForLogin() {
   periodGoalFilterState.year.type = "all";
   periodGoalFilterState.year.status = "active";
   periodGoalFilterState.year.tag = "all";
+  periodGoalFilterState.quarter.type = "all";
+  periodGoalFilterState.quarter.status = "active";
+  periodGoalFilterState.quarter.tag = "all";
   bucketListGoalStatusFilter = "active";
   bucketListItemStatusFilter = "all";
   resetViewAnchors();
@@ -7725,6 +8776,30 @@ function resetUiStateForLogin() {
   }
   if (bucketListEnabledSelect) {
     bucketListEnabledSelect.value = isBucketListEnabled() ? "on" : "off";
+  }
+  if (quartersEnabledSelect) {
+    quartersEnabledSelect.value = isQuartersEnabled() ? "on" : "off";
+  }
+  if (smartRemindersEnabledSelect) {
+    smartRemindersEnabledSelect.value = isSmartRemindersEnabled() ? "on" : "off";
+  }
+  if (missedEntryDaysInput) {
+    missedEntryDaysInput.value = String(Math.max(Math.floor(Number(settings.missedEntryDays) || 2), 1));
+  }
+  if (milestoneNotificationsEnabledSelect) {
+    milestoneNotificationsEnabledSelect.value = isMilestoneNotificationsEnabled() ? "on" : "off";
+  }
+  if (milestoneStepSelect) {
+    milestoneStepSelect.value = String(normalizeMilestoneStep(settings.milestoneStep));
+  }
+  if (mobileQuickActionsEnabledSelect) {
+    mobileQuickActionsEnabledSelect.value = isMobileQuickActionsEnabled() ? "on" : "off";
+  }
+  if (onboardingEnabledSelect) {
+    onboardingEnabledSelect.value = isOnboardingEnabled() ? "on" : "off";
+  }
+  if (performanceModeSelect) {
+    performanceModeSelect.value = normalizePerformanceMode(settings.performanceMode);
   }
   if (themeSelect) {
     themeSelect.value = normalizeThemeKey(settings.theme);
@@ -7825,6 +8900,15 @@ function resetUiStateForLogin() {
   if (yearGoalTagFilterSelect) {
     yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
   }
+  if (quarterGoalTypeFilterSelect) {
+    quarterGoalTypeFilterSelect.value = periodGoalFilterState.quarter.type;
+  }
+  if (quarterGoalStatusFilterSelect) {
+    quarterGoalStatusFilterSelect.value = periodGoalFilterState.quarter.status;
+  }
+  if (quarterGoalTagFilterSelect) {
+    quarterGoalTagFilterSelect.value = periodGoalFilterState.quarter.tag;
+  }
   if (bucketListGoalStatusFilterSelect) {
     bucketListGoalStatusFilterSelect.value = bucketListGoalStatusFilter;
   }
@@ -7835,6 +8919,9 @@ function resetUiStateForLogin() {
     csvUploadStatus.textContent = "";
   }
   primeGoalHitNotificationKeys();
+  if (isOnboardingEnabled() && !isOnboardingDismissed()) {
+    openOnboardingModal();
+  }
   updateGoalTypeFields();
   updateEntryFormMode();
 }
@@ -7843,6 +8930,7 @@ function resetViewAnchors() {
   const now = new Date();
   weekViewAnchor = normalizeDate(now);
   monthViewAnchor = new Date(now.getFullYear(), now.getMonth(), 1);
+  quarterViewAnchor = getQuarterRange(now).start;
   yearViewAnchor = new Date(now.getFullYear(), 0, 1);
   weekEntryAnchor = normalizeDate(now);
 }
@@ -8029,12 +9117,32 @@ function getDefaultSettings() {
     rewardPointsEnabled: false,
     pointStoreRewardsEnabled: true,
     bucketListEnabled: true,
+    quartersEnabled: false,
+    smartRemindersEnabled: true,
+    missedEntryDays: 2,
+    milestoneNotificationsEnabled: true,
+    milestoneStep: 20,
+    mobileQuickActionsEnabled: true,
+    onboardingEnabled: true,
+    performanceMode: "standard",
     theme: "teal"
   };
 }
 
 function normalizeProjectionAverageSource(value) {
   return value === "year" ? "year" : "period";
+}
+
+function normalizeMilestoneStep(value) {
+  const numeric = Number(value);
+  if (numeric === 10 || numeric === 20 || numeric === 25) {
+    return numeric;
+  }
+  return 20;
+}
+
+function normalizePerformanceMode(value) {
+  return value === "light" ? "light" : "standard";
 }
 
 function normalizeGoalPoints(value, fallback = 1) {
@@ -8078,6 +9186,11 @@ function applyTheme() {
   document.body.setAttribute("data-theme", theme);
 }
 
+function applyPerformanceMode() {
+  const mode = normalizePerformanceMode(settings && settings.performanceMode);
+  document.body.setAttribute("data-performance", mode);
+}
+
 function isBucketListEnabled() {
   return !(settings && settings.bucketListEnabled === false);
 }
@@ -8088,6 +9201,50 @@ function isRewardPointsEnabled() {
 
 function isPointStoreRewardsEnabled() {
   return isRewardPointsEnabled() && !(settings && settings.pointStoreRewardsEnabled === false);
+}
+
+function isQuartersEnabled() {
+  return Boolean(settings && settings.quartersEnabled === true);
+}
+
+function isSmartRemindersEnabled() {
+  return !(settings && settings.smartRemindersEnabled === false);
+}
+
+function isMilestoneNotificationsEnabled() {
+  return !(settings && settings.milestoneNotificationsEnabled === false);
+}
+
+function isMobileQuickActionsEnabled() {
+  return !(settings && settings.mobileQuickActionsEnabled === false);
+}
+
+function isOnboardingEnabled() {
+  return !(settings && settings.onboardingEnabled === false);
+}
+
+function applyQuarterFeatureVisibility() {
+  const enabled = isQuartersEnabled();
+  document.querySelectorAll("[data-tab='quarter']").forEach((button) => {
+    button.hidden = !enabled;
+  });
+  document.querySelectorAll("[data-tab-panel='quarter']").forEach((panel) => {
+    if (!enabled) {
+      panel.hidden = true;
+      panel.classList.remove("active");
+    }
+  });
+  if (!enabled && activeTab === "quarter") {
+    activeTab = "week";
+  }
+}
+
+function applyMobileQuickActionsVisibility() {
+  if (!mobileQuickActions) {
+    return;
+  }
+  const show = Boolean(currentUser && isMobileMenuMode() && isMobileQuickActionsEnabled());
+  mobileQuickActions.hidden = !show;
 }
 
 function applyBucketListFeatureVisibility() {
@@ -8331,6 +9488,8 @@ function migrateLegacyDataToUser() {
     SCHEDULE_STORAGE_KEY,
     SETTINGS_STORAGE_KEY,
     FRIENDS_STORAGE_KEY,
+    SQUADS_STORAGE_KEY,
+    TRASH_STORAGE_KEY,
     PERIOD_SNAPSHOTS_STORAGE_KEY,
     REWARDS_STORAGE_KEY,
     REWARD_PURCHASES_STORAGE_KEY,
@@ -8358,11 +9517,15 @@ function initializeData() {
     goalJournalEntries = [];
     schedules = [];
     friends = [];
+    squads = [];
+    deletedItems = [];
     periodSnapshots = [];
     rewards = [];
     rewardPurchases = [];
     pointTransactions = [];
     goalHitNotificationKeys = new Set();
+    milestoneNotificationKeys = new Set();
+    smartReminderNotificationKeys = new Set();
     settings = getDefaultSettings();
     return;
   }
@@ -8377,11 +9540,15 @@ function initializeData() {
   goalJournalEntries = loadGoalJournalEntries();
   schedules = loadSchedules().filter((item) => trackers.some((tracker) => tracker.id === item.trackerId));
   friends = loadFriends();
+  squads = loadSquads();
+  deletedItems = loadDeletedItems();
   periodSnapshots = loadPeriodSnapshots();
   rewards = loadRewards();
   rewardPurchases = loadRewardPurchases();
   pointTransactions = loadPointTransactions();
   goalHitNotificationKeys = loadGoalHitNotificationKeys();
+  milestoneNotificationKeys = loadNotificationKeySet(MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY);
+  smartReminderNotificationKeys = loadNotificationKeySet(SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY);
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
     entries = migrateLegacyLogs(loadedTrackers.legacyLogs, trackers);
@@ -8696,6 +9863,67 @@ function loadFriends() {
   }
 }
 
+function loadSquads() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(SQUADS_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => ({
+        id: item.id,
+        name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Untitled squad",
+        notes: typeof item.notes === "string" ? item.notes.trim() : "",
+        memberEmails: Array.isArray(item.memberEmails)
+          ? item.memberEmails.map((value) => normalizeEmail(value)).filter(Boolean)
+          : [],
+        goalIds: Array.isArray(item.goalIds)
+          ? item.goalIds.map((value) => String(value || "")).filter(Boolean)
+          : [],
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function loadDeletedItems() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(TRASH_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => ({
+        id: item.id,
+        itemType: typeof item.itemType === "string" ? item.itemType : "item",
+        payload: item.payload && typeof item.payload === "object" ? item.payload : null,
+        label: typeof item.label === "string" ? item.label : "Item",
+        deletedAt: typeof item.deletedAt === "string" ? item.deletedAt : new Date().toISOString()
+      }))
+      .filter((item) => item.payload)
+      .slice(0, 120);
+  } catch {
+    return [];
+  }
+}
+
 function loadRewards() {
   try {
     if (!currentUser) {
@@ -8799,6 +10027,7 @@ function loadSettings() {
       return getDefaultSettings();
     }
     const parsed = JSON.parse(raw);
+    const defaults = getDefaultSettings();
     return {
       weekStart: parsed && parsed.weekStart === "sunday" ? "sunday" : "monday",
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
@@ -8806,6 +10035,14 @@ function loadSettings() {
       rewardPointsEnabled: Boolean(parsed && (parsed.rewardPointsEnabled === true || parsed.rewardPointsEnabled === "on")),
       pointStoreRewardsEnabled: !(parsed && (parsed.pointStoreRewardsEnabled === false || parsed.pointStoreRewardsEnabled === "off")),
       bucketListEnabled: !(parsed && parsed.bucketListEnabled === false),
+      quartersEnabled: Boolean(parsed && (parsed.quartersEnabled === true || parsed.quartersEnabled === "on")),
+      smartRemindersEnabled: !(parsed && (parsed.smartRemindersEnabled === false || parsed.smartRemindersEnabled === "off")),
+      missedEntryDays: normalizePositiveInt(parsed && parsed.missedEntryDays, defaults.missedEntryDays),
+      milestoneNotificationsEnabled: !(parsed && (parsed.milestoneNotificationsEnabled === false || parsed.milestoneNotificationsEnabled === "off")),
+      milestoneStep: normalizeMilestoneStep(parsed && parsed.milestoneStep),
+      mobileQuickActionsEnabled: !(parsed && (parsed.mobileQuickActionsEnabled === false || parsed.mobileQuickActionsEnabled === "off")),
+      onboardingEnabled: !(parsed && (parsed.onboardingEnabled === false || parsed.onboardingEnabled === "off")),
+      performanceMode: normalizePerformanceMode(parsed && parsed.performanceMode),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
   } catch {
@@ -8904,6 +10141,24 @@ function saveFriends() {
   queueCloudSync();
 }
 
+function saveSquads() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(SQUADS_STORAGE_KEY), JSON.stringify(squads));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
+}
+
+function saveDeletedItems() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(TRASH_STORAGE_KEY), JSON.stringify(deletedItems.slice(0, 120)));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
+}
+
 function savePeriodSnapshots() {
   if (!currentUser) {
     return;
@@ -8951,6 +10206,95 @@ function saveSettings() {
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function escapeCssSelector(value) {
+  return String(value || "").replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+}
+
+function saveDeletedItem(itemType, label, payload) {
+  if (!currentUser || !payload || typeof payload !== "object") {
+    return;
+  }
+  deletedItems.unshift({
+    id: createId(),
+    itemType: String(itemType || "item"),
+    label: String(label || "Item"),
+    payload,
+    deletedAt: new Date().toISOString()
+  });
+  if (deletedItems.length > 120) {
+    deletedItems = deletedItems.slice(0, 120);
+  }
+  saveDeletedItems();
+}
+
+function restoreDeletedItem(itemId) {
+  const index = deletedItems.findIndex((item) => item && item.id === itemId);
+  if (index < 0) {
+    return false;
+  }
+  const item = deletedItems[index];
+  const payload = item && item.payload && typeof item.payload === "object" ? item.payload : null;
+  if (!payload) {
+    return false;
+  }
+  if (item.itemType === "goal" && payload.tracker) {
+    const tracker = payload.tracker;
+    if (!trackers.some((entry) => entry.id === tracker.id)) {
+      trackers.unshift(tracker);
+    }
+    if (Array.isArray(payload.entries)) {
+      payload.entries.forEach((entry) => {
+        if (!entries.some((existing) => existing.id === entry.id)) {
+          entries.unshift(entry);
+        }
+      });
+    }
+    if (Array.isArray(payload.schedules)) {
+      payload.schedules.forEach((schedule) => {
+        if (!schedules.some((existing) => existing.id === schedule.id)) {
+          schedules.unshift(schedule);
+        }
+      });
+    }
+    saveTrackers();
+    saveEntries();
+    saveSchedules();
+  } else if (item.itemType === "checkin" && payload.checkIn) {
+    if (!checkIns.some((entry) => entry.id === payload.checkIn.id)) {
+      checkIns.unshift(payload.checkIn);
+    }
+    if (Array.isArray(payload.checkInEntries)) {
+      payload.checkInEntries.forEach((entry) => {
+        if (!checkInEntries.some((existing) => existing.id === entry.id)) {
+          checkInEntries.unshift(entry);
+        }
+      });
+    }
+    saveCheckIns();
+    saveCheckInEntries();
+  } else if (item.itemType === "entry" && payload.entry) {
+    if (!entries.some((entry) => entry.id === payload.entry.id)) {
+      entries.unshift(payload.entry);
+      saveEntries();
+    }
+  } else if (item.itemType === "friend" && payload.friend) {
+    if (!friends.some((friend) => friend.id === payload.friend.id)) {
+      friends.unshift(payload.friend);
+      saveFriends();
+    }
+  } else if (item.itemType === "squad" && payload.squad) {
+    if (!squads.some((squad) => squad.id === payload.squad.id)) {
+      squads.unshift(payload.squad);
+      saveSquads();
+    }
+  } else {
+    return false;
+  }
+  deletedItems.splice(index, 1);
+  saveDeletedItems();
+  return true;
 }
 
 function normalizePositiveInt(value, fallback) {
@@ -9631,6 +10975,9 @@ function reopenBucketGoal(trackerId, dateValue, notes = "") {
 }
 
 function getCheckInsForPeriod(periodName) {
+  if (periodName === "quarter") {
+    return checkIns.filter((item) => normalizeCheckInCadence(item.cadence) === "monthly");
+  }
   const cadence = periodName === "year" ? "yearly" : periodName === "month" ? "monthly" : "weekly";
   return checkIns.filter((item) => normalizeCheckInCadence(item.cadence) === cadence);
 }

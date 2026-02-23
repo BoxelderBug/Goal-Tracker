@@ -255,6 +255,24 @@ body::before {
   gap: 10px;
 }
 
+.skip-link {
+  position: absolute;
+  top: -42px;
+  left: 12px;
+  z-index: 700;
+  border: 1px solid var(--brand);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--brand-strong);
+  padding: 8px 10px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.skip-link:focus {
+  top: 10px;
+}
+
 .btn-user-link {
   border-color: var(--line);
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
@@ -1171,6 +1189,10 @@ textarea {
   transform: translateY(-1px);
   border-color: var(--brand);
   box-shadow: 0 16px 26px rgba(4, 70, 63, 0.14);
+}
+
+.home-dashboard-grid {
+  margin-top: 14px;
 }
 
 .goal-card:focus-within,
@@ -2326,6 +2348,35 @@ strong.pace-off,
   flex-wrap: wrap;
 }
 
+.onboarding-card {
+  width: min(620px, 95vw);
+}
+
+.mobile-quick-actions {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 260;
+  display: none;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  box-shadow: var(--shadow-soft);
+}
+
+.mobile-quick-actions .btn {
+  min-height: 34px;
+  padding-inline: 8px;
+}
+
+.mobile-quick-actions[hidden] {
+  display: none !important;
+}
+
 .avg-control-label {
   display: grid;
   gap: 5px;
@@ -2705,6 +2756,10 @@ strong.pace-off,
   .graph-inline-controls-bottom {
     justify-content: space-between;
   }
+
+  .mobile-quick-actions {
+    display: grid;
+  }
 }
 
 @media (max-width: 520px) {
@@ -2737,5 +2792,12 @@ strong.pace-off,
     animation: none !important;
     transition: none !important;
   }
+}
+
+body[data-performance="light"] * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 

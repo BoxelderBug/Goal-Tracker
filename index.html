@@ -10,7 +10,8 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="page">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <main id="main-content" class="page">
     <section id="auth-panel" class="panel auth-panel">
       <h2>Account Login</h2>
       <p class="muted">Sign in to load your goal table, entries, schedules, and settings.</p>
@@ -108,6 +109,13 @@
         <button id="mobile-menu-toggle" class="btn mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-groups">Menu</button>
         <div id="main-nav-groups" class="nav-groups" aria-label="Tracker sections">
           <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Home</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
+            </div>
+          </div>
+
+          <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="entry">Add Entry</button>
@@ -130,6 +138,8 @@
               <button class="menu-btn" type="button" data-tab="week">Week</button>
               <button class="menu-btn" type="button" data-tab="month">Month</button>
               <button class="menu-btn" type="button" data-tab="year">Year</button>
+              <button class="menu-btn" type="button" data-tab="quarter">Quarter</button>
+              <button class="menu-btn" type="button" data-tab="trends">Trends</button>
               <button class="menu-btn" type="button" data-tab="bucket-list">Bucket List</button>
             </div>
           </div>
@@ -142,6 +152,13 @@
           </div>
 
           <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Social</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="social">Friends & Squads</button>
+            </div>
+          </div>
+
+          <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
             <div class="dropdown-menu">
               <button class="menu-btn active" type="button" data-tab="manage">Manage Goals</button>
@@ -150,6 +167,41 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="home" hidden>
+        <h2>Dashboard</h2>
+        <div id="home-summary" class="summary-grid"></div>
+        <div class="form-grid form-grid-2 home-dashboard-grid">
+          <section class="snapshot-panel">
+            <div class="snapshot-panel-head">
+              <h3>Missed Entries</h3>
+              <p class="muted small">Goals missing updates in the current period.</p>
+            </div>
+            <ul id="home-missed-list" class="card-list compact-list"></ul>
+            <p id="home-missed-empty" class="empty-state">No missed entries right now.</p>
+          </section>
+          <section class="snapshot-panel">
+            <div class="snapshot-panel-head">
+              <h3>Reminders</h3>
+              <p class="muted small">Upcoming nudges and due checks.</p>
+            </div>
+            <ul id="home-reminders-list" class="card-list compact-list"></ul>
+            <p id="home-reminders-empty" class="empty-state">No reminders to show.</p>
+          </section>
+        </div>
+        <section class="snapshot-panel">
+          <div class="snapshot-panel-head">
+            <h3>Quick Actions</h3>
+            <p class="muted small">Jump straight to common tasks.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" type="button" data-action="jump-tab" data-tab-target="entry">Add Entry</button>
+            <button class="btn" type="button" data-action="jump-tab" data-tab-target="week">Open Week View</button>
+            <button class="btn" type="button" data-action="jump-tab" data-tab-target="manage">Manage Goals</button>
+            <button class="btn" type="button" data-action="jump-tab" data-tab-target="social">Social</button>
+          </div>
+        </section>
       </section>
 
       <section class="panel tab-panel active" data-tab-panel="manage">
@@ -687,6 +739,92 @@
       <p id="year-empty" class="empty-state">No goals or check-ins yet.</p>
     </section>
 
+      <section class="panel tab-panel" data-tab-panel="quarter" hidden>
+      <div class="panel-head">
+        <h2>Quarter View</h2>
+        <div class="panel-actions">
+          <div class="period-nav" aria-label="Quarter navigation">
+            <button id="quarter-prev" class="btn btn-nav-pill" type="button" aria-label="Previous quarter">&lt;</button>
+            <button id="quarter-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current quarter">&#9679;</button>
+            <button id="quarter-next" class="btn btn-nav-pill" type="button" aria-label="Next quarter">&gt;</button>
+          </div>
+          <button id="quarter-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <details class="view-filters-disclosure">
+            <summary>Filters</summary>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="quarter-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="quarter-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="quarter-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
+          <p id="quarter-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="quarter-summary" class="summary-grid"></div>
+      <div id="quarter-list" class="view-accordion"></div>
+      <p id="quarter-empty" class="empty-state">No goals or check-ins yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="trends" hidden>
+      <div class="panel-head">
+        <h2>Trends</h2>
+        <div class="panel-actions">
+          <label class="inline-control">
+            Window
+            <select id="trends-window-select">
+              <option value="8">Last 8 weeks</option>
+              <option value="12">Last 12 weeks</option>
+              <option value="26">Last 26 weeks</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Metric
+            <select id="trends-metric-select">
+              <option value="consistency">Consistency</option>
+              <option value="volume">Volume</option>
+              <option value="hit-rate">Hit Rate</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Tag
+            <select id="trends-tag-filter">
+              <option value="all">All Tags</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="trends-summary" class="summary-grid"></div>
+      <ul id="trends-list" class="card-list"></ul>
+      <p id="trends-empty" class="empty-state">No trend data yet.</p>
+    </section>
+
       <section class="panel tab-panel" data-tab-panel="bucket-list" hidden>
       <div class="panel-head">
         <h2>Bucket List View</h2>
@@ -828,6 +966,60 @@
           </select>
         </label>
         <label>
+          Quarter Views
+          <select id="quarters-enabled-select">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </label>
+        <label>
+          Smart Reminders
+          <select id="smart-reminders-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Missed Entry Threshold (days)
+          <input id="missed-entry-days-input" type="number" min="1" max="30" value="2" />
+        </label>
+        <label>
+          Milestone Notifications
+          <select id="milestone-notifications-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Milestone Step (%)
+          <select id="milestone-step-select">
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="25">25%</option>
+          </select>
+        </label>
+        <label>
+          Mobile Quick Actions
+          <select id="mobile-quick-actions-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Onboarding Tips
+          <select id="onboarding-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Performance Mode
+          <select id="performance-mode-select">
+            <option value="standard">Standard</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+        <label>
           Color Theme
           <select id="theme-select">
             <option value="teal">Teal</option>
@@ -873,26 +1065,13 @@
         <p id="change-password-message" class="muted small"></p>
       </section>
 
-      <section id="friends-settings-section" class="snapshot-panel">
+      <section id="restore-section" class="snapshot-panel">
         <div class="snapshot-panel-head">
-          <h3>Friends</h3>
-          <p class="muted small">Add friends to keep a quick list of people you track with. Add their account email to send a notification.</p>
+          <h3>Undo / Restore</h3>
+          <p class="muted small">Restore recently deleted goals, check-ins, and entries.</p>
         </div>
-        <form id="friend-form" class="form-block">
-          <div class="form-grid form-grid-2">
-            <label>
-              Name
-              <input id="friend-name" type="text" maxlength="90" placeholder="Friend name" required />
-            </label>
-            <label>
-              Email (optional)
-              <input id="friend-email" type="email" maxlength="140" placeholder="friend@email.com" />
-            </label>
-          </div>
-          <button class="btn btn-primary" type="submit">Add Friend</button>
-        </form>
-        <ul id="friend-list" class="card-list compact-list"></ul>
-        <p id="friend-empty" class="empty-state">No friends added yet.</p>
+        <ul id="trash-list" class="card-list compact-list"></ul>
+        <p id="trash-empty" class="empty-state">No deleted items.</p>
       </section>
 
       <section id="point-store-settings-section" class="snapshot-panel" hidden>
@@ -952,6 +1131,59 @@
       </section>
       </section>
 
+      <section class="panel tab-panel" data-tab-panel="social" hidden>
+      <h2>Social</h2>
+      <section id="friends-settings-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Friends</h3>
+          <p class="muted small">Add friends to keep a quick list of people you track with. Add their account email to send a notification.</p>
+        </div>
+        <form id="friend-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Name
+              <input id="friend-name" type="text" maxlength="90" placeholder="Friend name" required />
+            </label>
+            <label>
+              Email (optional)
+              <input id="friend-email" type="email" maxlength="140" placeholder="friend@email.com" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Friend</button>
+        </form>
+        <ul id="friend-list" class="card-list compact-list"></ul>
+        <p id="friend-empty" class="empty-state">No friends added yet.</p>
+      </section>
+      <section id="squad-settings-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Squad Goals</h3>
+          <p class="muted small">Create shared squads where friends track goals together.</p>
+        </div>
+        <form id="squad-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Squad Name
+              <input id="squad-name" type="text" maxlength="90" placeholder="Weekend Runners" required />
+            </label>
+            <label>
+              Notes
+              <input id="squad-notes" type="text" maxlength="160" placeholder="Optional squad purpose" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Create Squad</button>
+        </form>
+        <ul id="squad-list" class="card-list"></ul>
+        <p id="squad-empty" class="empty-state">No squads yet.</p>
+      </section>
+      </section>
+
+      <nav id="mobile-quick-actions" class="mobile-quick-actions" hidden aria-label="Quick actions">
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="entry">Entry</button>
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="week">Week</button>
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="home">Home</button>
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="social">Social</button>
+      </nav>
+
       <div id="graph-modal" class="graph-modal hidden" aria-hidden="true">
         <div class="graph-modal-backdrop" data-action="close-graph-modal"></div>
         <section class="graph-modal-card" role="dialog" aria-modal="true" aria-labelledby="graph-modal-title">
@@ -960,6 +1192,24 @@
             <button id="graph-modal-close" class="btn" type="button">Close</button>
           </div>
           <div id="graph-modal-body" class="graph-modal-body"></div>
+        </section>
+      </div>
+
+      <div id="onboarding-modal" class="graph-modal hidden" aria-hidden="true">
+        <div class="graph-modal-backdrop" data-action="close-onboarding-modal"></div>
+        <section class="graph-modal-card onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+          <div class="graph-modal-head">
+            <h3 id="onboarding-title">Welcome</h3>
+            <button id="onboarding-close" class="btn" type="button">Close</button>
+          </div>
+          <div class="graph-modal-body">
+            <ol class="simple-list">
+              <li>Add goals in Manage Goals.</li>
+              <li>Log updates in Add Entry.</li>
+              <li>Review pace in Week/Month/Year views.</li>
+              <li>Close out periods to lock snapshots and reward points.</li>
+            </ol>
+          </div>
         </section>
       </div>
     </div>
