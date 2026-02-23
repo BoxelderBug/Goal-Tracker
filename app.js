@@ -7141,45 +7141,6 @@ function isLocalDataEmpty() {
   return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions || hasGoalHitNotifications);
 }
 
-function getCurrentLocalRecordCount() {
-  return (
-    (Array.isArray(trackers) ? trackers.length : 0)
-    + (Array.isArray(entries) ? entries.length : 0)
-    + (Array.isArray(checkIns) ? checkIns.length : 0)
-    + (Array.isArray(checkInEntries) ? checkInEntries.length : 0)
-    + (Array.isArray(goalJournalEntries) ? goalJournalEntries.length : 0)
-    + (Array.isArray(schedules) ? schedules.length : 0)
-    + (Array.isArray(periodSnapshots) ? periodSnapshots.length : 0)
-    + (Array.isArray(rewards) ? rewards.length : 0)
-    + (Array.isArray(rewardPurchases) ? rewardPurchases.length : 0)
-    + (Array.isArray(pointTransactions) ? pointTransactions.length : 0)
-    + (Array.isArray(goalHitNotificationKeys) ? goalHitNotificationKeys.length : 0)
-  );
-}
-
-function getCloudPayloadRecordCount(payload) {
-  if (!payload || typeof payload !== "object") {
-    return 0;
-  }
-  const keys = [
-    "trackers",
-    "entries",
-    "checkIns",
-    "checkInEntries",
-    "goalJournalEntries",
-    "schedules",
-    "periodSnapshots",
-    "rewards",
-    "rewardPurchases",
-    "pointTransactions",
-    "goalHitNotificationKeys"
-  ];
-  return keys.reduce((sum, key) => {
-    const value = payload[key];
-    return sum + (Array.isArray(value) ? value.length : 0);
-  }, 0);
-}
-
 function writeCloudPayloadToLocal(payload) {
   if (!currentUser || !payload || typeof payload !== "object") {
     return;
@@ -7221,11 +7182,11 @@ function normalizeCloudTimestamp(value) {
 
 async function syncCloudDataOnLogin() {
   if (!firebaseConfigured || !firebaseDb || !currentUser) {
-    return { pulled: false, reason: "no-firebase" };
+    return;
   }
   const dataRef = getCloudDataRef(currentUser.id);
   if (!dataRef) {
-    return { pulled: false, reason: "no-data-ref" };
+    return;
   }
   try {
     const snapshot = await getDoc(dataRef);
@@ -7235,19 +7196,14 @@ async function syncCloudDataOnLogin() {
       if (hasLocalContent) {
         queueCloudSync();
       }
-      return { pulled: false, reason: "no-cloud-doc" };
+      return;
     }
     const cloudData = snapshot.data() || {};
     const cloudUpdatedAt = normalizeCloudTimestamp(cloudData.updatedAt);
-    const cloudRecordCount = getCloudPayloadRecordCount(cloudData);
-    const localRecordCount = getCurrentLocalRecordCount();
-    const cloudLooksMoreComplete = cloudRecordCount > 0 && cloudRecordCount > localRecordCount;
-    const shouldPullCloud = !hasLocalContent
-      || (cloudUpdatedAt && (!localUpdatedAt || cloudUpdatedAt > localUpdatedAt))
-      || cloudLooksMoreComplete;
+    const shouldPullCloud = !hasLocalContent || (cloudUpdatedAt && (!localUpdatedAt || cloudUpdatedAt > localUpdatedAt));
     if (!shouldPullCloud) {
       queueCloudSync();
-      return { pulled: false, reason: "kept-local" };
+      return;
     }
     suppressCloudSync = true;
     writeCloudPayloadToLocal(cloudData);
@@ -7256,10 +7212,8 @@ async function syncCloudDataOnLogin() {
     if (cloudUpdatedAt) {
       markLocalDataUpdatedAt(cloudUpdatedAt);
     }
-    return { pulled: true, reason: "pulled-cloud" };
   } catch {
     // Leave local cache as source of truth if network fails.
-    return { pulled: false, reason: "sync-error" };
   } finally {
     suppressCloudSync = false;
   }
