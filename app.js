@@ -44,6 +44,8 @@ const CLOUD_PROFILE_COLLECTION = "goalTrackerProfiles";
 const CLOUD_DATA_COLLECTION = "goalTrackerData";
 const CLOUD_NOTIFICATION_COLLECTION = "goalTrackerNotifications";
 const CLOUD_GOAL_SHARE_COLLECTION = "goalTrackerGoalShares";
+const GOAL_TEMPLATE_WEEK_COUNT = 52;
+const GOAL_TEMPLATE_MONTH_COUNT = 12;
 
 const appShell = document.querySelector("#app-shell");
 const authPanel = document.querySelector("#auth-panel");
@@ -87,6 +89,12 @@ const goalTags = document.querySelector("#goal-tags");
 const goalWeekly = document.querySelector("#goal-weekly");
 const goalMonthly = document.querySelector("#goal-monthly");
 const goalYearly = document.querySelector("#goal-yearly");
+const goalCustomWeekEnabled = document.querySelector("#goal-custom-week-enabled");
+const goalCustomMonthEnabled = document.querySelector("#goal-custom-month-enabled");
+const goalCustomWeekWrap = document.querySelector("#goal-custom-week-wrap");
+const goalCustomMonthWrap = document.querySelector("#goal-custom-month-wrap");
+const goalCustomWeekGrid = document.querySelector("#goal-custom-week-grid");
+const goalCustomMonthGrid = document.querySelector("#goal-custom-month-grid");
 const goalRewardPointsWrap = document.querySelector("#goal-reward-points-wrap");
 const goalRewardWeeklyPoints = document.querySelector("#goal-reward-weekly-points");
 const goalRewardMonthlyPoints = document.querySelector("#goal-reward-monthly-points");
@@ -338,6 +346,11 @@ const graphModalState = {
   historyMetric: "avg",
   historyGraphType: "bar"
 };
+const goalTargetInputTouched = { weekly: false, monthly: false, yearly: false };
+let goalCustomWeekTargetsDraft = [];
+let goalCustomMonthTargetsDraft = [];
+let goalCustomWeekTargetsEdited = false;
+let goalCustomMonthTargetsEdited = false;
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
 scheduleDate.value = getDateKey(normalizeDate(new Date()));
@@ -352,6 +365,15 @@ if (goalJournalDate) {
 }
 if (goalUnit) {
   goalUnit.value = "units";
+}
+if (goalWeekly) {
+  goalWeekly.value = "0";
+}
+if (goalMonthly) {
+  goalMonthly.value = "0";
+}
+if (goalYearly) {
+  goalYearly.value = "0";
 }
 if (entryListSort) {
   entryListSort.value = entryListSortMode;
@@ -776,6 +798,98 @@ if (goalType) {
   });
 }
 
+if (goalWeekly) {
+  goalWeekly.addEventListener("input", () => {
+    handleGoalTargetInput("weekly");
+  });
+}
+
+if (goalMonthly) {
+  goalMonthly.addEventListener("input", () => {
+    handleGoalTargetInput("monthly");
+  });
+}
+
+if (goalYearly) {
+  goalYearly.addEventListener("input", () => {
+    handleGoalTargetInput("yearly");
+  });
+}
+
+if (goalCustomWeekEnabled) {
+  goalCustomWeekEnabled.addEventListener("change", () => {
+    if (goalCustomWeekEnabled.checked && goalCustomWeekTargetsDraft.length < 1) {
+      goalCustomWeekTargetsDraft = getDefaultCustomTargets(
+        GOAL_TEMPLATE_WEEK_COUNT,
+        normalizeGoalTargetInt(goalWeekly ? goalWeekly.value : 0, 0)
+      );
+      goalCustomWeekTargetsEdited = false;
+    }
+    if (!goalCustomWeekEnabled.checked) {
+      goalCustomWeekTargetsEdited = false;
+    }
+    syncGoalCustomTemplateVisibility();
+  });
+}
+
+if (goalCustomMonthEnabled) {
+  goalCustomMonthEnabled.addEventListener("change", () => {
+    if (goalCustomMonthEnabled.checked && goalCustomMonthTargetsDraft.length < 1) {
+      goalCustomMonthTargetsDraft = getDefaultCustomTargets(
+        GOAL_TEMPLATE_MONTH_COUNT,
+        normalizeGoalTargetInt(goalMonthly ? goalMonthly.value : 0, 0)
+      );
+      goalCustomMonthTargetsEdited = false;
+    }
+    if (!goalCustomMonthEnabled.checked) {
+      goalCustomMonthTargetsEdited = false;
+    }
+    syncGoalCustomTemplateVisibility();
+  });
+}
+
+if (goalCustomWeekGrid) {
+  goalCustomWeekGrid.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-template-period='week']");
+    if (!input) {
+      return;
+    }
+    const index = Number(input.dataset.templateIndex);
+    if (!Number.isFinite(index) || index < 0 || index >= GOAL_TEMPLATE_WEEK_COUNT) {
+      return;
+    }
+    if (goalCustomWeekTargetsDraft.length !== GOAL_TEMPLATE_WEEK_COUNT) {
+      goalCustomWeekTargetsDraft = getDefaultCustomTargets(
+        GOAL_TEMPLATE_WEEK_COUNT,
+        normalizeGoalTargetInt(goalWeekly ? goalWeekly.value : 0, 0)
+      );
+    }
+    goalCustomWeekTargetsDraft[index] = normalizeGoalTargetInt(input.value, 0);
+    goalCustomWeekTargetsEdited = true;
+  });
+}
+
+if (goalCustomMonthGrid) {
+  goalCustomMonthGrid.addEventListener("input", (event) => {
+    const input = event.target.closest("input[data-template-period='month']");
+    if (!input) {
+      return;
+    }
+    const index = Number(input.dataset.templateIndex);
+    if (!Number.isFinite(index) || index < 0 || index >= GOAL_TEMPLATE_MONTH_COUNT) {
+      return;
+    }
+    if (goalCustomMonthTargetsDraft.length !== GOAL_TEMPLATE_MONTH_COUNT) {
+      goalCustomMonthTargetsDraft = getDefaultCustomTargets(
+        GOAL_TEMPLATE_MONTH_COUNT,
+        normalizeGoalTargetInt(goalMonthly ? goalMonthly.value : 0, 0)
+      );
+    }
+    goalCustomMonthTargetsDraft[index] = normalizeGoalTargetInt(input.value, 0);
+    goalCustomMonthTargetsEdited = true;
+  });
+}
+
 goalForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!currentUser) {
@@ -790,13 +904,21 @@ goalForm.addEventListener("submit", (event) => {
   const unit = lockedUnit || normalizeGoalUnit(goalUnit.value);
   const priority = normalizeGoalPriority(goalPriority ? goalPriority.value : 0, 0);
   const tags = normalizeGoalTags(goalTags ? goalTags.value : "");
-  const weeklyGoal = normalizePositiveInt(goalWeekly.value, 1);
-  const monthlyGoal = normalizePositiveInt(goalMonthly.value, 1);
-  const yearlyGoal = normalizePositiveInt(goalYearly.value, 1);
+  const weeklyGoal = normalizeGoalTargetInt(goalWeekly ? goalWeekly.value : 0, 0);
+  const monthlyGoal = normalizeGoalTargetInt(goalMonthly ? goalMonthly.value : 0, 0);
+  const yearlyGoal = normalizeGoalTargetInt(goalYearly ? goalYearly.value : 0, 0);
+  const customWeeklyEnabled = Boolean(goalCustomWeekEnabled && goalCustomWeekEnabled.checked);
+  const customMonthlyEnabled = Boolean(goalCustomMonthEnabled && goalCustomMonthEnabled.checked);
+  const customWeeklyTargets = customWeeklyEnabled
+    ? normalizeCustomTargetList(goalCustomWeekTargetsDraft, GOAL_TEMPLATE_WEEK_COUNT, weeklyGoal)
+    : [];
+  const customMonthlyTargets = customMonthlyEnabled
+    ? normalizeCustomTargetList(goalCustomMonthTargetsDraft, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal)
+    : [];
   const rewardWeeklyPoints = normalizeGoalPoints(goalRewardWeeklyPoints ? goalRewardWeeklyPoints.value : 1, 1);
   const rewardMonthlyPoints = normalizeGoalPoints(goalRewardMonthlyPoints ? goalRewardMonthlyPoints.value : 3, 3);
   const rewardYearlyPoints = normalizeGoalPoints(goalRewardYearlyPoints ? goalRewardYearlyPoints.value : 10, 10);
-  if (!name || !unit || weeklyGoal < 1 || monthlyGoal < 1 || yearlyGoal < 1) {
+  if (!name || !unit || weeklyGoal < 0 || monthlyGoal < 0 || yearlyGoal < 0) {
     return;
   }
 
@@ -811,6 +933,10 @@ goalForm.addEventListener("submit", (event) => {
     weeklyGoal,
     monthlyGoal,
     yearlyGoal,
+    customWeeklyEnabled,
+    customWeeklyTargets,
+    customMonthlyEnabled,
+    customMonthlyTargets,
     goalPointsWeekly: rewardWeeklyPoints,
     goalPointsMonthly: rewardMonthlyPoints,
     goalPointsYearly: rewardYearlyPoints,
@@ -836,9 +962,7 @@ goalForm.addEventListener("submit", (event) => {
   if (goalTags) {
     goalTags.value = "";
   }
-  goalWeekly.value = "5";
-  goalMonthly.value = "22";
-  goalYearly.value = "260";
+  resetGoalTargetsToDefaults();
   if (goalRewardWeeklyPoints) {
     goalRewardWeeklyPoints.value = "1";
   }
@@ -848,6 +972,7 @@ goalForm.addEventListener("submit", (event) => {
   if (goalRewardYearlyPoints) {
     goalRewardYearlyPoints.value = "10";
   }
+  resetGoalCustomTemplates();
   updateGoalTypeFields();
   render();
 });
@@ -935,9 +1060,9 @@ if (manageGoalsForm) {
         priority: normalizeGoalPriority(priorityInput ? priorityInput.value : tracker.priority, tracker.priority),
         tags: normalizeGoalTags(tagsInput ? tagsInput.value : tracker.tags),
         unit: unitValue,
-        weeklyGoal: normalizePositiveInt(weeklyInput.value, tracker.weeklyGoal),
-        monthlyGoal: normalizePositiveInt(monthlyInput.value, tracker.monthlyGoal),
-        yearlyGoal: normalizePositiveInt(yearlyInput.value, tracker.yearlyGoal),
+        weeklyGoal: normalizeGoalTargetInt(weeklyInput.value, tracker.weeklyGoal),
+        monthlyGoal: normalizeGoalTargetInt(monthlyInput.value, tracker.monthlyGoal),
+        yearlyGoal: normalizeGoalTargetInt(yearlyInput.value, tracker.yearlyGoal),
         goalPointsWeekly: normalizeGoalPoints(
           goalPointsWeeklyInput ? goalPointsWeeklyInput.value : getTrackerGoalPointsForPeriod(tracker, "week"),
           getTrackerGoalPointsForPeriod(tracker, "week")
@@ -2352,24 +2477,27 @@ function renderGraphModal() {
 
 function getPeriodMeta(periodName) {
   if (periodName === "week") {
+    const range = getWeekRange(weekViewAnchor);
     return {
       title: "Week",
-      range: getWeekRange(weekViewAnchor),
-      targetFn: (tracker) => tracker.weeklyGoal
+      range,
+      targetFn: (tracker) => getTrackerTargetForPeriod(tracker, "week", range)
     };
   }
   if (periodName === "month") {
+    const range = getMonthRange(monthViewAnchor);
     return {
       title: "Month",
-      range: getMonthRange(monthViewAnchor),
-      targetFn: (tracker) => tracker.monthlyGoal
+      range,
+      targetFn: (tracker) => getTrackerTargetForPeriod(tracker, "month", range)
     };
   }
   if (periodName === "year") {
+    const range = getYearRange(yearViewAnchor);
     return {
       title: "Year",
-      range: getYearRange(yearViewAnchor),
-      targetFn: (tracker) => tracker.yearlyGoal
+      range,
+      targetFn: (tracker) => getTrackerTargetForPeriod(tracker, "year", range)
     };
   }
   return null;
@@ -2409,15 +2537,15 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
   let title = "";
   if (periodName === "week") {
     range = getWeekRange(weekViewAnchor);
-    target = tracker.weeklyGoal;
+    target = getTrackerTargetForPeriod(tracker, "week", range);
     title = "Week";
   } else if (periodName === "month") {
     range = getMonthRange(monthViewAnchor);
-    target = tracker.monthlyGoal;
+    target = getTrackerTargetForPeriod(tracker, "month", range);
     title = "Month";
   } else if (periodName === "year") {
     range = getYearRange(yearViewAnchor);
-    target = tracker.yearlyGoal;
+    target = getTrackerTargetForPeriod(tracker, "year", range);
     title = "Year";
   } else {
     return null;
@@ -2781,7 +2909,7 @@ function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, me
     if (selectedMetric === "total") {
       value = total;
     } else if (selectedMetric === "hit") {
-      const target = getTrackerTargetForPeriod(tracker, periodName);
+      const target = getTrackerTargetForPeriod(tracker, periodName, compareRange);
       value = target > 0 && total >= target ? 1 : 0;
     } else {
       value = safeDivide(total, days);
@@ -3272,13 +3400,13 @@ function renderManageGoals() {
           <input data-field="unit" type="text" maxlength="20" value="${escapeHtml(tracker.unit || "units")}" ${getLockedUnitForGoalType(tracker.goalType) ? "disabled" : ""} required />
         </td>
         <td>
-          <input data-field="weeklyGoal" type="number" min="1" max="1000000" value="${tracker.weeklyGoal}" required />
+          <input data-field="weeklyGoal" type="number" min="0" max="1000000" value="${tracker.weeklyGoal}" required />
         </td>
         <td>
-          <input data-field="monthlyGoal" type="number" min="1" max="1000000" value="${tracker.monthlyGoal}" required />
+          <input data-field="monthlyGoal" type="number" min="0" max="1000000" value="${tracker.monthlyGoal}" required />
         </td>
         <td>
-          <input data-field="yearlyGoal" type="number" min="1" max="1000000" value="${tracker.yearlyGoal}" required />
+          <input data-field="yearlyGoal" type="number" min="0" max="1000000" value="${tracker.yearlyGoal}" required />
         </td>
         <td class="goal-points-col" ${rewardPointsEnabled ? "" : "hidden"}>
           <input data-field="goalPointsWeekly" type="number" min="0" max="1000000" value="${getTrackerGoalPointsForPeriod(tracker, "week")}" ${rewardPointsEnabled ? "" : "disabled"} />
@@ -4122,9 +4250,9 @@ function renderPeriodTabs() {
   }
 
   const index = buildEntryIndex(entries);
-  renderPeriod("week", week, now, weekSummary, weekList, weekEmpty, (tracker) => tracker.weeklyGoal, index);
-  renderPeriod("month", month, now, monthSummary, monthList, monthEmpty, (tracker) => tracker.monthlyGoal, index);
-  renderPeriod("year", year, now, yearSummary, yearList, yearEmpty, (tracker) => tracker.yearlyGoal, index);
+  renderPeriod("week", week, now, weekSummary, weekList, weekEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "week", week), index);
+  renderPeriod("month", month, now, monthSummary, monthList, monthEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "month", month), index);
+  renderPeriod("year", year, now, yearSummary, yearList, yearEmpty, (tracker) => getTrackerTargetForPeriod(tracker, "year", year), index);
   renderSharedGoalsSection("week", week, weekList);
   renderSharedGoalsSection("month", month, monthList);
   renderSharedGoalsSection("year", year, yearList);
@@ -4509,7 +4637,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       }
 
       const index = buildEntryIndex(ownerData.entries);
-      const target = getTrackerTargetForPeriod(tracker, periodName);
+      const target = getTrackerTargetForPeriod(tracker, periodName, range);
       const progress = sumTrackerRange(index, tracker.id, range);
       const pct = percent(progress, target);
       const goalHit = target > 0 && progress >= target;
@@ -4622,7 +4750,7 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   const rewardPointsEnabled = isRewardPointsEnabled();
 
   const goalSnapshots = trackersForPeriod.map((tracker) => {
-    const target = getTrackerTargetForPeriod(tracker, periodName);
+    const target = getTrackerTargetForPeriod(tracker, periodName, range);
     const progress = sumTrackerRange(index, tracker.id, range);
     const isFloating = isFloatingGoalType(tracker.goalType);
     const avgPerDay = safeDivide(progress, elapsedDays);
@@ -4723,14 +4851,64 @@ function getPeriodRange(periodName) {
   return getWeekRange(weekViewAnchor);
 }
 
-function getTrackerTargetForPeriod(tracker, periodName) {
+function getWeekTemplateIndexForDate(date) {
+  const normalizedDate = normalizeDate(date || new Date());
+  const yearStart = new Date(normalizedDate.getFullYear(), 0, 1);
+  const yearWeekStart = getWeekRange(yearStart).start;
+  const targetWeekStart = getWeekRange(normalizedDate).start;
+  const diffDays = Math.round((normalizeDate(targetWeekStart) - normalizeDate(yearWeekStart)) / DAY_MS);
+  const weekIndex = Math.floor(diffDays / 7);
+  return Math.max(Math.min(weekIndex, GOAL_TEMPLATE_WEEK_COUNT - 1), 0);
+}
+
+function getTrackerCustomWeekTargetForRange(tracker, range) {
+  const weeklyTargets = normalizeCustomTargetList(
+    tracker && tracker.customWeeklyTargets,
+    GOAL_TEMPLATE_WEEK_COUNT,
+    normalizeGoalTargetInt(tracker && tracker.weeklyGoal, 0)
+  );
+  const rangeDate = range && range.start ? range.start : new Date();
+  return weeklyTargets[getWeekTemplateIndexForDate(rangeDate)] || 0;
+}
+
+function getTrackerCustomMonthTargetForRange(tracker, range) {
+  const monthlyTargets = normalizeCustomTargetList(
+    tracker && tracker.customMonthlyTargets,
+    GOAL_TEMPLATE_MONTH_COUNT,
+    normalizeGoalTargetInt(tracker && tracker.monthlyGoal, 0)
+  );
+  const rangeDate = range && range.start ? range.start : new Date();
+  const monthIndex = Math.max(Math.min(new Date(rangeDate).getMonth(), GOAL_TEMPLATE_MONTH_COUNT - 1), 0);
+  return monthlyTargets[monthIndex] || 0;
+}
+
+function getTrackerTargetForPeriod(tracker, periodName, range = null) {
+  const weeklyGoal = normalizeGoalTargetInt(tracker && tracker.weeklyGoal, 0);
+  const monthlyGoal = normalizeGoalTargetInt(tracker && tracker.monthlyGoal, 0);
+  const yearlyGoal = normalizeGoalTargetInt(tracker && tracker.yearlyGoal, 0);
+  const customWeeklyEnabled = Boolean(tracker && tracker.customWeeklyEnabled);
+  const customMonthlyEnabled = Boolean(tracker && tracker.customMonthlyEnabled);
   if (periodName === "month") {
-    return tracker.monthlyGoal;
+    if (customMonthlyEnabled) {
+      return getTrackerCustomMonthTargetForRange(tracker, range);
+    }
+    return monthlyGoal;
   }
   if (periodName === "year") {
-    return tracker.yearlyGoal;
+    if (customMonthlyEnabled) {
+      const monthlyTargets = normalizeCustomTargetList(tracker && tracker.customMonthlyTargets, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal);
+      return monthlyTargets.reduce((total, value) => addAmount(total, value), 0);
+    }
+    if (customWeeklyEnabled) {
+      const weeklyTargets = normalizeCustomTargetList(tracker && tracker.customWeeklyTargets, GOAL_TEMPLATE_WEEK_COUNT, weeklyGoal);
+      return weeklyTargets.reduce((total, value) => addAmount(total, value), 0);
+    }
+    return yearlyGoal;
   }
-  return tracker.weeklyGoal;
+  if (customWeeklyEnabled) {
+    return getTrackerCustomWeekTargetForRange(tracker, range);
+  }
+  return weeklyGoal;
 }
 
 function getTrackerGoalPointsForPeriod(tracker, periodName) {
@@ -6416,9 +6594,9 @@ function getGoalHitNotificationCandidates(now = new Date()) {
   const normalizedNow = normalizeDate(now);
   const index = buildEntryIndex(entries);
   const periods = [
-    { key: "week", range: getWeekRange(normalizedNow), target: (tracker) => tracker.weeklyGoal },
-    { key: "month", range: getMonthRange(normalizedNow), target: (tracker) => tracker.monthlyGoal },
-    { key: "year", range: getYearRange(normalizedNow), target: (tracker) => tracker.yearlyGoal }
+    { key: "week", range: getWeekRange(normalizedNow) },
+    { key: "month", range: getMonthRange(normalizedNow) },
+    { key: "year", range: getYearRange(normalizedNow) }
   ];
   const items = [];
   trackers.forEach((tracker) => {
@@ -6429,7 +6607,7 @@ function getGoalHitNotificationCandidates(now = new Date()) {
       return;
     }
     periods.forEach((period) => {
-      const target = normalizePositiveInt(period.target(tracker), 0);
+      const target = normalizeGoalTargetInt(getTrackerTargetForPeriod(tracker, period.key, period.range), 0);
       if (target < 1) {
         return;
       }
@@ -6797,9 +6975,13 @@ async function loadSharedOwnerData(ownerId) {
           name: typeof item.name === "string" ? item.name : "Shared Goal",
           goalType: normalizeGoalType(item.goalType),
           unit: normalizeGoalUnit(item.unit),
-          weeklyGoal: normalizePositiveInt(item.weeklyGoal, 1),
-          monthlyGoal: normalizePositiveInt(item.monthlyGoal, 1),
-          yearlyGoal: normalizePositiveInt(item.yearlyGoal, 1)
+          weeklyGoal: normalizeGoalTargetInt(item.weeklyGoal, 0),
+          monthlyGoal: normalizeGoalTargetInt(item.monthlyGoal, 0),
+          yearlyGoal: normalizeGoalTargetInt(item.yearlyGoal, 0),
+          customWeeklyEnabled: Boolean(item.customWeeklyEnabled),
+          customWeeklyTargets: normalizeCustomTargetList(item.customWeeklyTargets, GOAL_TEMPLATE_WEEK_COUNT, normalizeGoalTargetInt(item.weeklyGoal, 0)),
+          customMonthlyEnabled: Boolean(item.customMonthlyEnabled),
+          customMonthlyTargets: normalizeCustomTargetList(item.customMonthlyTargets, GOAL_TEMPLATE_MONTH_COUNT, normalizeGoalTargetInt(item.monthlyGoal, 0))
         }))
       : [];
     const trackerIds = new Set(ownerTrackers.map((item) => item.id));
@@ -7459,6 +7641,8 @@ function resetUiStateForLogin() {
   if (goalUnit) {
     goalUnit.value = "units";
   }
+  resetGoalTargetsToDefaults();
+  resetGoalCustomTemplates();
   if (goalPriority) {
     goalPriority.value = "0";
   }
@@ -8127,25 +8311,20 @@ function loadTrackers() {
         return;
       }
       const trackerGoalType = normalizeGoalType(item.goalType);
-      const defaultYearlyGoal = trackerGoalType === "yesno"
-        ? 365
-        : trackerGoalType === "floating"
-        ? 24
-        : 1;
-      const yearlyGoal = normalizePositiveInt(item.yearlyGoal, defaultYearlyGoal);
-      const defaultMonthlyGoal = trackerGoalType === "yesno"
-        ? 30
-        : trackerGoalType === "floating"
-        ? 4
-        : trackerGoalType === "bucket"
-        ? 1
-        : Math.max(Math.ceil(yearlyGoal / 12), 1);
-      const monthlyGoal = normalizePositiveInt(item.monthlyGoal, defaultMonthlyGoal);
-      const defaultWeeklyGoal = trackerGoalType === "yesno" ? 7 : 1;
+      const defaultYearlyGoal = 0;
+      const yearlyGoal = normalizeGoalTargetInt(item.yearlyGoal, defaultYearlyGoal);
+      const defaultMonthlyGoal = 0;
+      const monthlyGoal = normalizeGoalTargetInt(item.monthlyGoal, defaultMonthlyGoal);
+      const defaultWeeklyGoal = 0;
+      const weeklyGoal = normalizeGoalTargetInt(item.weeklyGoal, defaultWeeklyGoal);
       const loadedUnit = getLockedUnitForGoalType(trackerGoalType)
         || (trackerGoalType === "floating" && !String(item.unit || "").trim()
           ? "items"
           : normalizeGoalUnit(item.unit));
+      const customWeeklyEnabled = Boolean(item.customWeeklyEnabled);
+      const customWeeklyTargets = normalizeCustomTargetList(item.customWeeklyTargets, GOAL_TEMPLATE_WEEK_COUNT, weeklyGoal);
+      const customMonthlyEnabled = Boolean(item.customMonthlyEnabled);
+      const customMonthlyTargets = normalizeCustomTargetList(item.customMonthlyTargets, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal);
       const hasLegacyPoints = item.goalPoints !== undefined && item.goalPoints !== null && item.goalPoints !== "";
       const legacyPoints = hasLegacyPoints ? normalizeGoalPoints(item.goalPoints, 1) : null;
       loadedTrackers.push({
@@ -8156,9 +8335,13 @@ function loadTrackers() {
         priority: normalizeGoalPriority(item.priority, 0),
         tags: normalizeGoalTags(item.tags),
         unit: loadedUnit,
-        weeklyGoal: normalizePositiveInt(item.weeklyGoal, defaultWeeklyGoal),
+        weeklyGoal,
         monthlyGoal,
         yearlyGoal,
+        customWeeklyEnabled,
+        customWeeklyTargets,
+        customMonthlyEnabled,
+        customMonthlyTargets,
         goalPointsWeekly: normalizeGoalPoints(item.goalPointsWeekly, legacyPoints === null ? 1 : legacyPoints),
         goalPointsMonthly: normalizeGoalPoints(item.goalPointsMonthly, legacyPoints === null ? 3 : legacyPoints),
         goalPointsYearly: normalizeGoalPoints(item.goalPointsYearly, legacyPoints === null ? 10 : legacyPoints),
@@ -8677,6 +8860,14 @@ function normalizePositiveInt(value, fallback) {
   return Math.max(Math.floor(numeric), 1);
 }
 
+function normalizeGoalTargetInt(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return fallback;
+  }
+  return Math.max(Math.floor(numeric), 0);
+}
+
 function normalizePositiveAmount(value, fallback) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) {
@@ -8847,17 +9038,189 @@ function getLockedUnitForGoalType(value) {
 }
 
 function getGoalTargetDefaults(value) {
-  const type = normalizeGoalType(value);
-  if (type === "yesno") {
-    return { weekly: 7, monthly: 30, yearly: 365 };
+  normalizeGoalType(value);
+  return { weekly: 0, monthly: 0, yearly: 0 };
+}
+
+function getGoalTargetFieldElement(key) {
+  if (key === "month" || key === "monthly") {
+    return goalMonthly;
   }
-  if (type === "bucket") {
-    return { weekly: 1, monthly: 1, yearly: 1 };
+  if (key === "year" || key === "yearly") {
+    return goalYearly;
   }
-  if (type === "floating") {
-    return { weekly: 1, monthly: 4, yearly: 24 };
+  return goalWeekly;
+}
+
+function readGoalTargetInputValue(key) {
+  const input = getGoalTargetFieldElement(key);
+  return normalizeGoalTargetInt(input ? input.value : 0, 0);
+}
+
+function setGoalTargetInputValue(key, value) {
+  const input = getGoalTargetFieldElement(key);
+  if (!input) {
+    return;
   }
-  return { weekly: 1, monthly: 1, yearly: 1 };
+  input.value = String(normalizeGoalTargetInt(value, 0));
+}
+
+function resetGoalTargetsToDefaults() {
+  const defaults = getGoalTargetDefaults(goalType ? goalType.value : "quantity");
+  setGoalTargetInputValue("weekly", defaults.weekly);
+  setGoalTargetInputValue("monthly", defaults.monthly);
+  setGoalTargetInputValue("yearly", defaults.yearly);
+  goalTargetInputTouched.weekly = false;
+  goalTargetInputTouched.monthly = false;
+  goalTargetInputTouched.yearly = false;
+}
+
+function deriveGoalTargetsFromSource(sourceKey, sourceValue) {
+  const safeValue = normalizeGoalTargetInt(sourceValue, 0);
+  const weeklyFromYearly = Math.ceil(safeValue / 52);
+  const monthlyFromYearly = Math.ceil(safeValue / 12);
+  if (sourceKey === "yearly") {
+    return {
+      weekly: weeklyFromYearly,
+      monthly: monthlyFromYearly,
+      yearly: safeValue
+    };
+  }
+  if (sourceKey === "monthly") {
+    const yearly = safeValue * 12;
+    return {
+      weekly: Math.ceil(yearly / 52),
+      monthly: safeValue,
+      yearly
+    };
+  }
+  const yearly = safeValue * 52;
+  return {
+    weekly: safeValue,
+    monthly: Math.ceil(yearly / 12),
+    yearly
+  };
+}
+
+function normalizeTargetInputKey(sourceKey) {
+  if (sourceKey === "month" || sourceKey === "monthly") {
+    return "monthly";
+  }
+  if (sourceKey === "year" || sourceKey === "yearly") {
+    return "yearly";
+  }
+  return "weekly";
+}
+
+function handleGoalTargetInput(sourceKey) {
+  const normalizedKey = normalizeTargetInputKey(sourceKey);
+  goalTargetInputTouched[normalizedKey] = true;
+  const sourceValue = readGoalTargetInputValue(normalizedKey);
+  const nextTargets = deriveGoalTargetsFromSource(normalizedKey, sourceValue);
+  const keys = ["weekly", "monthly", "yearly"];
+  keys.forEach((key) => {
+    if (key === normalizedKey) {
+      return;
+    }
+    if (goalTargetInputTouched[key]) {
+      return;
+    }
+    setGoalTargetInputValue(key, nextTargets[key]);
+  });
+  if (goalCustomWeekEnabled && goalCustomWeekEnabled.checked && !goalCustomWeekTargetsEdited) {
+    goalCustomWeekTargetsDraft = getDefaultCustomTargets(
+      GOAL_TEMPLATE_WEEK_COUNT,
+      readGoalTargetInputValue("weekly")
+    );
+  }
+  if (goalCustomMonthEnabled && goalCustomMonthEnabled.checked && !goalCustomMonthTargetsEdited) {
+    goalCustomMonthTargetsDraft = getDefaultCustomTargets(
+      GOAL_TEMPLATE_MONTH_COUNT,
+      readGoalTargetInputValue("monthly")
+    );
+  }
+  syncGoalCustomTemplateVisibility();
+}
+
+function getDefaultCustomTargets(count, fallbackValue = 0) {
+  const safeCount = Math.max(Math.floor(Number(count) || 0), 0);
+  const safeFallback = normalizeGoalTargetInt(fallbackValue, 0);
+  return Array.from({ length: safeCount }, () => safeFallback);
+}
+
+function normalizeCustomTargetList(value, count, fallbackValue = 0) {
+  const safeCount = Math.max(Math.floor(Number(count) || 0), 0);
+  const safeFallback = normalizeGoalTargetInt(fallbackValue, 0);
+  const source = Array.isArray(value) ? value : [];
+  return Array.from({ length: safeCount }, (_, index) => normalizeGoalTargetInt(source[index], safeFallback));
+}
+
+function resetGoalCustomTemplates() {
+  if (goalCustomWeekEnabled) {
+    goalCustomWeekEnabled.checked = false;
+  }
+  if (goalCustomMonthEnabled) {
+    goalCustomMonthEnabled.checked = false;
+  }
+  goalCustomWeekTargetsDraft = [];
+  goalCustomMonthTargetsDraft = [];
+  goalCustomWeekTargetsEdited = false;
+  goalCustomMonthTargetsEdited = false;
+  syncGoalCustomTemplateVisibility();
+}
+
+function renderGoalCustomTemplateGrid(periodName) {
+  const isWeek = periodName === "week";
+  const gridEl = isWeek ? goalCustomWeekGrid : goalCustomMonthGrid;
+  if (!gridEl) {
+    return;
+  }
+  const count = isWeek ? GOAL_TEMPLATE_WEEK_COUNT : GOAL_TEMPLATE_MONTH_COUNT;
+  const labelPrefix = isWeek ? "W" : "M";
+  const fallbackValue = isWeek
+    ? readGoalTargetInputValue("weekly")
+    : readGoalTargetInputValue("monthly");
+  const nextValues = isWeek
+    ? normalizeCustomTargetList(goalCustomWeekTargetsDraft, count, fallbackValue)
+    : normalizeCustomTargetList(goalCustomMonthTargetsDraft, count, fallbackValue);
+  const inputsMarkup = nextValues
+    .map((value, index) => `
+      <label class="goal-template-cell">
+        <span>${labelPrefix}${index + 1}</span>
+        <input
+          type="number"
+          min="0"
+          max="1000000"
+          value="${normalizeGoalTargetInt(value, 0)}"
+          data-template-period="${isWeek ? "week" : "month"}"
+          data-template-index="${index}"
+        />
+      </label>
+    `)
+    .join("");
+  gridEl.innerHTML = inputsMarkup;
+  if (isWeek) {
+    goalCustomWeekTargetsDraft = nextValues;
+  } else {
+    goalCustomMonthTargetsDraft = nextValues;
+  }
+}
+
+function syncGoalCustomTemplateVisibility() {
+  const weekEnabled = Boolean(goalCustomWeekEnabled && goalCustomWeekEnabled.checked);
+  const monthEnabled = Boolean(goalCustomMonthEnabled && goalCustomMonthEnabled.checked);
+  if (goalCustomWeekWrap) {
+    goalCustomWeekWrap.hidden = !weekEnabled;
+  }
+  if (goalCustomMonthWrap) {
+    goalCustomMonthWrap.hidden = !monthEnabled;
+  }
+  if (weekEnabled) {
+    renderGoalCustomTemplateGrid("week");
+  }
+  if (monthEnabled) {
+    renderGoalCustomTemplateGrid("month");
+  }
 }
 
 function normalizeCheckInCadence(value) {
@@ -8968,13 +9331,13 @@ function updateGoalTypeFields() {
   if (lockedUnit) {
     const targetDefaults = getGoalTargetDefaults(normalizedType);
     goalUnit.value = lockedUnit;
-    if (!goalWeekly.value || Number(goalWeekly.value) < 1) {
+    if (!goalWeekly.value || Number(goalWeekly.value) < 0) {
       goalWeekly.value = String(targetDefaults.weekly);
     }
-    if (!goalMonthly.value || Number(goalMonthly.value) < 1) {
+    if (!goalMonthly.value || Number(goalMonthly.value) < 0) {
       goalMonthly.value = String(targetDefaults.monthly);
     }
-    if (!goalYearly.value || Number(goalYearly.value) < 1) {
+    if (!goalYearly.value || Number(goalYearly.value) < 0) {
       goalYearly.value = String(targetDefaults.yearly);
     }
     goalUnit.placeholder = lockedUnit;
@@ -8983,13 +9346,13 @@ function updateGoalTypeFields() {
     if (!String(goalUnit.value || "").trim() || goalUnit.value === "units") {
       goalUnit.value = "items";
     }
-    if (!goalWeekly.value || Number(goalWeekly.value) < 1) {
+    if (!goalWeekly.value || Number(goalWeekly.value) < 0) {
       goalWeekly.value = String(targetDefaults.weekly);
     }
-    if (!goalMonthly.value || Number(goalMonthly.value) < 1) {
+    if (!goalMonthly.value || Number(goalMonthly.value) < 0) {
       goalMonthly.value = String(targetDefaults.monthly);
     }
-    if (!goalYearly.value || Number(goalYearly.value) < 1) {
+    if (!goalYearly.value || Number(goalYearly.value) < 0) {
       goalYearly.value = String(targetDefaults.yearly);
     }
     goalUnit.placeholder = "meals, projects, items";
@@ -8999,6 +9362,7 @@ function updateGoalTypeFields() {
     }
     goalUnit.placeholder = "miles, pages, calls";
   }
+  syncGoalCustomTemplateVisibility();
 }
 
 function updateEntryFormMode() {

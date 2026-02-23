@@ -111,7 +111,6 @@
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="entry">Add Entry</button>
-              <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
               <button class="menu-btn" type="button" data-tab="bucket-entry">Bucket List Entry</button>
               <button class="menu-btn" type="button" data-tab="checkin-entry">Add Check-in</button>
               <button class="menu-btn" type="button" data-tab="entry-list">Entry List</button>
@@ -135,7 +134,12 @@
             </div>
           </div>
 
-          <button class="btn menu-btn top-tab" type="button" data-tab="goal-journal">Goal Journal</button>
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Reflection</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
+            </div>
+          </div>
 
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
@@ -184,16 +188,34 @@
           <div class="form-grid form-grid-3">
             <label>
               Weekly Goal
-              <input id="goal-weekly" type="number" min="1" max="1000000" value="5" required />
+              <input id="goal-weekly" type="number" min="0" max="1000000" value="0" required />
             </label>
             <label>
               Monthly Goal
-              <input id="goal-monthly" type="number" min="1" max="1000000" value="22" required />
+              <input id="goal-monthly" type="number" min="0" max="1000000" value="0" required />
             </label>
             <label>
               Yearly Goal
-              <input id="goal-yearly" type="number" min="1" max="1000000" value="260" required />
+              <input id="goal-yearly" type="number" min="0" max="1000000" value="0" required />
             </label>
+          </div>
+          <div class="goal-template-toggle-row">
+            <label class="check-inline">
+              <input id="goal-custom-week-enabled" type="checkbox" />
+              Define each week
+            </label>
+            <label class="check-inline">
+              <input id="goal-custom-month-enabled" type="checkbox" />
+              Define each month
+            </label>
+          </div>
+          <div id="goal-custom-week-wrap" class="goal-template-wrap" hidden>
+            <p class="muted small">Custom weekly targets (W1-W52)</p>
+            <div id="goal-custom-week-grid" class="goal-template-grid goal-template-grid-week"></div>
+          </div>
+          <div id="goal-custom-month-wrap" class="goal-template-wrap" hidden>
+            <p class="muted small">Custom monthly targets (M1-M12)</p>
+            <div id="goal-custom-month-grid" class="goal-template-grid goal-template-grid-month"></div>
           </div>
           <div id="goal-reward-points-wrap" class="form-grid form-grid-3" hidden>
             <label>

@@ -334,6 +334,10 @@ body::before {
   right: -6px;
 }
 
+.notifications-badge[hidden] {
+  display: none;
+}
+
 .notifications-panel {
   position: absolute;
   right: 0;
@@ -923,6 +927,57 @@ label {
 
 .form-grid-entry {
   grid-template-columns: 1fr 1.5fr 1fr;
+}
+
+.goal-template-toggle-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.goal-template-wrap {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, var(--surface-soft) 0%, #ffffff 100%);
+}
+
+.goal-template-wrap .muted.small {
+  margin: 0 0 8px;
+}
+
+.goal-template-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.goal-template-grid-week {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.goal-template-grid-month {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+}
+
+.goal-template-cell {
+  display: grid;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.goal-template-cell input {
+  border-radius: 9px;
+  padding: 7px 8px;
+  font-size: 0.85rem;
 }
 
 input,
