@@ -2364,8 +2364,8 @@ function createExpandedTargetStatusMarkup(tracker, index, now) {
           <span class="pace-chip ${status.onPace ? "pace-on" : "pace-off"}">${status.onPace ? "On pace" : "Off pace"}</span>
         </div>
         <p class="target-status-line">${status.rangeLabel}</p>
-        <p class="target-status-line">${formatAmountWithUnit(status.progress, tracker.unit)}/${formatAmountWithUnit(status.target, tracker.unit)} (${status.completion}%)</p>
-        <div class="progress"><span style="width:${Math.min(status.completion, 100)}%"></span></div>
+        <p class="target-status-line">${formatProgressAgainstGoal(status.progress, status.target, tracker.unit)} (${status.completion}%)</p>
+        <div class="progress"><span class="progress-fill" style="width:${Math.min(status.completion, 100)}%"></span></div>
       </article>
     `;
   }).join("");
@@ -4140,13 +4140,18 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             </span>
         `;
 
+      const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
+
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}</h3>
           </div>
-          <p class="metric-line">${formatAmountWithUnit(progress, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)} (${pct}%)</p>
-          <div class="progress"><span class="${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span></div>
+          <div class="progress progress-with-label">
+            <span class="progress-fill ${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span>
+            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
+            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
+          </div>
           <div class="pace-line">
             ${paceStatusChip}
             <span class="pace-actions">
@@ -4209,7 +4214,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             </div>
           </div>
           <p class="metric-line">Status: <strong class="${statusClass}">${statusLabel}</strong></p>
-          <div class="progress"><span style="width:${pct}%"></span></div>
+          <div class="progress"><span class="progress-fill" style="width:${pct}%"></span></div>
           <p class="metric-line">${latestLabel}</p>
           ${notesLine}
         </li>
@@ -4350,14 +4355,19 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const pct = percent(progress, target);
       const goalHit = target > 0 && progress >= target;
       const ownerLabel = share.ownerUsername || "Friend";
+      const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
+
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}</h3>
             <span class="pace-chip">${escapeHtml(ownerLabel)}</span>
           </div>
-          <p class="metric-line">${formatAmountWithUnit(progress, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)} (${pct}%)</p>
-          <div class="progress"><span class="${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span></div>
+          <div class="progress progress-with-label">
+            <span class="progress-fill ${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span>
+            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
+            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
+          </div>
           <form data-action="add-shared-goal-entry" data-share-id="${share.id}" data-owner-id="${share.ownerId}" data-goal-id="${tracker.id}" class="entry-edit-form">
             <div class="form-grid form-grid-3">
               <label>
@@ -8850,6 +8860,10 @@ function updateEntryFormMode() {
 
 function formatAmountWithUnit(value, unit) {
   return `${formatAmount(value)} ${normalizeGoalUnit(unit)}`;
+}
+
+function formatProgressAgainstGoal(progress, target, unit) {
+  return `${formatAmount(progress)}/${formatAmount(target)} ${normalizeGoalUnit(unit)}`;
 }
 
 function getBucketTrackers(goalStatusFilter = "active") {

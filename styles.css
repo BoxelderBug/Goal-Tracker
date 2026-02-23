@@ -1689,18 +1689,52 @@ strong.pace-off,
   border-radius: 999px;
   overflow: hidden;
   background: var(--progress-track);
+  position: relative;
 }
 
-.progress > span {
-  display: block;
+.progress > .progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
   width: 0;
   height: 100%;
   background: linear-gradient(90deg, var(--progress-fill-start), var(--progress-fill-end));
   transition: width 0.25s ease;
+  z-index: 1;
 }
 
-.progress > span.progress-hit {
+.progress > .progress-fill.progress-hit {
   background: linear-gradient(90deg, var(--goal-hit-start), var(--goal-hit-end));
+}
+
+.progress.progress-with-label {
+  height: 20px;
+}
+
+.progress.progress-with-label > .progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 10px;
+  font-size: 0.76rem;
+  line-height: 1;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.progress.progress-with-label > .progress-label-track {
+  color: var(--text);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  z-index: 2;
+}
+
+.progress.progress-with-label > .progress-label-fill {
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  z-index: 3;
 }
 
 .graph-wrap {
