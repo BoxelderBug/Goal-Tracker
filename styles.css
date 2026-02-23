@@ -247,6 +247,26 @@ body::before {
   gap: 10px;
 }
 
+.btn-user-link {
+  border-color: var(--line);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.btn-user-link:hover,
+.btn-user-link:focus-visible {
+  border-color: var(--brand);
+  color: var(--brand-strong);
+}
+
+.btn-points-shortcut {
+  border-color: var(--goal-hit-line);
+  background: linear-gradient(180deg, var(--success-soft) 0%, #ffffff 100%);
+  color: var(--goal-hit-line);
+  font-weight: 700;
+}
+
 .notifications-wrap {
   position: relative;
 }

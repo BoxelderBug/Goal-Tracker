@@ -80,7 +80,8 @@
         <div class="hero-top">
           <p class="eyebrow">Goal System</p>
           <div class="hero-actions">
-            <p id="active-user-label" class="muted small"></p>
+            <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" hidden></button>
+            <button id="active-user-points-btn" class="btn btn-nav-compact btn-points-shortcut" type="button" hidden></button>
             <div class="notifications-wrap">
               <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel" hidden>
                 <span class="notifications-icon" aria-hidden="true">&#128276;</span>
@@ -135,7 +136,6 @@
           </div>
 
           <button class="btn menu-btn top-tab" type="button" data-tab="goal-journal">Goal Journal</button>
-          <button id="point-store-menu-btn" class="btn menu-btn top-tab" type="button" data-tab="point-store" hidden>Point Store</button>
 
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>

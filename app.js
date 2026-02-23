@@ -63,7 +63,8 @@ const authMessage = document.querySelector("#auth-message");
 const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authForms = document.querySelectorAll("[data-auth-form]");
 const logoutButton = document.querySelector("#logout-btn");
-const activeUserLabel = document.querySelector("#active-user-label");
+const activeUserButton = document.querySelector("#active-user-btn");
+const activeUserPointsButton = document.querySelector("#active-user-points-btn");
 const notificationsToggleButton = document.querySelector("#notifications-toggle-btn");
 const notificationsBadge = document.querySelector("#notifications-unread-count");
 const notificationsPanel = document.querySelector("#notifications-panel");
@@ -183,7 +184,6 @@ const friendNameInput = document.querySelector("#friend-name");
 const friendEmailInput = document.querySelector("#friend-email");
 const friendList = document.querySelector("#friend-list");
 const friendEmpty = document.querySelector("#friend-empty");
-const pointStoreMenuButton = document.querySelector("#point-store-menu-btn");
 const pointStoreSettingsSection = document.querySelector("#point-store-settings-section");
 const pointStoreToggleForm = document.querySelector("#point-store-toggle-form");
 const pointStoreEnabledSelect = document.querySelector("#point-store-enabled-select");
@@ -708,6 +708,27 @@ logoutButton.addEventListener("click", async () => {
   resetStateForSignedOutUser();
   render();
 });
+
+if (activeUserButton) {
+  activeUserButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    activeTab = "settings";
+    renderTabs();
+  });
+}
+
+if (activeUserPointsButton) {
+  activeUserPointsButton.addEventListener("click", () => {
+    if (!currentUser || !isPointStoreRewardsEnabled()) {
+      return;
+    }
+    activeTab = "point-store";
+    renderTabs();
+    renderPointStoreTab();
+  });
+}
 
 if (notificationsToggleButton) {
   notificationsToggleButton.addEventListener("click", (event) => {
@@ -2922,10 +2943,17 @@ function renderAuthState() {
   appShell.hidden = !isAuthenticated;
   authPanel.hidden = isAuthenticated;
   const username = isAuthenticated ? getUserDisplayName(currentUser) : "";
-  const pointSuffix = isAuthenticated
-    ? ` | ${formatAmount(getPointBankBalance())} pts`
-    : "";
-  activeUserLabel.textContent = isAuthenticated ? `${username}${pointSuffix}` : "";
+  if (activeUserButton) {
+    activeUserButton.hidden = !isAuthenticated;
+    activeUserButton.textContent = username;
+    activeUserButton.disabled = !isAuthenticated;
+  }
+  if (activeUserPointsButton) {
+    const showPointsButton = isAuthenticated && isPointStoreRewardsEnabled();
+    activeUserPointsButton.hidden = !showPointsButton;
+    activeUserPointsButton.textContent = `${formatAmount(getPointBankBalance())} pts`;
+    activeUserPointsButton.disabled = !showPointsButton;
+  }
   renderNotifications();
   if (isAuthenticated) {
     showAuthMessage("");
@@ -7662,13 +7690,6 @@ function applyBucketListFeatureVisibility() {
 function applyRewardPointsFeatureVisibility() {
   const enabled = isRewardPointsEnabled();
   const pointStoreEnabled = isPointStoreRewardsEnabled();
-  if (pointStoreMenuButton) {
-    pointStoreMenuButton.hidden = !pointStoreEnabled;
-    if (!pointStoreEnabled) {
-      pointStoreMenuButton.classList.remove("active");
-      pointStoreMenuButton.setAttribute("aria-current", "false");
-    }
-  }
   document.querySelectorAll("[data-tab='point-store']").forEach((button) => {
     button.hidden = !pointStoreEnabled;
   });
