@@ -24,9 +24,13 @@
   --progress-fill-end: var(--brand-strong);
   --progress-fill-strong-start: var(--brand-strong);
   --progress-fill-strong-end: var(--brand);
-  --goal-hit-start: #a88adb;
-  --goal-hit-end: #7f5fbc;
-  --goal-hit-line: #8f6fd0;
+  --goal-hit-start: #1ea879;
+  --goal-hit-end: #15845f;
+  --goal-hit-line: #188f67;
+  --toast-bg-start: #ffffff;
+  --toast-bg-end: var(--surface-soft);
+  --toast-border: var(--brand);
+  --toast-text: var(--brand-strong);
   --success: #177a52;
   --success-soft: #e6f8ef;
   --warning: #8b6419;
@@ -37,6 +41,14 @@
   --shadow: 0 18px 50px rgba(0, 94, 86, 0.13);
   --shadow-strong: 0 30px 70px rgba(0, 70, 62, 0.2);
   --focus-ring: 0 0 0 3px var(--brand-soft);
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --ui-panel-pad: 20px;
+  --ui-card-pad: 12px;
+  --ui-gap: 12px;
+  --ui-list-gap: 10px;
 }
 
 body[data-theme="teal"] {
@@ -135,9 +147,9 @@ body[data-theme="berry"] {
   --brand: #b05390;
   --brand-strong: #984377;
   --brand-soft: #f4deec;
-  --goal-hit-start: #a88adb;
-  --goal-hit-end: #7f5fbc;
-  --goal-hit-line: #8f6fd0;
+  --goal-hit-start: #4eb37b;
+  --goal-hit-end: #318f5e;
+  --goal-hit-line: #3a9f6b;
   --shadow: 0 18px 50px rgba(109, 47, 87, 0.16);
 }
 
@@ -209,14 +221,14 @@ body::before {
   margin: 0 auto;
   padding: 44px 18px 72px;
   display: grid;
-  gap: 18px;
+  gap: var(--space-4);
   position: relative;
   z-index: 1;
 }
 
 #app-shell {
   display: grid;
-  gap: 16px;
+  gap: var(--space-3);
 }
 
 #app-shell[hidden] {
@@ -431,7 +443,7 @@ body::before {
   border-radius: 22px;
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
   box-shadow: var(--shadow);
-  padding: 20px;
+  padding: var(--ui-panel-pad);
   animation: reveal-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
   overflow: hidden;
 }
@@ -463,13 +475,13 @@ body::before {
 
 .tabs {
   display: flex;
-  gap: 8px;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .nav-groups {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
 }
@@ -696,17 +708,17 @@ h3 {
   display: flex;
   justify-content: space-between;
   align-items: end;
-  gap: 12px;
+  gap: var(--ui-gap);
   flex-wrap: wrap;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .panel-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  padding: 8px;
+  padding: var(--space-2);
   border: 1px solid var(--line);
   border-radius: 14px;
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
@@ -819,8 +831,8 @@ h3 {
 
 .form-block {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--ui-gap);
+  padding: var(--ui-card-pad);
   border: 1px solid var(--line);
   border-radius: 16px;
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
@@ -840,7 +852,7 @@ label {
 
 .form-grid {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -902,9 +914,9 @@ textarea {
 }
 
 .summary-grid {
-  margin-top: 8px;
+  margin-top: var(--space-2);
   display: grid;
-  gap: 12px;
+  gap: var(--ui-gap);
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
@@ -966,16 +978,16 @@ textarea {
 
 .card-list {
   list-style: none;
-  margin: 14px 0 0;
+  margin: var(--space-3) 0 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: var(--ui-list-gap);
 }
 
 .view-accordion {
-  margin-top: 14px;
+  margin-top: var(--space-3);
   display: grid;
-  gap: 10px;
+  gap: var(--ui-list-gap);
 }
 
 .accordion-section {
@@ -1040,10 +1052,12 @@ textarea {
 .metric-card,
 .quick-item,
 .entry-card {
+  position: relative;
+  z-index: 0;
   border: 1px solid var(--line);
   border-radius: 15px;
   background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
-  padding: 13px;
+  padding: var(--ui-card-pad);
   box-shadow: 0 10px 20px rgba(4, 70, 63, 0.08);
   animation: reveal-up 0.28s ease both;
   animation-delay: calc(var(--stagger, 0) * 55ms);
@@ -1054,9 +1068,17 @@ textarea {
 .metric-card:hover,
 .quick-item:hover,
 .entry-card:hover {
+  z-index: 12;
   transform: translateY(-1px);
   border-color: var(--brand);
   box-shadow: 0 16px 26px rgba(4, 70, 63, 0.14);
+}
+
+.goal-card:focus-within,
+.metric-card:focus-within,
+.quick-item:focus-within,
+.entry-card:focus-within {
+  z-index: 12;
 }
 
 .goal-edit-form {
@@ -1093,7 +1115,7 @@ textarea {
 
 .data-table th,
 .data-table td {
-  padding: 11px 10px;
+  padding: 10px 10px;
   text-align: left;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
@@ -1420,8 +1442,91 @@ textarea {
 
 .actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-1);
   flex-wrap: wrap;
+}
+
+.setup-template-grid {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface-soft) 0%, #ffffff 100%);
+}
+
+.undo-toast {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 500;
+  max-width: min(520px, calc(100vw - 28px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--toast-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--toast-bg-start) 0%, var(--toast-bg-end) 100%);
+  box-shadow: 0 16px 28px rgba(0, 66, 59, 0.2);
+  overflow: hidden;
+}
+
+.undo-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand), var(--goal-hit-line));
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.undo-toast.hidden {
+  display: none;
+}
+
+.undo-toast p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--toast-text);
+}
+
+.undo-toast-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+#undo-toast-action {
+  border-color: var(--brand);
+  background: linear-gradient(180deg, var(--brand-soft) 0%, #ffffff 100%);
+}
+
+.goal-hit-toast {
+  position: fixed;
+  right: 14px;
+  bottom: 92px;
+  z-index: 499;
+  max-width: min(460px, calc(100vw - 28px));
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--goal-hit-line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--success-soft) 0%, #ffffff 100%);
+  box-shadow: var(--shadow-soft);
+}
+
+.goal-hit-toast.hidden {
+  display: none;
+}
+
+.goal-hit-toast p {
+  margin: 0;
+  font-weight: 700;
+  color: var(--goal-hit-line);
 }
 
 .quick-item {
@@ -1440,7 +1545,7 @@ textarea {
 }
 
 .compact-list {
-  gap: 8px;
+  gap: var(--space-1);
 }
 
 .metric-card h3 {
@@ -1596,8 +1701,8 @@ textarea {
 }
 
 .pace-chip.pace-on {
-  color: var(--success);
-  border-color: #95d8b8;
+  color: var(--goal-hit-line);
+  border-color: var(--goal-hit-line);
   background: linear-gradient(180deg, var(--success-soft) 0%, #ffffff 100%);
 }
 
@@ -1609,7 +1714,7 @@ textarea {
 
 strong.pace-on,
 .metric-line .pace-on {
-  color: var(--success);
+  color: var(--goal-hit-line);
 }
 
 strong.pace-off,
@@ -1645,22 +1750,54 @@ strong.pace-off,
 
 .progress {
   width: 100%;
-  height: 9px;
+  height: 20px;
   border-radius: 999px;
   overflow: hidden;
   background: var(--progress-track);
+  position: relative;
 }
 
-.progress > span {
-  display: block;
+.progress > .progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
   width: 0;
   height: 100%;
   background: linear-gradient(90deg, var(--progress-fill-start), var(--progress-fill-end));
   transition: width 0.25s ease;
+  z-index: 1;
 }
 
-.progress > span.progress-hit {
+.progress > .progress-fill.progress-hit {
   background: linear-gradient(90deg, var(--goal-hit-start), var(--goal-hit-end));
+}
+
+.progress.progress-with-label > .progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 10px;
+  font-size: 0.76rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.progress.progress-with-label > .progress-label-track {
+  color: var(--text);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  z-index: 2;
+}
+
+.progress.progress-with-label > .progress-label-fill {
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  justify-content: flex-start;
+  z-index: 3;
 }
 
 .graph-wrap {
@@ -1910,7 +2047,7 @@ strong.pace-off,
   font-size: 0.78rem;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 2;
+  z-index: 30;
 }
 
 .graph-tooltip.hidden {
@@ -2148,6 +2285,25 @@ strong.pace-off,
   gap: 6px;
 }
 
+.avg-select-control {
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.avg-select-control select {
+  min-height: 30px;
+  padding: 5px 9px;
+  border-radius: 9px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 .avg-mode-btn {
   border: 1px solid var(--btn-border);
   background: var(--btn-bg);
@@ -2267,6 +2423,24 @@ strong.pace-off,
   }
 }
 
+body[data-density="compact"] {
+  --ui-panel-pad: 14px;
+  --ui-card-pad: 9px;
+  --ui-gap: 9px;
+  --ui-list-gap: 7px;
+}
+
+body[data-density="compact"] .btn,
+body[data-density="compact"] .menu-btn {
+  padding: 7px 12px;
+  font-size: 0.9rem;
+}
+
+body[data-density="compact"] .data-table th,
+body[data-density="compact"] .data-table td {
+  padding: 8px 8px;
+}
+
 @media (max-width: 900px) {
   .form-grid-2,
   .form-grid-3,
@@ -2322,6 +2496,11 @@ strong.pace-off,
 
   .tab-strip-panel.mobile-menu-open .nav-groups {
     display: grid;
+    padding: var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+    box-shadow: var(--shadow-soft);
   }
 
   .tab-strip-panel .nav-groups > .btn,
@@ -2413,10 +2592,20 @@ strong.pace-off,
     justify-content: space-between;
   }
 
-  .notifications-panel {
-    right: auto;
-    left: 0;
-    width: min(420px, 94vw);
+  .undo-toast {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .goal-hit-toast {
+    left: 10px;
+    right: 10px;
+    bottom: 86px;
+    max-width: none;
   }
 
   .hero h1 {
