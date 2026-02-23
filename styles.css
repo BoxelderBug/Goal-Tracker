@@ -24,6 +24,14 @@
   --progress-fill-end: var(--brand-strong);
   --progress-fill-strong-start: var(--brand-strong);
   --progress-fill-strong-end: var(--brand);
+  --avg-neutral-border: #bccac7;
+  --avg-neutral-bg: #e8efee;
+  --goal-missed-start: #d26a72;
+  --goal-missed-end: #b94f59;
+  --goal-off-pace-start: #dea34d;
+  --goal-off-pace-end: #be7f24;
+  --goal-on-pace-start: #2f9fb6;
+  --goal-on-pace-end: #267f92;
   --goal-hit-start: #27b07d;
   --goal-hit-end: #198b60;
   --goal-hit-line: #1f9b6c;
@@ -1726,6 +1734,18 @@ strong.pace-off,
   background: linear-gradient(90deg, var(--goal-hit-start), var(--goal-hit-end));
 }
 
+.progress > .progress-fill.progress-on-pace {
+  background: linear-gradient(90deg, var(--goal-on-pace-start), var(--goal-on-pace-end));
+}
+
+.progress > .progress-fill.progress-off-pace {
+  background: linear-gradient(90deg, var(--goal-off-pace-start), var(--goal-off-pace-end));
+}
+
+.progress > .progress-fill.progress-missed {
+  background: linear-gradient(90deg, var(--goal-missed-start), var(--goal-missed-end));
+}
+
 .progress.progress-with-label {
   height: 24px;
 }
@@ -2227,41 +2247,30 @@ strong.pace-off,
 
 .avg-controls-row {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  justify-content: flex-start;
+  align-items: flex-end;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.avg-controls-row .avg-mode-toggle {
-  margin: 4px 0 8px;
-}
-
-.avg-mode-toggle-right {
-  justify-content: flex-end;
-}
-
-.avg-mode-group {
-  display: inline-flex;
-  gap: 6px;
-}
-
-.avg-mode-btn {
-  border: 1px solid var(--btn-border);
-  background: var(--btn-bg);
-  color: var(--text);
-  border-radius: 8px;
-  font: inherit;
-  padding: 5px 10px;
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.avg-mode-btn.active {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-  color: var(--brand-strong);
+.avg-control-label {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
   font-weight: 700;
+}
+
+.avg-control-select {
+  min-width: 128px;
+  border-radius: 10px;
+  padding: 6px 30px 6px 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
 }
 
 .avg-bar-item {
@@ -2279,9 +2288,9 @@ strong.pace-off,
 .avg-bar-track {
   width: 26px;
   height: 95px;
-  border: 1px solid var(--btn-border);
+  border: 1px solid var(--avg-neutral-border);
   border-radius: 10px;
-  background: var(--progress-track);
+  background: var(--avg-neutral-bg);
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -2296,6 +2305,52 @@ strong.pace-off,
 
 .avg-bar-item.is-current .avg-bar-track span {
   background: linear-gradient(180deg, #21aba0, #0d847a);
+}
+
+.avg-line-wrap {
+  width: 100%;
+  min-height: 160px;
+}
+
+.avg-line-graph {
+  width: 100%;
+  height: 170px;
+  display: block;
+}
+
+.avg-line-axis {
+  stroke: var(--avg-neutral-border);
+  stroke-width: 1.4;
+}
+
+.avg-line-path {
+  fill: none;
+  stroke: #6f8480;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.avg-line-point {
+  fill: #6f8480;
+}
+
+.avg-line-point.is-current {
+  fill: var(--brand-strong);
+}
+
+.avg-line-value {
+  fill: var(--text);
+  font-size: 10px;
+  font-family: "Sora", "Manrope", sans-serif;
+  font-weight: 700;
+}
+
+.avg-line-label {
+  fill: var(--muted);
+  font-size: 10px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
 }
 
 .avg-bar-label {

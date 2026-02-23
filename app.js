@@ -335,7 +335,8 @@ const graphModalState = {
   period: "",
   trackerId: "",
   avgMode: "week",
-  historyMetric: "avg"
+  historyMetric: "avg",
+  historyGraphType: "bar"
 };
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
@@ -2249,6 +2250,7 @@ function handleGraphCardActions(event) {
   graphModalState.trackerId = id;
   graphModalState.avgMode = period;
   graphModalState.historyMetric = "avg";
+  graphModalState.historyGraphType = "bar";
   renderPeriodTabs();
 }
 
@@ -2258,6 +2260,7 @@ function closeGraphModal() {
   graphModalState.trackerId = "";
   graphModalState.avgMode = "week";
   graphModalState.historyMetric = "avg";
+  graphModalState.historyGraphType = "bar";
   if (graphModal) {
     graphModal.classList.add("hidden");
     graphModal.setAttribute("aria-hidden", "true");
@@ -2338,7 +2341,8 @@ function renderGraphModal() {
     series,
     index,
     normalizePeriodMode(graphModalState.avgMode || graphModalState.period),
-    normalizeHistoryMetric(graphModalState.historyMetric)
+    normalizeHistoryMetric(graphModalState.historyMetric),
+    normalizeHistoryGraphType(graphModalState.historyGraphType)
   );
   graphModalBody.innerHTML += createExpandedTargetStatusMarkup(tracker, index, normalizeDate(new Date()));
 
@@ -2386,7 +2390,7 @@ function createExpandedTargetStatusMarkup(tracker, index, now) {
         </div>
         <p class="target-status-line">${status.rangeLabel}</p>
         <p class="target-status-line">${formatProgressAgainstGoal(status.progress, status.target, tracker.unit)} (${status.completion}%)</p>
-        <div class="progress"><span class="progress-fill" style="width:${Math.min(status.completion, 100)}%"></span></div>
+        <div class="progress"><span class="progress-fill ${status.toneClass}" style="width:${Math.min(status.completion, 100)}%"></span></div>
       </article>
     `;
   }).join("");
@@ -2425,17 +2429,23 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
   const completion = percent(progress, target);
   const avgPerDay = safeDivide(progress, elapsedDays);
   const projected = avgPerDay * totalDays;
+  const onPace = projected >= target;
+  const goalHit = target > 0 && progress >= target;
+  const isPastPeriod = range.end < now;
+  const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
+  const useFinalPaceLabel = isPastPeriod && hasAllEntriesLogged;
   return {
     title,
     progress,
     target,
     completion,
-    onPace: projected >= target,
+    onPace,
+    toneClass: getProgressToneClass(goalHit, onPace, useFinalPaceLabel),
     rangeLabel: `${formatDate(range.start)} to ${formatDate(range.end)}`
   };
 }
 
-function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric) {
+function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric, historyGraphType) {
   const unit = normalizeGoalUnit(tracker.unit);
   const today = normalizeDate(new Date());
   const todayKey = getDateKey(today);
@@ -2454,45 +2464,25 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
 
   const selectedMode = normalizePeriodMode(averageMode || periodName);
   const selectedMetric = normalizeHistoryMetric(historyMetric);
+  const selectedGraphType = normalizeHistoryGraphType(historyGraphType);
+  const lookbackCount = getHistoryLookbackCount(selectedMetric);
   const averageRange = getCurrentRangeForMode(selectedMode, today);
   const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric);
   const maxMetricValue = Math.max(...history.map((item) => item.value), 1);
   const barsMarkup = history.map((item) => {
-    const heightPct = Math.max(Math.round((item.value / maxMetricValue) * 100), 2);
+    const normalizedHeight = maxMetricValue > 0 ? Math.round((item.value / maxMetricValue) * 100) : 0;
+    const heightPct = item.value > 0 ? Math.max(normalizedHeight, 2) : 0;
     const isCurrent = item.offset === 0;
+    const valueLabel = selectedMetric === "hit" ? (item.value > 0 ? "Yes" : "No") : formatAmount(item.value);
     return `
       <article class="avg-bar-item${isCurrent ? " is-current" : ""}" title="${escapeAttr(item.rangeLabel)}">
-        <p class="avg-bar-value">${escapeHtml(formatAmount(item.value))}</p>
+        <p class="avg-bar-value">${escapeHtml(valueLabel)}</p>
         <div class="avg-bar-track"><span style="height:${heightPct}%"></span></div>
         <p class="avg-bar-label">${escapeHtml(item.label)}</p>
       </article>
     `;
   }).join("");
-
-  const modeButtons = [
-    { key: "week", label: "Weeks" },
-    { key: "month", label: "Months" },
-    { key: "year", label: "Years" }
-  ].map((item) => `
-    <button
-      type="button"
-      class="avg-mode-btn${selectedMode === item.key ? " active" : ""}"
-      data-action="set-avg-mode"
-      data-mode="${item.key}"
-    >${item.label}</button>
-  `).join("");
-
-  const metricButtons = [
-    { key: "avg", label: "Average" },
-    { key: "total", label: "Total" }
-  ].map((item) => `
-    <button
-      type="button"
-      class="avg-mode-btn${selectedMetric === item.key ? " active" : ""}"
-      data-action="set-history-metric"
-      data-metric="${item.key}"
-    >${item.label}</button>
-  `).join("");
+  const lineMarkup = createHistoryLineGraphMarkup(history, maxMetricValue, selectedMetric);
 
   const bestDayText = bestDay
     ? `${formatAmountWithUnit(bestDay.amount, unit)} on ${formatDate(parseDateKey(bestDay.date))}`
@@ -2506,7 +2496,14 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const currentWeekLabel = getPeriodRecordLabel("week", getWeekRange(today));
   const currentMonthLabel = getPeriodRecordLabel("month", getMonthRange(today));
   const currentYearLabel = getPeriodRecordLabel("year", getYearRange(today));
-  const historyTitle = selectedMetric === "total" ? "Total vs last 4 periods" : "Average/day vs last 4 periods";
+  const modeLabel = selectedMode === "month" ? "Months" : selectedMode === "year" ? "Years" : "Weeks";
+  const historyTitle = selectedMetric === "hit"
+    ? `Goal Hit vs last ${lookbackCount} ${modeLabel.toLowerCase()}`
+    : `${selectedMetric === "total" ? "Total" : "Average/day"} vs last ${lookbackCount} periods`;
+  const unitSuffix = selectedMetric === "hit" ? "" : ` (${escapeHtml(unit)})`;
+  const viewMarkup = selectedGraphType === "line"
+    ? `<div class="avg-line-wrap">${lineMarkup}</div>`
+    : `<div class="avg-bars">${barsMarkup}</div>`;
 
   return `
     <section class="deep-dive-insights">
@@ -2535,14 +2532,33 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
           </div>
         </article>
         <article class="deep-dive-card">
-          <p class="target-status-line"><strong>${escapeHtml(historyTitle)}</strong> (${escapeHtml(unit)})</p>
+          <p class="target-status-line"><strong>${escapeHtml(historyTitle)}</strong>${unitSuffix}</p>
           <div class="avg-controls-row">
-            <div class="avg-mode-toggle">${modeButtons}</div>
-            <div class="avg-mode-toggle avg-mode-toggle-right">
-              <div class="avg-mode-group">${metricButtons}</div>
-            </div>
+            <label class="avg-control-label">
+              Period
+              <select data-action="set-avg-mode-select" class="avg-control-select">
+                <option value="week" ${selectedMode === "week" ? "selected" : ""}>Weeks</option>
+                <option value="month" ${selectedMode === "month" ? "selected" : ""}>Months</option>
+                <option value="year" ${selectedMode === "year" ? "selected" : ""}>Years</option>
+              </select>
+            </label>
+            <label class="avg-control-label">
+              Metric
+              <select data-action="set-history-metric-select" class="avg-control-select">
+                <option value="avg" ${selectedMetric === "avg" ? "selected" : ""}>Average</option>
+                <option value="total" ${selectedMetric === "total" ? "selected" : ""}>Total</option>
+                <option value="hit" ${selectedMetric === "hit" ? "selected" : ""}>Goal Hit</option>
+              </select>
+            </label>
+            <label class="avg-control-label">
+              Graph Type
+              <select data-action="set-history-graph-type-select" class="avg-control-select">
+                <option value="bar" ${selectedGraphType === "bar" ? "selected" : ""}>Bars</option>
+                <option value="line" ${selectedGraphType === "line" ? "selected" : ""}>Line</option>
+              </select>
+            </label>
           </div>
-          <div class="avg-bars">${barsMarkup}</div>
+          ${viewMarkup}
         </article>
       </div>
     </section>
@@ -2560,7 +2576,25 @@ function normalizeHistoryMetric(value) {
   if (value === "total" || value === "sum") {
     return "total";
   }
+  if (value === "hit" || value === "goal-hit" || value === "yesno") {
+    return "hit";
+  }
   return "avg";
+}
+
+function normalizeHistoryGraphType(value) {
+  if (value === "line") {
+    return "line";
+  }
+  return "bar";
+}
+
+function getHistoryLookbackCount(metricType) {
+  const selectedMetric = normalizeHistoryMetric(metricType);
+  if (selectedMetric === "hit") {
+    return 5;
+  }
+  return 4;
 }
 
 function getCurrentRangeForMode(mode, date) {
@@ -2731,18 +2765,27 @@ function formatCurrentPeriodText(total, unit, label) {
 
 function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg") {
   const selectedMetric = normalizeHistoryMetric(metricType);
+  const lookbackCount = getHistoryLookbackCount(selectedMetric);
   const history = [];
   const firstEntryDate = getTrackerFirstEntryDate(tracker.id);
-  for (let offset = 0; offset <= 4; offset += 1) {
+  for (let offset = 0; offset <= lookbackCount; offset += 1) {
     const compareRange = shiftPeriodRange(periodName, currentRange, offset);
     if (offset > 0) {
-      if (!firstEntryDate || compareRange.end < firstEntryDate) {
+      if (selectedMetric !== "hit" && (!firstEntryDate || compareRange.end < firstEntryDate)) {
         break;
       }
     }
     const total = sumTrackerRange(index, tracker.id, compareRange);
     const days = getRangeDays(compareRange);
-    const value = selectedMetric === "total" ? total : safeDivide(total, days);
+    let value = 0;
+    if (selectedMetric === "total") {
+      value = total;
+    } else if (selectedMetric === "hit") {
+      const target = getTrackerTargetForPeriod(tracker, periodName);
+      value = target > 0 && total >= target ? 1 : 0;
+    } else {
+      value = safeDivide(total, days);
+    }
     history.push({
       offset,
       value,
@@ -2794,6 +2837,27 @@ function getAverageBarLabel(periodName, offset) {
 
 function handleViewControlChange(event) {
   if (!currentUser) {
+    return;
+  }
+
+  const avgModeSelect = event.target.closest("select[data-action='set-avg-mode-select']");
+  if (avgModeSelect) {
+    graphModalState.avgMode = normalizePeriodMode(avgModeSelect.value);
+    renderGraphModal();
+    return;
+  }
+
+  const historyMetricSelect = event.target.closest("select[data-action='set-history-metric-select']");
+  if (historyMetricSelect) {
+    graphModalState.historyMetric = normalizeHistoryMetric(historyMetricSelect.value);
+    renderGraphModal();
+    return;
+  }
+
+  const historyGraphTypeSelect = event.target.closest("select[data-action='set-history-graph-type-select']");
+  if (historyGraphTypeSelect) {
+    graphModalState.historyGraphType = normalizeHistoryGraphType(historyGraphTypeSelect.value);
+    renderGraphModal();
     return;
   }
 
@@ -2914,6 +2978,55 @@ function render() {
   renderRewardsSettings();
   renderPointStoreTab();
   queueGoalHitNotificationCheck();
+}
+
+function createHistoryLineGraphMarkup(history, maxMetricValue, selectedMetric) {
+  if (!Array.isArray(history) || history.length < 1) {
+    return "";
+  }
+  const width = 360;
+  const height = 160;
+  const paddingLeft = 24;
+  const paddingRight = 18;
+  const paddingTop = 18;
+  const paddingBottom = 38;
+  const innerWidth = Math.max(width - paddingLeft - paddingRight, 1);
+  const innerHeight = Math.max(height - paddingTop - paddingBottom, 1);
+  const stepX = history.length > 1 ? innerWidth / (history.length - 1) : 0;
+
+  const points = history.map((item, index) => {
+    const normalized = maxMetricValue > 0 ? item.value / maxMetricValue : 0;
+    const x = paddingLeft + (stepX * index);
+    const y = paddingTop + ((1 - normalized) * innerHeight);
+    return {
+      x,
+      y,
+      label: item.label,
+      value: item.value,
+      valueLabel: selectedMetric === "hit" ? (item.value > 0 ? "Yes" : "No") : formatAmount(item.value),
+      rangeLabel: item.rangeLabel,
+      isCurrent: item.offset === 0
+    };
+  });
+
+  const polylinePoints = points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+  const pointMarkup = points.map((point) => `
+    <g>
+      <circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="${point.isCurrent ? "5.5" : "4.5"}" class="avg-line-point${point.isCurrent ? " is-current" : ""}">
+        <title>${escapeHtml(point.rangeLabel)}</title>
+      </circle>
+      <text x="${point.x.toFixed(2)}" y="${Math.max(point.y - 10, 10).toFixed(2)}" text-anchor="middle" class="avg-line-value">${escapeHtml(point.valueLabel)}</text>
+      <text x="${point.x.toFixed(2)}" y="${(height - 14).toFixed(2)}" text-anchor="middle" class="avg-line-label">${escapeHtml(point.label)}</text>
+    </g>
+  `).join("");
+
+  return `
+    <svg class="avg-line-graph" viewBox="0 0 ${width} ${height}" role="img" aria-label="History comparison line chart">
+      <line x1="${paddingLeft}" y1="${(height - paddingBottom).toFixed(2)}" x2="${(width - paddingRight).toFixed(2)}" y2="${(height - paddingBottom).toFixed(2)}" class="avg-line-axis"></line>
+      <polyline points="${polylinePoints}" class="avg-line-path"></polyline>
+      ${pointMarkup}
+    </svg>
+  `;
 }
 
 function renderTabs() {
@@ -4022,6 +4135,16 @@ function renderPeriodTabs() {
   renderAuthState();
 }
 
+function getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel) {
+  if (goalHit) {
+    return "progress-hit";
+  }
+  if (useFinalPaceLabel) {
+    return isOnPace ? "progress-hit" : "progress-missed";
+  }
+  return isOnPace ? "progress-on-pace" : "progress-off-pace";
+}
+
 function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, targetFn, index) {
   const filteredTrackers = getTrackersForPeriod(periodName);
   const dueCheckIns = getCheckInsForPeriod(periodName);
@@ -4104,6 +4227,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const isPastPeriod = range.end < now;
       const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
       const useFinalPaceLabel = isPastPeriod && hasAllEntriesLogged;
+      const progressToneClass = getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel);
       const paceLabel = goalHit
         ? "Hit"
         : useFinalPaceLabel
@@ -4148,7 +4272,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
                 class="pace-chip pace-chip-detail"
                 data-action="toggle-pace-detail"
                 data-detail="${escapeAttr(paceDetailText)}"
-                title="${escapeAttr(paceDetailText)}"
+                aria-label="${escapeAttr(paceDetailText)}"
                 aria-expanded="false"
               >Floating</button>
               <span class="pace-detail-popover">${escapeHtml(paceDetailText)}</span>
@@ -4161,7 +4285,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
                 class="pace-chip pace-chip-detail ${isOnPace ? "pace-on" : "pace-off"}"
                 data-action="toggle-pace-detail"
                 data-detail="${escapeAttr(paceDetailText)}"
-                title="${escapeAttr(paceDetailText)}"
+                aria-label="${escapeAttr(paceDetailText)}"
                 aria-expanded="false"
               >${paceLabel}</button>
               <span class="pace-detail-popover">${escapeHtml(paceDetailText)}</span>
@@ -4176,7 +4300,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             <h3>${escapeHtml(tracker.name)}</h3>
           </div>
           <div class="progress progress-with-label">
-            <span class="progress-fill ${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span>
+            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
             <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
             <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
           </div>
@@ -4348,6 +4472,8 @@ function renderSharedGoalsSection(periodName, range, listEl) {
 }
 
 function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
+  const now = normalizeDate(new Date());
+  const totalDays = getRangeDays(range);
   const todayKey = getDateKey(normalizeDate(new Date()));
   return approvedShares
     .map((share, indexPosition) => {
@@ -4382,6 +4508,14 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const progress = sumTrackerRange(index, tracker.id, range);
       const pct = percent(progress, target);
       const goalHit = target > 0 && progress >= target;
+      const elapsedDays = getElapsedDays(range, now);
+      const avgPerDay = safeDivide(progress, elapsedDays);
+      const projected = avgPerDay * totalDays;
+      const isOnPace = projected >= target;
+      const isPastPeriod = range.end < now;
+      const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
+      const useFinalPaceLabel = isPastPeriod && hasAllEntriesLogged;
+      const progressToneClass = getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel);
       const ownerLabel = share.ownerUsername || "Friend";
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
 
@@ -4392,7 +4526,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
             <span class="pace-chip">${escapeHtml(ownerLabel)}</span>
           </div>
           <div class="progress progress-with-label">
-            <span class="progress-fill ${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span>
+            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
             <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
             <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
           </div>
