@@ -679,6 +679,10 @@ loginForm.addEventListener("submit", async (event) => {
     showAuthMessage("Enter email and password.", true);
     return;
   }
+  if (!isValidEmail(email)) {
+    showAuthMessage("Sign in with your account email (not username).", true);
+    return;
+  }
   try {
     await signInWithEmailAndPassword(firebaseAuth, email, password);
     loginForm.reset();
@@ -7370,10 +7374,25 @@ function initializeAuth() {
       startNotificationsListener();
       startGoalShareListeners();
       render();
-    } catch {
-      resetStateForSignedOutUser();
-      showAuthMessage("Unable to load account data.", true);
-      render();
+    } catch (error) {
+      const detail = getFirebaseErrorCode(error) || String(error && error.message || "").trim();
+      console.error("Auth bootstrap failed", error);
+      try {
+        if (!currentUser) {
+          currentUser = await loadCurrentUserProfile(authUser);
+        }
+        initializeData();
+        resetUiStateForLogin();
+        render();
+      } catch (fallbackError) {
+        console.error("Fallback account bootstrap failed", fallbackError);
+      }
+      showAuthMessage(
+        detail
+          ? `Signed in, but some account data failed to load (${detail}).`
+          : "Signed in, but some account data failed to load.",
+        true
+      );
     }
   });
 }
@@ -7409,8 +7428,12 @@ function resetUiStateForLogin() {
   resetInlineGraphState();
   resetPeriodAccordionState();
   closeGraphModal();
-  weekStartSelect.value = settings.weekStart;
-  compareDefaultSelect.value = settings.compareToLastDefault ? "on" : "off";
+  if (weekStartSelect) {
+    weekStartSelect.value = settings.weekStart;
+  }
+  if (compareDefaultSelect) {
+    compareDefaultSelect.value = settings.compareToLastDefault ? "on" : "off";
+  }
   if (projectionAverageSelect) {
     projectionAverageSelect.value = normalizeProjectionAverageSource(settings.projectionAverageSource);
   }
@@ -7871,6 +7894,9 @@ function getFirebaseErrorCode(error) {
 
 function getFirebaseAuthErrorMessage(error, fallbackMessage) {
   const code = getFirebaseErrorCode(error);
+  if (code === "auth/invalid-email") {
+    return "Use a valid account email address.";
+  }
   if (code === "auth/email-already-in-use") {
     return "Email already exists.";
   }
@@ -7880,8 +7906,20 @@ function getFirebaseAuthErrorMessage(error, fallbackMessage) {
   if (code === "auth/operation-not-allowed") {
     return "Email/Password auth is not enabled in Firebase Authentication.";
   }
+  if (code === "auth/unauthorized-domain") {
+    return "This site domain is not authorized in Firebase Authentication.";
+  }
   if (code === "auth/invalid-api-key") {
     return "Invalid Firebase API key. Check firebase-config.js.";
+  }
+  if (code === "auth/api-key-not-valid.-please-pass-a-valid-api-key.") {
+    return "Invalid Firebase API key. Check firebase-config.js.";
+  }
+  if (code === "auth/user-disabled") {
+    return "This account is disabled in Firebase Authentication.";
+  }
+  if (code === "auth/invalid-credential" || code === "auth/user-not-found" || code === "auth/wrong-password") {
+    return "Invalid email or password.";
   }
   if (code === "auth/network-request-failed") {
     return "Network error connecting to Firebase. Try again.";
