@@ -149,69 +149,6 @@
       </section>
 
       <section class="panel tab-panel active" data-tab-panel="manage">
-        <section id="setup-wizard" class="snapshot-panel" hidden>
-          <div class="snapshot-panel-head">
-            <h3>Quick Setup</h3>
-            <p class="muted small">Set your defaults and optionally preload starter goals.</p>
-          </div>
-          <form id="setup-wizard-form" class="form-block">
-            <div class="form-grid form-grid-3">
-              <label>
-                Week Definition
-                <select id="setup-week-start">
-                  <option value="monday">Mon-Sun</option>
-                  <option value="sunday">Sun-Sat</option>
-                </select>
-              </label>
-              <label>
-                Default Goal Type
-                <select id="setup-default-goal-type">
-                  <option value="quantity">Quantity Goal</option>
-                  <option value="yesno">Yes/No Goal</option>
-                  <option value="floating">Floating Goal</option>
-                </select>
-              </label>
-              <label>
-                Default Goal Tags
-                <input id="setup-default-tags" type="text" maxlength="140" placeholder="fitness, finance" />
-              </label>
-            </div>
-            <div class="form-grid form-grid-2">
-              <label>
-                Reward Points
-                <select id="setup-reward-points">
-                  <option value="off">Off</option>
-                  <option value="on">On</option>
-                </select>
-              </label>
-              <label>
-                Bucket List
-                <select id="setup-bucket-list">
-                  <option value="on">On</option>
-                  <option value="off">Off</option>
-                </select>
-              </label>
-            </div>
-            <div class="setup-template-grid">
-              <label class="check-inline">
-                <input id="setup-template-fitness" type="checkbox" checked />
-                Add Fitness Starter Goals
-              </label>
-              <label class="check-inline">
-                <input id="setup-template-learning" type="checkbox" checked />
-                Add Learning Starter Goals
-              </label>
-              <label class="check-inline">
-                <input id="setup-template-routine" type="checkbox" checked />
-                Add Routine Starter Goals
-              </label>
-            </div>
-            <div class="actions">
-              <button class="btn btn-primary" type="submit">Apply Setup</button>
-              <button id="setup-wizard-skip" class="btn" type="button">Skip Setup</button>
-            </div>
-          </form>
-        </section>
         <h2>Manage Goals</h2>
         <form id="goal-form" class="form-block">
           <div class="form-grid form-grid-2">
@@ -881,23 +818,31 @@
             <option value="midnight">Midnight</option>
           </select>
         </label>
-        <label>
-          Compact Mode
-          <select id="compact-mode-select">
-            <option value="off">Off</option>
-            <option value="on">On</option>
-          </select>
-        </label>
-        <label>
-          Goal Hit Notifications
-          <select id="goal-hit-notifications-select">
-            <option value="on">On</option>
-            <option value="off">Off</option>
-          </select>
-        </label>
         <button class="btn" type="submit">Save Settings</button>
       </form>
-      <p id="settings-note" class="muted">This affects week boundaries, compare defaults, projection behavior, reward points, notifications, bucket list visibility, visual density, and your saved color theme.</p>
+      <p id="settings-note" class="muted">This affects week boundaries, compare behavior in views, projection behavior, reward points, bucket list visibility, and your saved color theme.</p>
+
+      <section id="friends-settings-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Friends</h3>
+          <p class="muted small">Add friends to keep a quick list of people you track with. Add their account email to send a notification.</p>
+        </div>
+        <form id="friend-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Name
+              <input id="friend-name" type="text" maxlength="90" placeholder="Friend name" required />
+            </label>
+            <label>
+              Email (optional)
+              <input id="friend-email" type="email" maxlength="140" placeholder="friend@email.com" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Friend</button>
+        </form>
+        <ul id="friend-list" class="card-list compact-list"></ul>
+        <p id="friend-empty" class="empty-state">No friends added yet.</p>
+      </section>
 
       <section id="point-store-settings-section" class="snapshot-panel" hidden>
         <div class="snapshot-panel-head">
@@ -965,19 +910,6 @@
           </div>
           <div id="graph-modal-body" class="graph-modal-body"></div>
         </section>
-      </div>
-
-      <div id="undo-toast" class="undo-toast hidden" role="status" aria-live="polite">
-        <p id="undo-toast-message"></p>
-        <div class="undo-toast-actions">
-          <button id="undo-toast-action" class="btn" type="button">Undo</button>
-          <button id="undo-toast-dismiss" class="btn" type="button">Dismiss</button>
-        </div>
-      </div>
-
-      <div id="goal-hit-toast" class="goal-hit-toast hidden" role="status" aria-live="polite">
-        <p id="goal-hit-toast-message"></p>
-        <button id="goal-hit-toast-dismiss" class="btn" type="button">Dismiss</button>
       </div>
     </div>
   </main>

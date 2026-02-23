@@ -21,16 +21,6 @@ import {
   setDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
-import {
-  getDefaultSettings,
-  normalizeProjectionAverageSource,
-  normalizeGoalPoints,
-  normalizeGoalPriority,
-  compareTrackersByPriority,
-  normalizeThemeKey,
-  normalizeDefaultGoalType
-} from "./modules/settings-core.js";
-import { createUndoToastController } from "./modules/ui-feedback.js";
 
 const TRACKERS_STORAGE_KEY = "goal-tracker-trackers-v3";
 const ENTRIES_STORAGE_KEY = "goal-tracker-entries-v1";
@@ -44,11 +34,9 @@ const PERIOD_SNAPSHOTS_STORAGE_KEY = "goal-tracker-period-snapshots-v1";
 const REWARDS_STORAGE_KEY = "goal-tracker-rewards-v1";
 const REWARD_PURCHASES_STORAGE_KEY = "goal-tracker-reward-purchases-v1";
 const POINT_TRANSACTIONS_STORAGE_KEY = "goal-tracker-point-transactions-v1";
-const GOAL_HIT_NOTIFICATIONS_STORAGE_KEY = "goal-tracker-goal-hit-notifications-v1";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
-const ENTRY_UI_PREFS_STORAGE_KEY = "goal-tracker-entry-ui-prefs-v1";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CLOUD_LOCAL_UPDATED_AT_KEY = "goal-tracker-cloud-local-updated-v1";
 const CLOUD_PROFILE_COLLECTION = "goalTrackerProfiles";
@@ -105,17 +93,6 @@ const manageList = document.querySelector("#manage-list");
 const manageEmpty = document.querySelector("#manage-empty");
 const manageTable = document.querySelector("#manage-table");
 const manageGoalsForm = document.querySelector("#manage-goals-form");
-const setupWizard = document.querySelector("#setup-wizard");
-const setupWizardForm = document.querySelector("#setup-wizard-form");
-const setupWizardSkipButton = document.querySelector("#setup-wizard-skip");
-const setupWeekStart = document.querySelector("#setup-week-start");
-const setupDefaultGoalType = document.querySelector("#setup-default-goal-type");
-const setupDefaultTags = document.querySelector("#setup-default-tags");
-const setupRewardPoints = document.querySelector("#setup-reward-points");
-const setupBucketList = document.querySelector("#setup-bucket-list");
-const setupTemplateFitness = document.querySelector("#setup-template-fitness");
-const setupTemplateLearning = document.querySelector("#setup-template-learning");
-const setupTemplateRoutine = document.querySelector("#setup-template-routine");
 
 const entryForm = document.querySelector("#entry-form");
 const entryModeSelect = document.querySelector("#entry-mode-select");
@@ -200,8 +177,11 @@ const projectionAverageSelect = document.querySelector("#projection-average-sele
 const rewardPointsEnabledSelect = document.querySelector("#reward-points-enabled-select");
 const bucketListEnabledSelect = document.querySelector("#bucket-list-enabled-select");
 const themeSelect = document.querySelector("#theme-select");
-const compactModeSelect = document.querySelector("#compact-mode-select");
-const goalHitNotificationsSelect = document.querySelector("#goal-hit-notifications-select");
+const friendForm = document.querySelector("#friend-form");
+const friendNameInput = document.querySelector("#friend-name");
+const friendEmailInput = document.querySelector("#friend-email");
+const friendList = document.querySelector("#friend-list");
+const friendEmpty = document.querySelector("#friend-empty");
 const pointStoreMenuButton = document.querySelector("#point-store-menu-btn");
 const pointStoreSettingsSection = document.querySelector("#point-store-settings-section");
 const pointStoreToggleForm = document.querySelector("#point-store-toggle-form");
@@ -271,13 +251,6 @@ const graphModal = document.querySelector("#graph-modal");
 const graphModalBody = document.querySelector("#graph-modal-body");
 const graphModalTitle = document.querySelector("#graph-modal-title");
 const graphModalClose = document.querySelector("#graph-modal-close");
-const undoToastContainer = document.querySelector("#undo-toast");
-const undoToastMessage = document.querySelector("#undo-toast-message");
-const undoToastAction = document.querySelector("#undo-toast-action");
-const undoToastDismiss = document.querySelector("#undo-toast-dismiss");
-const goalHitToast = document.querySelector("#goal-hit-toast");
-const goalHitToastMessage = document.querySelector("#goal-hit-toast-message");
-const goalHitToastDismiss = document.querySelector("#goal-hit-toast-dismiss");
 
 let trackers = [];
 let entries = [];
@@ -301,7 +274,6 @@ let authMode = "signin";
 let scheduleWeekAnchor = normalizeDate(new Date());
 let weekEntryAnchor = normalizeDate(new Date());
 let weekEntryStatusMessage = "";
-let entrySoloInitialized = false;
 let weekViewAnchor = normalizeDate(new Date());
 let monthViewAnchor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let yearViewAnchor = new Date(new Date().getFullYear(), 0, 1);
@@ -327,15 +299,6 @@ let firebaseDb = null;
 let cloudSyncTimer = null;
 let cloudSyncInFlight = false;
 let suppressCloudSync = false;
-let entryUiPrefs = getDefaultEntryUiPrefs();
-let goalHitNotificationKeys = [];
-let goalHitToastTimer = null;
-const undoToast = createUndoToastController({
-  container: undoToastContainer,
-  messageElement: undoToastMessage,
-  undoButton: undoToastAction,
-  dismissButton: undoToastDismiss
-});
 let firebaseConfigured = false;
 const goalCompareState = {
   week: {},
@@ -476,17 +439,6 @@ function setMobileMenuOpen(open) {
   }
 }
 
-function scrollActivePanelIntoView() {
-  if (!isMobileMenuMode()) {
-    return;
-  }
-  const panel = document.querySelector(`.tab-panel[data-tab-panel="${activeTab}"]`);
-  if (!panel) {
-    return;
-  }
-  panel.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 if (mobileMenuToggle) {
   mobileMenuToggle.addEventListener("click", () => {
     const currentlyOpen = tabStripPanel ? tabStripPanel.classList.contains("mobile-menu-open") : false;
@@ -569,7 +521,6 @@ menuButtons.forEach((button) => {
     }
     if (isMobileMenuMode()) {
       setMobileMenuOpen(false);
-      scrollActivePanelIntoView();
     }
   });
 });
@@ -582,31 +533,14 @@ authModeButtons.forEach((button) => {
 
 if (entryTracker) {
   entryTracker.addEventListener("change", () => {
-    entryUiPrefs.trackerId = String(entryTracker.value || "");
-    saveEntryUiPrefs();
     updateEntryFormMode();
-  });
-}
-
-if (entryDate) {
-  entryDate.addEventListener("change", () => {
-    if (!isDateKey(entryDate.value)) {
-      return;
-    }
-    entryUiPrefs.date = entryDate.value;
-    saveEntryUiPrefs();
   });
 }
 
 if (entryModeSelect) {
   entryModeSelect.addEventListener("change", () => {
     entryMode = normalizeEntryMode(entryModeSelect.value);
-    entryUiPrefs.mode = entryMode;
-    saveEntryUiPrefs();
     weekEntryStatusMessage = "";
-    if (entryMode === "solo") {
-      entrySoloInitialized = false;
-    }
     renderEntryTab();
   });
 }
@@ -862,23 +796,19 @@ goalForm.addEventListener("submit", (event) => {
   });
 
   saveTrackers();
-  if (!settings.onboardingComplete) {
-    settings.onboardingComplete = true;
-    saveSettings();
-  }
   goalForm.reset();
   if (goalType) {
-    const defaultGoalType = normalizeDefaultGoalType(settings.defaultGoalType);
-    goalType.value = !isBucketListEnabled() && defaultGoalType === "bucket"
-      ? "quantity"
-      : defaultGoalType;
+    goalType.value = "quantity";
   }
   goalUnit.value = "units";
   if (goalPriority) {
     goalPriority.value = "0";
   }
   if (goalTags) {
-    goalTags.value = formatGoalTags(settings.defaultGoalTags || "");
+    goalTags.value = "";
+  }
+  if (goalTags) {
+    goalTags.value = "";
   }
   goalWeekly.value = "5";
   goalMonthly.value = "22";
@@ -1012,16 +942,7 @@ if (manageGoalsForm) {
       });
     }
 
-    const hasDelete = deleteIds.size > 0;
-    const deleteSnapshot = hasDelete
-      ? {
-        trackers: deepCloneValue(trackers),
-        entries: deepCloneValue(entries),
-        schedules: deepCloneValue(schedules)
-      }
-      : null;
-
-    if (hasDelete) {
+    if (deleteIds.size > 0) {
       const prompt = deleteNames.length === 1
         ? `Delete goal "${deleteNames[0]}"? This also removes related entries and schedule items.`
         : `Delete ${deleteIds.size} goals? This also removes related entries and schedule items.`;
@@ -1042,7 +963,7 @@ if (manageGoalsForm) {
       };
     });
 
-    if (hasDelete) {
+    if (deleteIds.size > 0) {
       deleteIds.forEach((id) => {
         removeGoalWithRelatedData(id);
       });
@@ -1055,21 +976,6 @@ if (manageGoalsForm) {
     }
     saveTrackers();
     render();
-    if (hasDelete && deleteSnapshot) {
-      queueUndoableAction(
-        `${deleteIds.size} goal${deleteIds.size === 1 ? "" : "s"} deleted.`,
-        null,
-        () => {
-          trackers = deleteSnapshot.trackers;
-          entries = deleteSnapshot.entries;
-          schedules = deleteSnapshot.schedules;
-          saveTrackers();
-          saveEntries();
-          saveSchedules();
-        },
-        { renderAfter: false }
-      );
-    }
   });
 }
 
@@ -1140,10 +1046,6 @@ if (checkinForm) {
       cadence
     });
     saveCheckIns();
-    if (!settings.onboardingComplete) {
-      settings.onboardingComplete = true;
-      saveSettings();
-    }
     checkinForm.reset();
     if (checkinCadence) {
       checkinCadence.value = "weekly";
@@ -1224,26 +1126,11 @@ if (checkinList) {
     if (!confirmed) {
       return;
     }
-    const snapshot = {
-      checkIns: deepCloneValue(checkIns),
-      checkInEntries: deepCloneValue(checkInEntries)
-    };
     checkIns = checkIns.filter((item) => item.id !== id);
     checkInEntries = checkInEntries.filter((item) => item.checkInId !== id);
     saveCheckIns();
     saveCheckInEntries();
     render();
-    queueUndoableAction(
-      `Deleted check-in "${checkIn.name}".`,
-      null,
-      () => {
-        checkIns = snapshot.checkIns;
-        checkInEntries = snapshot.checkInEntries;
-        saveCheckIns();
-        saveCheckInEntries();
-      },
-      { renderAfter: false }
-    );
   });
 }
 
@@ -1378,10 +1265,6 @@ entryForm.addEventListener("submit", (event) => {
   notifyAccountabilityPartnerEntryUpdate(tracker, amount, dateValue);
 
   saveEntries();
-  entryUiPrefs.mode = "solo";
-  entryUiPrefs.trackerId = tracker.id;
-  entryUiPrefs.date = dateValue;
-  saveEntryUiPrefs();
   if (isBinaryGoal) {
     if (entryYesNo) {
       entryYesNo.value = "yes";
@@ -1390,9 +1273,8 @@ entryForm.addEventListener("submit", (event) => {
     entryAmount.value = "1.00";
   }
   entryNotes.value = "";
-  entryDate.value = dateValue;
+  entryDate.value = getDateKey(normalizeDate(new Date()));
   weekEntryStatusMessage = "";
-  entrySoloInitialized = true;
   render();
 });
 
@@ -1485,8 +1367,6 @@ if (weekEntryForm) {
     });
 
     weekEntryStatusMessage = `Week update saved. ${insertedCount} value${insertedCount === 1 ? "" : "s"} set, ${removedCount} prior row${removedCount === 1 ? "" : "s"} replaced.`;
-    entryUiPrefs.mode = "week";
-    saveEntryUiPrefs();
     saveEntries();
     render();
   });
@@ -1566,24 +1446,9 @@ scheduleList.addEventListener("click", (event) => {
   if (!button) {
     return;
   }
-  const scheduleId = String(button.dataset.id || "");
-  const deletedItem = schedules.find((item) => item.id === scheduleId);
-  if (!deletedItem) {
-    return;
-  }
-  schedules = schedules.filter((item) => item.id !== scheduleId);
+  schedules = schedules.filter((item) => item.id !== button.dataset.id);
   saveSchedules();
   renderGoalScheduleTab();
-  queueUndoableAction(
-    "Schedule item deleted.",
-    null,
-    () => {
-      schedules.unshift(deletedItem);
-      saveSchedules();
-      renderGoalScheduleTab();
-    },
-    { renderAfter: false, renderAfterUndo: false }
-  );
 });
 
 schedulePrevWeek.addEventListener("click", () => {
@@ -1658,23 +1523,9 @@ entryListAll.addEventListener("click", (event) => {
   if (!button) {
     return;
   }
-  const entryId = String(button.dataset.id || "");
-  const deletedEntry = entries.find((item) => item.id === entryId);
-  if (!deletedEntry) {
-    return;
-  }
-  entries = entries.filter((item) => item.id !== entryId);
+  entries = entries.filter((item) => item.id !== button.dataset.id);
   saveEntries();
   render();
-  queueUndoableAction(
-    "Entry deleted.",
-    null,
-    () => {
-      entries.unshift(deletedEntry);
-      saveEntries();
-    },
-    { renderAfter: false }
-  );
 });
 
 if (entryListSort) {
@@ -1811,23 +1662,9 @@ if (goalJournalList) {
     if (!journalId) {
       return;
     }
-    const deletedEntry = goalJournalEntries.find((item) => item.id === journalId);
-    if (!deletedEntry) {
-      return;
-    }
     goalJournalEntries = goalJournalEntries.filter((item) => item.id !== journalId);
     saveGoalJournalEntries();
     renderGoalJournalTab();
-    queueUndoableAction(
-      "Journal entry deleted.",
-      null,
-      () => {
-        goalJournalEntries.unshift(deletedEntry);
-        saveGoalJournalEntries();
-        renderGoalJournalTab();
-      },
-      { renderAfter: false, renderAfterUndo: false }
-    );
   });
 }
 
@@ -1958,22 +1795,10 @@ if (rewardSettingsList) {
     if (!confirmed) {
       return;
     }
-    const deletedReward = deepCloneValue(reward);
     rewards = rewards.filter((item) => item.id !== rewardId);
     saveRewards();
     renderRewardsSettings();
     renderPointStoreTab();
-    queueUndoableAction(
-      `Deleted reward "${reward.name}".`,
-      null,
-      () => {
-        rewards.unshift(deletedReward);
-        saveRewards();
-        renderRewardsSettings();
-        renderPointStoreTab();
-      },
-      { renderAfter: false, renderAfterUndo: false }
-    );
   });
 }
 
@@ -2046,59 +1871,8 @@ if (pointStoreClearClosedButton) {
     if (!confirmed) {
       return;
     }
-    const priorPurchases = deepCloneValue(rewardPurchases);
     clearClosedRewardPurchases();
     renderPointStoreTab();
-    queueUndoableAction(
-      `Cleared ${closedCount} closed reward${closedCount === 1 ? "" : "s"}.`,
-      null,
-      () => {
-        rewardPurchases = priorPurchases;
-        saveRewardPurchases();
-        renderPointStoreTab();
-      },
-      { renderAfter: false, renderAfterUndo: false }
-    );
-  });
-}
-
-if (setupWizardForm) {
-  setupWizardForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (!currentUser) {
-      return;
-    }
-    applySetupWizardSelections({ createTemplates: true });
-    render();
-    queueUndoableAction(
-      "Quick setup applied.",
-      () => {},
-      null,
-      { canUndo: false, renderAfter: false }
-    );
-  });
-}
-
-if (setupWizardSkipButton) {
-  setupWizardSkipButton.addEventListener("click", () => {
-    if (!currentUser) {
-      return;
-    }
-    settings.onboardingComplete = true;
-    saveSettings();
-    renderManageSetupWizard();
-    queueUndoableAction(
-      "Setup skipped. You can still configure everything in Settings.",
-      () => {},
-      null,
-      { canUndo: false, renderAfter: false }
-    );
-  });
-}
-
-if (goalHitToastDismiss) {
-  goalHitToastDismiss.addEventListener("click", () => {
-    hideGoalHitToast();
   });
 }
 
@@ -2163,28 +1937,15 @@ settingsForm.addEventListener("submit", (event) => {
     projectionAverageSelect ? projectionAverageSelect.value : settings.projectionAverageSource
   );
   settings.rewardPointsEnabled = rewardPointsEnabledSelect ? rewardPointsEnabledSelect.value === "on" : false;
-  settings.goalHitNotificationsEnabled = goalHitNotificationsSelect ? goalHitNotificationsSelect.value !== "off" : true;
   settings.bucketListEnabled = bucketListEnabledSelect ? bucketListEnabledSelect.value !== "off" : true;
   settings.theme = normalizeThemeKey(themeSelect ? themeSelect.value : settings.theme);
-  settings.compactMode = compactModeSelect ? compactModeSelect.value === "on" : false;
-  if (priorCompareDefault !== settings.compareToLastDefault) {
-    resetGoalCompareState();
-  }
   saveSettings();
   applyTheme();
-  applyDensityMode();
   applyBucketListFeatureVisibility();
   applyRewardPointsFeatureVisibility();
   scheduleWeekAnchor = normalizeDate(new Date());
   resetScheduleTileFlips();
-  if (!isGoalHitNotificationsEnabled()) {
-    hideGoalHitToast();
-  }
   render();
-
-  if (settings.goalHitNotificationsEnabled && typeof Notification !== "undefined" && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {});
-  }
 });
 
 weekPrevButton.addEventListener("click", () => {
@@ -2599,8 +2360,8 @@ function createExpandedTargetStatusMarkup(tracker, index, now) {
           <span class="pace-chip ${status.onPace ? "pace-on" : "pace-off"}">${status.onPace ? "On pace" : "Off pace"}</span>
         </div>
         <p class="target-status-line">${status.rangeLabel}</p>
-        <p class="target-status-line">${formatProgressAgainstGoal(status.progress, status.target, tracker.unit)} (${status.completion}%)</p>
-        <div class="progress"><span class="progress-fill" style="width:${Math.min(status.completion, 100)}%"></span></div>
+        <p class="target-status-line">${formatAmountWithUnit(status.progress, tracker.unit)}/${formatAmountWithUnit(status.target, tracker.unit)} (${status.completion}%)</p>
+        <div class="progress"><span style="width:${Math.min(status.completion, 100)}%"></span></div>
       </article>
     `;
   }).join("");
@@ -2633,10 +2394,12 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
     return null;
   }
 
+  const totalDays = getRangeDays(range);
+  const elapsedDays = getElapsedDays(range, now);
   const progress = sumTrackerRange(index, tracker.id, range);
   const completion = percent(progress, target);
-  const projectionMeta = getTrackerProjectionForRange(index, tracker.id, range, now);
-  const projected = projectionMeta.projected;
+  const avgPerDay = safeDivide(progress, elapsedDays);
+  const projected = avgPerDay * totalDays;
   return {
     title,
     progress,
@@ -2681,26 +2444,30 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
     `;
   }).join("");
 
-  const modeSelect = `
-    <label class="avg-select-control">
-      Previous Periods
-      <select data-action="set-avg-mode">
-        <option value="week" ${selectedMode === "week" ? "selected" : ""}>Weeks</option>
-        <option value="month" ${selectedMode === "month" ? "selected" : ""}>Months</option>
-        <option value="year" ${selectedMode === "year" ? "selected" : ""}>Years</option>
-      </select>
-    </label>
-  `;
+  const modeButtons = [
+    { key: "week", label: "Weeks" },
+    { key: "month", label: "Months" },
+    { key: "year", label: "Years" }
+  ].map((item) => `
+    <button
+      type="button"
+      class="avg-mode-btn${selectedMode === item.key ? " active" : ""}"
+      data-action="set-avg-mode"
+      data-mode="${item.key}"
+    >${item.label}</button>
+  `).join("");
 
-  const metricSelect = `
-    <label class="avg-select-control">
-      Metric
-      <select data-action="set-history-metric">
-        <option value="avg" ${selectedMetric === "avg" ? "selected" : ""}>Average</option>
-        <option value="total" ${selectedMetric === "total" ? "selected" : ""}>Total</option>
-      </select>
-    </label>
-  `;
+  const metricButtons = [
+    { key: "avg", label: "Average" },
+    { key: "total", label: "Total" }
+  ].map((item) => `
+    <button
+      type="button"
+      class="avg-mode-btn${selectedMetric === item.key ? " active" : ""}"
+      data-action="set-history-metric"
+      data-metric="${item.key}"
+    >${item.label}</button>
+  `).join("");
 
   const bestDayText = bestDay
     ? `${formatAmountWithUnit(bestDay.amount, unit)} on ${formatDate(parseDateKey(bestDay.date))}`
@@ -2745,9 +2512,9 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
         <article class="deep-dive-card">
           <p class="target-status-line"><strong>${escapeHtml(historyTitle)}</strong> (${escapeHtml(unit)})</p>
           <div class="avg-controls-row">
-            <div class="avg-mode-toggle">${modeSelect}</div>
+            <div class="avg-mode-toggle">${modeButtons}</div>
             <div class="avg-mode-toggle avg-mode-toggle-right">
-              ${metricSelect}
+              <div class="avg-mode-group">${metricButtons}</div>
             </div>
           </div>
           <div class="avg-bars">${barsMarkup}</div>
@@ -3028,20 +2795,6 @@ function handleViewControlChange(event) {
     projectionLineState[period][id] = projectionInput.checked;
     renderPeriodTabs();
     renderGraphModal();
-    return;
-  }
-
-  const avgModeSelect = event.target.closest("select[data-action='set-avg-mode']");
-  if (avgModeSelect) {
-    graphModalState.avgMode = normalizePeriodMode(avgModeSelect.value);
-    renderGraphModal();
-    return;
-  }
-
-  const historyMetricSelect = event.target.closest("select[data-action='set-history-metric']");
-  if (historyMetricSelect) {
-    graphModalState.historyMetric = normalizeHistoryMetric(historyMetricSelect.value);
-    renderGraphModal();
   }
 }
 
@@ -3114,7 +2867,6 @@ function hideAllPaceDetailPopovers(scope = document, exceptWrap = null) {
 
 function render() {
   applyTheme();
-  applyDensityMode();
   renderAuthState();
   if (!currentUser) {
     return;
@@ -3124,7 +2876,6 @@ function render() {
   applyRewardPointsFeatureVisibility();
   renderTabs();
   renderManageGoals();
-  renderManageSetupWizard();
   renderCheckinsTab();
   renderEntryTab();
   renderGoalJournalTab();
@@ -3137,7 +2888,6 @@ function render() {
   renderFriendsSettings();
   renderRewardsSettings();
   renderPointStoreTab();
-  refreshGoalHitNotifications(true);
 }
 
 function renderTabs() {
@@ -3294,8 +3044,6 @@ function renderManageGoals() {
     return;
   }
 
-  applyGoalFormDefaults();
-
   if (trackers.length < 1) {
     manageList.innerHTML = "";
     manageEmpty.style.display = "block";
@@ -3398,37 +3146,6 @@ function renderManageGoals() {
       </tr>
     `)
     .join("");
-}
-
-function renderManageSetupWizard() {
-  if (!setupWizard) {
-    return;
-  }
-  if (!currentUser) {
-    setupWizard.hidden = true;
-    return;
-  }
-  const noContent = trackers.length < 1 && checkIns.length < 1 && entries.length < 1;
-  const shouldShow = !Boolean(settings && settings.onboardingComplete) && noContent;
-  setupWizard.hidden = !shouldShow;
-  if (!shouldShow) {
-    return;
-  }
-  if (setupWeekStart) {
-    setupWeekStart.value = settings.weekStart === "sunday" ? "sunday" : "monday";
-  }
-  if (setupDefaultGoalType) {
-    setupDefaultGoalType.value = normalizeDefaultGoalType(settings.defaultGoalType);
-  }
-  if (setupDefaultTags) {
-    setupDefaultTags.value = formatGoalTags(settings.defaultGoalTags || "");
-  }
-  if (setupRewardPoints) {
-    setupRewardPoints.value = isRewardPointsEnabled() ? "on" : "off";
-  }
-  if (setupBucketList) {
-    setupBucketList.value = isBucketListEnabled() ? "on" : "off";
-  }
 }
 
 function renderCheckinsTab() {
@@ -3535,41 +3252,13 @@ function renderSoloEntrySection(standardTrackers) {
       return `<option value="${tracker.id}">${escapeHtml(tracker.name)} (${suffix})</option>`;
     })
     .join("");
-  const validTrackerIds = new Set(standardTrackers.map((tracker) => tracker.id));
-  let nextTrackerId = "";
-  if (validTrackerIds.has(selected)) {
-    nextTrackerId = selected;
-  } else if (!entrySoloInitialized && validTrackerIds.has(entryUiPrefs.trackerId)) {
-    nextTrackerId = entryUiPrefs.trackerId;
-  } else {
-    const recentEntry = [...entries]
-      .filter((item) => validTrackerIds.has(item.trackerId))
-      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
-    nextTrackerId = recentEntry ? recentEntry.trackerId : standardTrackers[0].id;
-  }
-  if (nextTrackerId) {
-    entryTracker.value = nextTrackerId;
+  if (standardTrackers.some((tracker) => tracker.id === selected)) {
+    entryTracker.value = selected;
   }
 
   const todayKey = getDateKey(normalizeDate(new Date()));
   const trackerById = new Map(trackers.map((tracker) => [tracker.id, tracker]));
   const allowedTrackerIds = new Set(standardTrackers.map((tracker) => tracker.id));
-  if (!entrySoloInitialized) {
-    let preferredDate = "";
-    if (isDateKey(entryUiPrefs.date)) {
-      preferredDate = entryUiPrefs.date;
-    } else {
-      const latestForTracker = [...entries]
-        .filter((item) => item.trackerId === entryTracker.value && isDateKey(item.date))
-        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
-      preferredDate = latestForTracker ? latestForTracker.date : "";
-    }
-    entryDate.value = isDateKey(preferredDate) ? preferredDate : todayKey;
-    entryUiPrefs.trackerId = String(entryTracker.value || "");
-    entryUiPrefs.date = entryDate.value;
-    saveEntryUiPrefs();
-    entrySoloInitialized = true;
-  }
   const todayEntries = entries
     .filter((entry) => entry.date === todayKey && allowedTrackerIds.has(entry.trackerId))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
@@ -4312,10 +4001,11 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
 
   emptyEl.style.display = "none";
   const totalDays = getRangeDays(range);
+  const elapsedDays = getElapsedDays(range, now);
 
   let goalsProgressTotal = 0;
   let goalsTargetTotal = 0;
-  let projectedGoalsTotal = 0;
+  let paceProgressTotal = 0;
   let paceTargetTotal = 0;
   let completedGoalsCount = 0;
   let goalPointsEarned = 0;
@@ -4333,8 +4023,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       }
     }
     if (!isFloatingGoalType(tracker.goalType)) {
-      const projectionMeta = getTrackerProjectionForRange(index, tracker.id, range, now);
-      projectedGoalsTotal = addAmount(projectedGoalsTotal, projectionMeta.projected);
+      paceProgressTotal = addAmount(paceProgressTotal, periodProgress);
       paceTargetTotal = addAmount(paceTargetTotal, goalTarget);
     }
   });
@@ -4350,7 +4039,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
   const totalTarget = addAmount(goalsTargetTotal, checkInTargetTotal);
 
   const completion = percent(totalProgress, totalTarget);
-  const projectedGoals = projectedGoalsTotal;
+  const avgPerDay = safeDivide(paceProgressTotal, elapsedDays);
+  const projectedGoals = avgPerDay * totalDays;
   const projected = addAmount(projectedGoals, checkInProgressTotal);
   const paceTargetWithCheckIns = addAmount(paceTargetTotal, checkInTargetTotal);
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
@@ -4374,10 +4064,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const target = targetFn(tracker);
       const goalHit = target > 0 && progress >= target;
       const pct = percent(progress, target);
-      const projectionMeta = getTrackerProjectionForRange(index, tracker.id, range, now);
-      const avg = projectionMeta.averagePerDay;
+      const avg = safeDivide(progress, elapsedDays);
       const needed = safeDivide(target, totalDays);
-      const projectedTracker = projectionMeta.projected;
+      const projectedTracker = avg * totalDays;
       const isOnPace = projectedTracker >= target;
       const isPastPeriod = range.end < now;
       const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
@@ -4446,19 +4135,13 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             </span>
         `;
 
-      const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
-
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}</h3>
           </div>
-          <div class="progress progress-with-label">
-            <span class="progress-fill ${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span>
-            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
-            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
-          </div>
-          ${paceDetailLine}
+          <p class="metric-line">${formatAmountWithUnit(progress, tracker.unit)}/${formatAmountWithUnit(target, tracker.unit)} (${pct}%)</p>
+          <div class="progress"><span class="${goalHit ? "progress-hit" : ""}" style="width:${Math.min(pct, 100)}%"></span></div>
           <div class="pace-line">
             ${paceStatusChip}
             <span class="pace-actions">
@@ -4521,7 +4204,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             </div>
           </div>
           <p class="metric-line">Status: <strong class="${statusClass}">${statusLabel}</strong></p>
-          <div class="progress"><span class="progress-fill" style="width:${pct}%"></span></div>
+          <div class="progress"><span style="width:${pct}%"></span></div>
           <p class="metric-line">${latestLabel}</p>
           ${notesLine}
         </li>
@@ -4747,9 +4430,10 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   }
 
   const totalDays = getRangeDays(range);
+  const elapsedDays = getElapsedDays(range, now);
   let goalsProgressTotal = 0;
   let goalsTargetTotal = 0;
-  let projectedGoalsTotal = 0;
+  let paceProgressTotal = 0;
   let paceTargetTotal = 0;
   let completedGoalsCount = 0;
   let goalPointsEarned = 0;
@@ -4759,11 +4443,10 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
     const target = getTrackerTargetForPeriod(tracker, periodName);
     const progress = sumTrackerRange(index, tracker.id, range);
     const isFloating = isFloatingGoalType(tracker.goalType);
-    const projectionMeta = getTrackerProjectionForRange(index, tracker.id, range, now);
-    const avgPerDay = projectionMeta.averagePerDay;
+    const avgPerDay = safeDivide(progress, elapsedDays);
     const neededPerDay = safeDivide(target, totalDays);
-    const projected = projectionMeta.projected;
-    const onPaceLabel = isFloating ? "N/A" : projected >= target ? "Yes" : "No";
+    const projected = avgPerDay * totalDays;
+    const onPaceLabel = isFloating ? "N/A" : projected >= target ? "On pace" : "Off pace";
 
     goalsProgressTotal = addAmount(goalsProgressTotal, progress);
     goalsTargetTotal = addAmount(goalsTargetTotal, target);
@@ -4774,7 +4457,7 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
       }
     }
     if (!isFloating) {
-      projectedGoalsTotal = addAmount(projectedGoalsTotal, projected);
+      paceProgressTotal = addAmount(paceProgressTotal, progress);
       paceTargetTotal = addAmount(paceTargetTotal, target);
     }
 
@@ -4813,8 +4496,9 @@ function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
 
   const totalProgress = addAmount(goalsProgressTotal, checkInProgressTotal);
   const totalTarget = addAmount(goalsTargetTotal, checkInTargetTotal);
-  const completion = percent(completedGoalsCount, trackersForPeriod.length);
-  const projectedGoals = projectedGoalsTotal;
+  const completion = percent(totalProgress, totalTarget);
+  const avgPerDay = safeDivide(paceProgressTotal, elapsedDays);
+  const projectedGoals = avgPerDay * totalDays;
   const projected = addAmount(projectedGoals, checkInProgressTotal);
   const paceTargetWithCheckIns = addAmount(paceTargetTotal, checkInTargetTotal);
   const onPace = paceTargetWithCheckIns > 0 ? projected >= paceTargetWithCheckIns : null;
@@ -4938,11 +4622,6 @@ function renderPeriodSnapshots(periodName, range, listEl, emptyEl = null) {
     const filterType = normalizeGoalTypeFilterValue(snapshot.filters && snapshot.filters.type);
     const filterStatus = normalizeGoalStatusFilterValue(snapshot.filters && snapshot.filters.status);
     const filterTag = normalizeGoalTagFilterValue(snapshot.filters && snapshot.filters.tag);
-    const goalsCount = Math.max(Math.floor(Number(summary.goalsCount) || 0), 0);
-    const completedGoalsCount = Math.max(Math.floor(Number(summary.completedGoalsCount) || 0), 0);
-    const goalsHitPct = goalsCount > 0
-      ? percent(completedGoalsCount, goalsCount)
-      : Math.max(Math.round(Number(summary.completion) || 0), 0);
     const filterLine = filterType === "all" && filterStatus === "active" && filterTag === "all"
       ? ""
       : `<p class="muted small">Filters: ${escapeHtml(filterType)} | ${escapeHtml(filterStatus)} | ${escapeHtml(filterTag === "all" ? "all tags" : filterTag)}</p>`;
@@ -4954,7 +4633,8 @@ function renderPeriodSnapshots(periodName, range, listEl, emptyEl = null) {
           <span class="pace-chip">${escapeHtml(getSnapshotPeriodTitle(snapshot.period))}</span>
         </div>
         <p class="muted small">Closed ${escapeHtml(formatSnapshotClosedAt(snapshot.closedAt))}</p>
-        <p class="metric-line">Goals Hit ${escapeHtml(String(completedGoalsCount))}/${escapeHtml(String(goalsCount))} (${escapeHtml(String(goalsHitPct))}%)</p>
+        <p class="muted small">Pace: ${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</p>
+        <p class="metric-line">Completion ${escapeHtml(String(Math.max(Math.round(Number(summary.completion) || 0), 0)))}% | Progress ${escapeHtml(formatAmount(summary.totalProgress || 0))}/${escapeHtml(formatAmount(summary.totalTarget || 0))}</p>
         <p class="muted small">${escapeHtml(String(Math.max(Math.floor(Number(summary.goalsCount) || 0), 0)))} goals + ${escapeHtml(String(Math.max(Math.floor(Number(summary.checkInsCount) || 0), 0)))} check-ins</p>
         ${filterLine}
         <div class="actions">
@@ -6274,23 +5954,6 @@ function getProjectionAveragePerDay(index, trackerId, fullRange, chartEndDate) {
   return safeDivide(total, days);
 }
 
-function getTrackerProjectionForRange(index, trackerId, fullRange, now) {
-  const normalizedNow = normalizeDate(now || new Date());
-  const chartRange = getChartDisplayRange(index, trackerId, fullRange, normalizedNow);
-  const averagePerDay = getProjectionAveragePerDay(index, trackerId, fullRange, chartRange.end);
-  const progressSoFar = sumTrackerRange(index, trackerId, { start: fullRange.start, end: chartRange.end });
-  const chartEndDay = dateKeyToDayNumber(getDateKey(chartRange.end));
-  const fullEndDay = dateKeyToDayNumber(getDateKey(fullRange.end));
-  const remainingDays = Math.max(fullEndDay - chartEndDay, 0);
-  const projected = addAmount(progressSoFar, averagePerDay * remainingDays);
-  return {
-    projected,
-    averagePerDay,
-    progressSoFar,
-    source: normalizeProjectionAverageSource(settings && settings.projectionAverageSource)
-  };
-}
-
 function getOverlayRange(periodName, range) {
   if (periodName === "week") {
     const start = addDays(range.start, -7);
@@ -7077,8 +6740,6 @@ function buildCloudPayload() {
     rewards,
     rewardPurchases,
     pointTransactions,
-    entryUiPrefs,
-    goalHitNotificationKeys,
     settings
   };
 }
@@ -7133,8 +6794,7 @@ function isLocalDataEmpty() {
   const hasRewards = Array.isArray(rewards) && rewards.length > 0;
   const hasRewardPurchases = Array.isArray(rewardPurchases) && rewardPurchases.length > 0;
   const hasTransactions = Array.isArray(pointTransactions) && pointTransactions.length > 0;
-  const hasGoalHitNotifications = Array.isArray(goalHitNotificationKeys) && goalHitNotificationKeys.length > 0;
-  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions || hasGoalHitNotifications);
+  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasFriends || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
 }
 
 function writeCloudPayloadToLocal(payload) {
@@ -7153,8 +6813,6 @@ function writeCloudPayloadToLocal(payload) {
     [REWARDS_STORAGE_KEY, Array.isArray(payload.rewards) ? payload.rewards : []],
     [REWARD_PURCHASES_STORAGE_KEY, Array.isArray(payload.rewardPurchases) ? payload.rewardPurchases : []],
     [POINT_TRANSACTIONS_STORAGE_KEY, Array.isArray(payload.pointTransactions) ? payload.pointTransactions : []],
-    [ENTRY_UI_PREFS_STORAGE_KEY, payload.entryUiPrefs && typeof payload.entryUiPrefs === "object" ? payload.entryUiPrefs : getDefaultEntryUiPrefs()],
-    [GOAL_HIT_NOTIFICATIONS_STORAGE_KEY, Array.isArray(payload.goalHitNotificationKeys) ? payload.goalHitNotificationKeys : []],
     [SETTINGS_STORAGE_KEY, payload.settings && typeof payload.settings === "object" ? payload.settings : getDefaultSettings()]
   ];
   keysToWrite.forEach(([key, value]) => {
@@ -7279,12 +6937,13 @@ function resetStateForSignedOutUser() {
   rewards = [];
   rewardPurchases = [];
   pointTransactions = [];
-  goalHitNotificationKeys = [];
+  notifications = [];
+  notificationsPanelOpen = false;
+  sharedGoalShares = [];
+  sharedGoalOwnerData = new Map();
   settings = getDefaultSettings();
   activeTab = "manage";
   entryMode = "solo";
-  entryUiPrefs = getDefaultEntryUiPrefs();
-  entrySoloInitialized = false;
   entryListSortMode = "date_desc";
   entryListTypeFilter = "all";
   entryListStatusFilter = "active";
@@ -7330,9 +6989,6 @@ function resetStateForSignedOutUser() {
   if (entryModeSelect) {
     entryModeSelect.value = entryMode;
   }
-  if (goalHitNotificationsSelect) {
-    goalHitNotificationsSelect.value = "on";
-  }
   if (weekGoalTagFilterSelect) {
     weekGoalTagFilterSelect.value = periodGoalFilterState.week.tag;
   }
@@ -7342,7 +6998,6 @@ function resetStateForSignedOutUser() {
   if (yearGoalTagFilterSelect) {
     yearGoalTagFilterSelect.value = periodGoalFilterState.year.tag;
   }
-  hideGoalHitToast();
 }
 
 function initializeAuth() {
@@ -7379,10 +7034,11 @@ function initializeAuth() {
 }
 
 function resetUiStateForLogin() {
-  hideGoalHitToast();
   activeTab = "manage";
-  entryMode = normalizeEntryMode(entryUiPrefs.mode);
-  entrySoloInitialized = false;
+  entryMode = "solo";
+  notificationsPanelOpen = false;
+  sharedGoalShares = [];
+  sharedGoalOwnerData = new Map();
   scheduleWeekAnchor = normalizeDate(new Date());
   weekEntryAnchor = normalizeDate(new Date());
   weekEntryStatusMessage = "";
@@ -7417,8 +7073,17 @@ function resetUiStateForLogin() {
   if (rewardPointsEnabledSelect) {
     rewardPointsEnabledSelect.value = isRewardPointsEnabled() ? "on" : "off";
   }
-  if (goalHitNotificationsSelect) {
-    goalHitNotificationsSelect.value = settings.goalHitNotificationsEnabled === false ? "off" : "on";
+  if (pointStoreEnabledSelect) {
+    pointStoreEnabledSelect.value = isPointStoreRewardsEnabled() ? "on" : "off";
+  }
+  if (pointAdjustDirectionSelect) {
+    pointAdjustDirectionSelect.value = "add";
+  }
+  if (pointAdjustAmount) {
+    pointAdjustAmount.value = "10.00";
+  }
+  if (pointAdjustNote) {
+    pointAdjustNote.value = "";
   }
   if (bucketListEnabledSelect) {
     bucketListEnabledSelect.value = isBucketListEnabled() ? "on" : "off";
@@ -7426,23 +7091,16 @@ function resetUiStateForLogin() {
   if (themeSelect) {
     themeSelect.value = normalizeThemeKey(settings.theme);
   }
-  if (compactModeSelect) {
-    compactModeSelect.value = settings.compactMode ? "on" : "off";
-  }
   applyTheme();
-  applyDensityMode();
   setAuthMode("signin");
   if (goalType) {
-    goalType.value = normalizeDefaultGoalType(settings.defaultGoalType);
+    goalType.value = "quantity";
   }
   if (goalUnit) {
     goalUnit.value = "units";
   }
   if (goalPriority) {
     goalPriority.value = "0";
-  }
-  if (goalTags) {
-    goalTags.value = formatGoalTags(settings.defaultGoalTags || "");
   }
   if (goalRewardWeeklyPoints) {
     goalRewardWeeklyPoints.value = "1";
@@ -7466,7 +7124,7 @@ function resetUiStateForLogin() {
     bucketEntryDate.value = getDateKey(normalizeDate(new Date()));
   }
   if (entryDate) {
-    entryDate.value = isDateKey(entryUiPrefs.date) ? entryUiPrefs.date : getDateKey(normalizeDate(new Date()));
+    entryDate.value = getDateKey(normalizeDate(new Date()));
   }
   if (goalJournalDate) {
     goalJournalDate.value = getDateKey(normalizeDate(new Date()));
@@ -7531,7 +7189,6 @@ function resetUiStateForLogin() {
   if (csvUploadStatus) {
     csvUploadStatus.textContent = "";
   }
-  primeGoalHitNotifications();
   updateGoalTypeFields();
   updateEntryFormMode();
 }
@@ -7718,17 +7375,61 @@ function parseCsvAmount(value) {
   return Math.round(numeric * 100) / 100;
 }
 
+function getDefaultSettings() {
+  return {
+    weekStart: "monday",
+    compareToLastDefault: true,
+    projectionAverageSource: "period",
+    rewardPointsEnabled: false,
+    pointStoreRewardsEnabled: true,
+    bucketListEnabled: true,
+    theme: "teal"
+  };
+}
+
+function normalizeProjectionAverageSource(value) {
+  return value === "year" ? "year" : "period";
+}
+
+function normalizeGoalPoints(value, fallback = 1) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return Math.max(Math.floor(Number(fallback) || 1), 0);
+  }
+  return Math.max(Math.floor(numeric), 0);
+}
+
+function normalizeGoalPriority(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return Math.max(Math.floor(Number(fallback) || 0), 0);
+  }
+  return Math.max(Math.min(Math.floor(numeric), 1000), 0);
+}
+
+function compareTrackersByPriority(a, b) {
+  const priorityA = normalizeGoalPriority(a && a.priority, 0);
+  const priorityB = normalizeGoalPriority(b && b.priority, 0);
+  if (priorityA !== priorityB) {
+    return priorityB - priorityA;
+  }
+  const nameA = String(a && a.name || "");
+  const nameB = String(b && b.name || "");
+  return nameA.localeCompare(nameB);
+}
+
+function normalizeThemeKey(value) {
+  const allowed = new Set(["teal", "ocean", "forest", "sunset", "amber", "berry", "slate", "midnight"]);
+  const key = String(value || "").toLowerCase().trim();
+  if (allowed.has(key)) {
+    return key;
+  }
+  return "teal";
+}
+
 function applyTheme() {
   const theme = normalizeThemeKey(settings && settings.theme);
   document.body.setAttribute("data-theme", theme);
-}
-
-function isCompactModeEnabled() {
-  return Boolean(settings && settings.compactMode === true);
-}
-
-function applyDensityMode() {
-  document.body.setAttribute("data-density", isCompactModeEnabled() ? "compact" : "comfortable");
 }
 
 function isBucketListEnabled() {
@@ -7739,8 +7440,8 @@ function isRewardPointsEnabled() {
   return Boolean(settings && settings.rewardPointsEnabled === true);
 }
 
-function isGoalHitNotificationsEnabled() {
-  return !(settings && settings.goalHitNotificationsEnabled === false);
+function isPointStoreRewardsEnabled() {
+  return isRewardPointsEnabled() && !(settings && settings.pointStoreRewardsEnabled === false);
 }
 
 function applyBucketListFeatureVisibility() {
@@ -7995,8 +7696,6 @@ function migrateLegacyDataToUser() {
     REWARDS_STORAGE_KEY,
     REWARD_PURCHASES_STORAGE_KEY,
     POINT_TRANSACTIONS_STORAGE_KEY,
-    ENTRY_UI_PREFS_STORAGE_KEY,
-    GOAL_HIT_NOTIFICATIONS_STORAGE_KEY,
     LEGACY_TRACKERS_KEY
   ];
   keys.forEach((key) => {
@@ -8024,11 +7723,7 @@ function initializeData() {
     rewards = [];
     rewardPurchases = [];
     pointTransactions = [];
-    goalHitNotificationKeys = [];
     settings = getDefaultSettings();
-    entryUiPrefs = getDefaultEntryUiPrefs();
-    entryMode = "solo";
-    entrySoloInitialized = false;
     return;
   }
 
@@ -8046,10 +7741,6 @@ function initializeData() {
   rewards = loadRewards();
   rewardPurchases = loadRewardPurchases();
   pointTransactions = loadPointTransactions();
-  goalHitNotificationKeys = loadGoalHitNotificationKeys();
-  entryUiPrefs = loadEntryUiPrefs();
-  entryMode = normalizeEntryMode(entryUiPrefs.mode);
-  entrySoloInitialized = false;
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
     entries = migrateLegacyLogs(loadedTrackers.legacyLogs, trackers);
@@ -8473,326 +8164,12 @@ function loadSettings() {
       compareToLastDefault: parsed && parsed.compareToLastDefault === false ? false : true,
       projectionAverageSource: normalizeProjectionAverageSource(parsed && parsed.projectionAverageSource),
       rewardPointsEnabled: Boolean(parsed && (parsed.rewardPointsEnabled === true || parsed.rewardPointsEnabled === "on")),
-      goalHitNotificationsEnabled: !(parsed && parsed.goalHitNotificationsEnabled === false),
+      pointStoreRewardsEnabled: !(parsed && (parsed.pointStoreRewardsEnabled === false || parsed.pointStoreRewardsEnabled === "off")),
       bucketListEnabled: !(parsed && parsed.bucketListEnabled === false),
-      theme: normalizeThemeKey(parsed && parsed.theme),
-      compactMode: Boolean(parsed && (parsed.compactMode === true || parsed.compactMode === "on")),
-      onboardingComplete: Boolean(parsed && parsed.onboardingComplete === true),
-      defaultGoalType: normalizeDefaultGoalType(parsed && parsed.defaultGoalType),
-      defaultGoalTags: normalizeGoalTags(parsed && parsed.defaultGoalTags)
+      theme: normalizeThemeKey(parsed && parsed.theme)
     };
   } catch {
     return getDefaultSettings();
-  }
-}
-
-function getDefaultEntryUiPrefs() {
-  return {
-    mode: "solo",
-    trackerId: "",
-    date: ""
-  };
-}
-
-function normalizeEntryUiPrefs(raw) {
-  const defaults = getDefaultEntryUiPrefs();
-  if (!raw || typeof raw !== "object") {
-    return defaults;
-  }
-  const mode = normalizeEntryMode(raw.mode);
-  const trackerId = typeof raw.trackerId === "string" ? raw.trackerId : "";
-  const date = isDateKey(raw.date) ? raw.date : "";
-  return { mode, trackerId, date };
-}
-
-function loadEntryUiPrefs() {
-  try {
-    if (!currentUser) {
-      return getDefaultEntryUiPrefs();
-    }
-    const raw = localStorage.getItem(getScopedStorageKey(ENTRY_UI_PREFS_STORAGE_KEY));
-    if (!raw) {
-      return getDefaultEntryUiPrefs();
-    }
-    return normalizeEntryUiPrefs(JSON.parse(raw));
-  } catch {
-    return getDefaultEntryUiPrefs();
-  }
-}
-
-function saveEntryUiPrefs() {
-  if (!currentUser) {
-    return;
-  }
-  const next = normalizeEntryUiPrefs(entryUiPrefs);
-  localStorage.setItem(getScopedStorageKey(ENTRY_UI_PREFS_STORAGE_KEY), JSON.stringify(next));
-  markLocalDataUpdatedAt();
-  queueCloudSync();
-}
-
-function deepCloneValue(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function queueUndoableAction(message, applyAction, undoAction, options = {}) {
-  const {
-    durationMs = 6000,
-    renderAfter = true,
-    renderAfterUndo = true,
-    canUndo = true
-  } = options;
-
-  if (typeof applyAction === "function") {
-    applyAction();
-  }
-  if (renderAfter) {
-    render();
-  }
-  if (!undoToast) {
-    return;
-  }
-  if (!canUndo || typeof undoAction !== "function") {
-    undoToast.show({
-      message,
-      onUndo: null,
-      durationMs: Math.min(durationMs, 3200)
-    });
-    return;
-  }
-  undoToast.show({
-    message,
-    onUndo: () => {
-      undoAction();
-      if (renderAfterUndo) {
-        render();
-      }
-    },
-    durationMs
-  });
-}
-
-function normalizeGoalHitNotificationKeys(raw) {
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  return raw
-    .map((item) => {
-      if (typeof item === "string") {
-        return { key: item, notifiedAt: "" };
-      }
-      if (!item || typeof item !== "object" || typeof item.key !== "string") {
-        return null;
-      }
-      return {
-        key: item.key,
-        notifiedAt: typeof item.notifiedAt === "string" ? item.notifiedAt : ""
-      };
-    })
-    .filter((item) => item && item.key);
-}
-
-function loadGoalHitNotificationKeys() {
-  try {
-    if (!currentUser) {
-      return [];
-    }
-    const raw = localStorage.getItem(getScopedStorageKey(GOAL_HIT_NOTIFICATIONS_STORAGE_KEY));
-    if (!raw) {
-      return [];
-    }
-    return normalizeGoalHitNotificationKeys(JSON.parse(raw));
-  } catch {
-    return [];
-  }
-}
-
-function saveGoalHitNotificationKeys() {
-  if (!currentUser) {
-    return;
-  }
-  localStorage.setItem(
-    getScopedStorageKey(GOAL_HIT_NOTIFICATIONS_STORAGE_KEY),
-    JSON.stringify(normalizeGoalHitNotificationKeys(goalHitNotificationKeys))
-  );
-  markLocalDataUpdatedAt();
-  queueCloudSync();
-}
-
-function hideGoalHitToast() {
-  if (!goalHitToast) {
-    return;
-  }
-  if (goalHitToastTimer) {
-    clearTimeout(goalHitToastTimer);
-    goalHitToastTimer = null;
-  }
-  goalHitToast.classList.add("hidden");
-  if (goalHitToastMessage) {
-    goalHitToastMessage.textContent = "";
-  }
-}
-
-function showGoalHitToast(message) {
-  if (!goalHitToast || !goalHitToastMessage) {
-    return;
-  }
-  if (goalHitToastTimer) {
-    clearTimeout(goalHitToastTimer);
-  }
-  goalHitToastMessage.textContent = String(message || "");
-  goalHitToast.classList.remove("hidden");
-  goalHitToastTimer = setTimeout(() => {
-    hideGoalHitToast();
-  }, 7000);
-}
-
-function formatPeriodTitle(periodName) {
-  if (periodName === "month") {
-    return "Month";
-  }
-  if (periodName === "year") {
-    return "Year";
-  }
-  return "Week";
-}
-
-function getGoalHitNotificationCandidates(now = new Date()) {
-  if (!currentUser) {
-    return [];
-  }
-  const normalizedNow = normalizeDate(now);
-  const index = buildEntryIndex(entries);
-  const activeTrackers = trackers.filter((tracker) => {
-    if (tracker.archived) {
-      return false;
-    }
-    const type = normalizeGoalType(tracker.goalType);
-    return type !== "bucket";
-  });
-  const periods = [
-    { key: "week", range: getWeekRange(normalizedNow), target: (tracker) => tracker.weeklyGoal },
-    { key: "month", range: getMonthRange(normalizedNow), target: (tracker) => tracker.monthlyGoal },
-    { key: "year", range: getYearRange(normalizedNow), target: (tracker) => tracker.yearlyGoal }
-  ];
-
-  const hits = [];
-  activeTrackers.forEach((tracker) => {
-    periods.forEach((period) => {
-      const target = normalizePositiveInt(period.target(tracker), 0);
-      if (target <= 0) {
-        return;
-      }
-      const progress = sumTrackerRange(index, tracker.id, period.range);
-      if (progress < target) {
-        return;
-      }
-      const rangeStart = getDateKey(period.range.start);
-      const rangeEnd = getDateKey(period.range.end);
-      hits.push({
-        key: `${tracker.id}|${period.key}|${rangeStart}|${rangeEnd}`,
-        trackerId: tracker.id,
-        trackerName: tracker.name,
-        period: period.key,
-        rangeStart,
-        rangeEnd
-      });
-    });
-  });
-  return hits;
-}
-
-function notifyGoalHits(hitItems) {
-  if (!Array.isArray(hitItems) || hitItems.length < 1) {
-    return;
-  }
-  const grouped = new Map();
-  hitItems.forEach((item) => {
-    if (!item || !item.trackerId) {
-      return;
-    }
-    const existing = grouped.get(item.trackerId) || {
-      trackerName: item.trackerName || "Goal",
-      periods: []
-    };
-    if (!existing.periods.includes(item.period)) {
-      existing.periods.push(item.period);
-    }
-    grouped.set(item.trackerId, existing);
-  });
-
-  const lines = Array.from(grouped.values()).map((item) => {
-    const periodLabels = item.periods.map((periodName) => formatPeriodTitle(periodName)).join(", ");
-    return `${item.trackerName}: ${periodLabels}`;
-  });
-  const inAppMessage = lines.length > 2
-    ? `${lines.slice(0, 2).join(" | ")} +${lines.length - 2} more`
-    : lines.join(" | ");
-
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    try {
-      const desktopBody = lines.length > 3
-        ? `${lines.slice(0, 3).join(" | ")} +${lines.length - 3} more`
-        : lines.join(" | ");
-      new Notification("Goal hit", { body: desktopBody });
-    } catch {
-      // Desktop notification is optional; in-app toast below is the fallback.
-    }
-  }
-  showGoalHitToast(inAppMessage);
-}
-
-function primeGoalHitNotifications() {
-  if (!currentUser) {
-    return;
-  }
-  if (goalHitNotificationKeys.length > 0) {
-    return;
-  }
-  const nowHits = getGoalHitNotificationCandidates(new Date());
-  if (nowHits.length < 1) {
-    return;
-  }
-  goalHitNotificationKeys = nowHits.map((item) => ({
-    key: item.key,
-    notifiedAt: new Date().toISOString()
-  }));
-  saveGoalHitNotificationKeys();
-}
-
-function refreshGoalHitNotifications(shouldNotify = false) {
-  if (!currentUser) {
-    return;
-  }
-  const existing = normalizeGoalHitNotificationKeys(goalHitNotificationKeys);
-  const existingMap = new Map(existing.map((item) => [item.key, item]));
-  const hits = getGoalHitNotificationCandidates(new Date());
-  const hitKeySet = new Set(hits.map((item) => item.key));
-  const next = [];
-  const newHits = [];
-
-  hits.forEach((item) => {
-    const prior = existingMap.get(item.key);
-    if (prior) {
-      next.push(prior);
-      return;
-    }
-    const added = {
-      key: item.key,
-      notifiedAt: new Date().toISOString()
-    };
-    next.push(added);
-    newHits.push(item);
-  });
-
-  const changed = next.length !== existing.length
-    || existing.some((item) => !hitKeySet.has(item.key));
-  if (changed) {
-    goalHitNotificationKeys = next;
-    saveGoalHitNotificationKeys();
-  }
-
-  if (shouldNotify && isGoalHitNotificationsEnabled() && newHits.length > 0) {
-    notifyGoalHits(newHits);
   }
 }
 
@@ -9216,98 +8593,6 @@ function parseWeekEntryInputValue(rawValue, tracker) {
   return { valid: true, amount: normalized };
 }
 
-function applyGoalFormDefaults() {
-  if (!goalType || !goalTags) {
-    return;
-  }
-  const selectedType = normalizeGoalType(goalType.value || "");
-  let nextDefaultType = normalizeDefaultGoalType(settings.defaultGoalType);
-  if (!isBucketListEnabled() && nextDefaultType === "bucket") {
-    nextDefaultType = "quantity";
-  }
-  if (!goalType.value || selectedType === "quantity") {
-    goalType.value = nextDefaultType;
-  }
-  if (!String(goalTags.value || "").trim()) {
-    goalTags.value = formatGoalTags(settings.defaultGoalTags || "");
-  }
-  updateGoalTypeFields();
-}
-
-function buildStarterGoalsFromSetup(options = {}) {
-  const normalizedTags = normalizeGoalTags(options.defaultTags || settings.defaultGoalTags || "");
-  const createGoal = (name, goalType, unit, weeklyGoal, monthlyGoal, yearlyGoal, extraTags = []) => ({
-    id: createId(),
-    name,
-    goalType,
-    archived: false,
-    priority: 50,
-    tags: normalizeGoalTags([...normalizedTags, ...extraTags]),
-    unit,
-    weeklyGoal,
-    monthlyGoal,
-    yearlyGoal,
-    goalPointsWeekly: 1,
-    goalPointsMonthly: 3,
-    goalPointsYearly: 10
-  });
-
-  const starters = [];
-  if (options.fitness) {
-    starters.push(createGoal("Distance", "quantity", "miles", 10, 40, 480, ["fitness"]));
-  }
-  if (options.learning) {
-    starters.push(createGoal("Reading", "quantity", "pages", 70, 300, 3600, ["learning"]));
-  }
-  if (options.routine) {
-    starters.push(createGoal("In Bed On Time", "yesno", "days", 5, 22, 260, ["routine"]));
-  }
-  return starters;
-}
-
-function applySetupWizardSelections({ createTemplates = true } = {}) {
-  if (!currentUser) {
-    return;
-  }
-  const defaultGoalType = normalizeDefaultGoalType(setupDefaultGoalType ? setupDefaultGoalType.value : settings.defaultGoalType);
-  const defaultTags = normalizeGoalTags(setupDefaultTags ? setupDefaultTags.value : settings.defaultGoalTags);
-  settings.weekStart = setupWeekStart && setupWeekStart.value === "sunday" ? "sunday" : "monday";
-  settings.rewardPointsEnabled = Boolean(setupRewardPoints && setupRewardPoints.value === "on");
-  settings.bucketListEnabled = !(setupBucketList && setupBucketList.value === "off");
-  settings.defaultGoalType = defaultGoalType;
-  settings.defaultGoalTags = defaultTags;
-  settings.onboardingComplete = true;
-
-  if (createTemplates && trackers.length < 1) {
-    const starterGoals = buildStarterGoalsFromSetup({
-      defaultTags,
-      fitness: Boolean(setupTemplateFitness && setupTemplateFitness.checked),
-      learning: Boolean(setupTemplateLearning && setupTemplateLearning.checked),
-      routine: Boolean(setupTemplateRoutine && setupTemplateRoutine.checked)
-    });
-    if (starterGoals.length > 0) {
-      trackers = starterGoals.concat(trackers);
-      saveTrackers();
-    }
-  }
-
-  if (!isBucketListEnabled() && goalType && goalType.value === "bucket") {
-    goalType.value = "quantity";
-  }
-  if (rewardPointsEnabledSelect) {
-    rewardPointsEnabledSelect.value = settings.rewardPointsEnabled ? "on" : "off";
-  }
-  if (bucketListEnabledSelect) {
-    bucketListEnabledSelect.value = settings.bucketListEnabled ? "on" : "off";
-  }
-  if (weekStartSelect) {
-    weekStartSelect.value = settings.weekStart;
-  }
-  applyBucketListFeatureVisibility();
-  applyRewardPointsFeatureVisibility();
-  saveSettings();
-}
-
 function updateGoalTypeFields() {
   if (!goalType || !goalUnit || !goalWeekly || !goalMonthly || !goalYearly) {
     return;
@@ -9381,10 +8666,6 @@ function updateEntryFormMode() {
 
 function formatAmountWithUnit(value, unit) {
   return `${formatAmount(value)} ${normalizeGoalUnit(unit)}`;
-}
-
-function formatProgressAgainstGoal(progress, target, unit) {
-  return `${formatAmount(progress)}/${formatAmount(target)} ${normalizeGoalUnit(unit)}`;
 }
 
 function getBucketTrackers(goalStatusFilter = "active") {
