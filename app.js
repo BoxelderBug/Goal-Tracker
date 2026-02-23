@@ -7265,40 +7265,6 @@ async function syncCloudDataOnLogin() {
   }
 }
 
-async function forceCloudRestoreIfEmpty() {
-  if (!firebaseConfigured || !firebaseDb || !currentUser) {
-    return false;
-  }
-  const localCount = getCurrentLocalRecordCount();
-  if (localCount > 0) {
-    return false;
-  }
-  const dataRef = getCloudDataRef(currentUser.id);
-  if (!dataRef) {
-    return false;
-  }
-  try {
-    const snapshot = await getDoc(dataRef);
-    if (!snapshot.exists()) {
-      return false;
-    }
-    const cloudData = snapshot.data() || {};
-    const cloudCount = getCloudPayloadRecordCount(cloudData);
-    if (cloudCount < 1) {
-      return false;
-    }
-    suppressCloudSync = true;
-    writeCloudPayloadToLocal(cloudData);
-    initializeData();
-    suppressCloudSync = false;
-    return true;
-  } catch {
-    return false;
-  } finally {
-    suppressCloudSync = false;
-  }
-}
-
 async function loadCurrentUserProfile(authUser) {
   if (!authUser) {
     return null;
@@ -7450,7 +7416,6 @@ function initializeAuth() {
       migrateLegacyDataToUser();
       initializeData();
       await syncCloudDataOnLogin();
-      await forceCloudRestoreIfEmpty();
       resetUiStateForLogin();
       startNotificationsListener();
       startGoalShareListeners();
@@ -7463,7 +7428,6 @@ function initializeAuth() {
           currentUser = await loadCurrentUserProfile(authUser);
         }
         initializeData();
-        await forceCloudRestoreIfEmpty();
         resetUiStateForLogin();
         render();
       } catch (fallbackError) {
