@@ -82,6 +82,10 @@
           <p class="eyebrow">Goal System</p>
           <div class="hero-actions">
             <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" hidden></button>
+            <button id="settings-shortcut-btn" class="btn btn-nav-compact btn-settings-shortcut" type="button" aria-label="Settings" title="Settings" hidden>
+              <span aria-hidden="true">&#9881;</span>
+              <span class="visually-hidden">Settings</span>
+            </button>
             <button id="active-user-points-btn" class="btn btn-nav-compact btn-points-shortcut" type="button" hidden></button>
             <div class="notifications-wrap">
               <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel" hidden>
@@ -152,18 +156,11 @@
           </div>
 
           <div class="dropdown" data-dropdown>
-            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Social</button>
-            <div class="dropdown-menu">
-              <button class="menu-btn" type="button" data-tab="social">Friends & Squads</button>
-            </div>
-          </div>
-
-          <div class="dropdown" data-dropdown>
-            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Profile</button>
             <div class="dropdown-menu">
               <button class="menu-btn active" type="button" data-tab="manage">Manage Goals</button>
               <button class="menu-btn" type="button" data-tab="checkins">Manage Check-ins</button>
-              <button class="menu-btn" type="button" data-tab="settings">General Settings</button>
+              <button class="menu-btn" type="button" data-tab="social">Friends & Squads</button>
             </div>
           </div>
         </div>
@@ -236,6 +233,27 @@
               <input id="goal-tags" type="text" maxlength="140" placeholder="fitness, finance, health" />
             </label>
           </div>
+          <section class="progress-metrics-builder" aria-label="Progress metrics">
+            <div class="snapshot-panel-head">
+              <h3>Progress Metrics</h3>
+              <p class="muted small">Optional sub-metrics for this goal. Example: Max Reps (reps), Weight Lifted (lbs).</p>
+            </div>
+            <div class="form-grid form-grid-3 progress-metrics-controls">
+              <label>
+                Metric Name
+                <input id="goal-metric-name" type="text" maxlength="60" placeholder="Max Reps, Pages Read..." />
+              </label>
+              <label>
+                Metric Unit
+                <input id="goal-metric-unit" type="text" maxlength="20" placeholder="reps, lbs, pages" />
+              </label>
+              <div class="progress-metrics-actions">
+                <button id="goal-metric-add-btn" class="btn" type="button">Add Metric</button>
+              </div>
+            </div>
+            <ul id="goal-metrics-draft-list" class="card-list compact-list"></ul>
+            <p id="goal-metrics-draft-empty" class="muted small">No progress metrics yet.</p>
+          </section>
           <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
           <div class="form-grid form-grid-3">
             <label>
@@ -298,6 +316,7 @@
                   <th>Status</th>
                   <th>Priority</th>
                   <th>Unit</th>
+                  <th>Metrics</th>
                   <th>Weekly</th>
                   <th>Monthly</th>
                   <th>Yearly</th>
@@ -352,6 +371,10 @@
             </select>
           </label>
         </div>
+        <section id="entry-metrics-wrap" class="entry-metrics-wrap" hidden>
+          <p class="muted small">Progress Metrics</p>
+          <div id="entry-metrics-grid" class="form-grid form-grid-3"></div>
+        </section>
         <label>
           Notes
           <textarea id="entry-notes" rows="2" maxlength="280" placeholder="Optional note for this entry"></textarea>
@@ -1160,7 +1183,7 @@
           <p class="muted small">Create shared squads where friends track goals together.</p>
         </div>
         <form id="squad-form" class="form-block">
-          <div class="form-grid form-grid-2">
+          <div class="form-grid form-grid-3">
             <label>
               Squad Name
               <input id="squad-name" type="text" maxlength="90" placeholder="Weekend Runners" required />
@@ -1168,6 +1191,10 @@
             <label>
               Notes
               <input id="squad-notes" type="text" maxlength="160" placeholder="Optional squad purpose" />
+            </label>
+            <label>
+              Weekly Goal
+              <input id="squad-weekly-goal" type="number" min="0" max="1000000" value="0" />
             </label>
           </div>
           <button class="btn btn-primary" type="submit">Create Squad</button>

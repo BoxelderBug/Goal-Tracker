@@ -74,6 +74,7 @@ const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authForms = document.querySelectorAll("[data-auth-form]");
 const logoutButton = document.querySelector("#logout-btn");
 const activeUserButton = document.querySelector("#active-user-btn");
+const settingsShortcutButton = document.querySelector("#settings-shortcut-btn");
 const activeUserPointsButton = document.querySelector("#active-user-points-btn");
 const notificationsToggleButton = document.querySelector("#notifications-toggle-btn");
 const notificationsBadge = document.querySelector("#notifications-unread-count");
@@ -108,6 +109,11 @@ const goalRewardPointsWrap = document.querySelector("#goal-reward-points-wrap");
 const goalRewardWeeklyPoints = document.querySelector("#goal-reward-weekly-points");
 const goalRewardMonthlyPoints = document.querySelector("#goal-reward-monthly-points");
 const goalRewardYearlyPoints = document.querySelector("#goal-reward-yearly-points");
+const goalMetricName = document.querySelector("#goal-metric-name");
+const goalMetricUnit = document.querySelector("#goal-metric-unit");
+const goalMetricAddButton = document.querySelector("#goal-metric-add-btn");
+const goalMetricsDraftList = document.querySelector("#goal-metrics-draft-list");
+const goalMetricsDraftEmpty = document.querySelector("#goal-metrics-draft-empty");
 const manageList = document.querySelector("#manage-list");
 const manageEmpty = document.querySelector("#manage-empty");
 const manageTable = document.querySelector("#manage-table");
@@ -128,6 +134,8 @@ const entryAmountLabel = document.querySelector("#entry-amount-label");
 const entryAmount = document.querySelector("#entry-amount");
 const entryYesNoLabel = document.querySelector("#entry-yesno-label");
 const entryYesNo = document.querySelector("#entry-yesno");
+const entryMetricsWrap = document.querySelector("#entry-metrics-wrap");
+const entryMetricsGrid = document.querySelector("#entry-metrics-grid");
 const entryNotes = document.querySelector("#entry-notes");
 const todayEntriesList = document.querySelector("#today-entries-list");
 const todayEntriesEmpty = document.querySelector("#today-entries-empty");
@@ -314,6 +322,7 @@ const performanceModeSelect = document.querySelector("#performance-mode-select")
 const squadForm = document.querySelector("#squad-form");
 const squadNameInput = document.querySelector("#squad-name");
 const squadNotesInput = document.querySelector("#squad-notes");
+const squadWeeklyGoalInput = document.querySelector("#squad-weekly-goal");
 const squadList = document.querySelector("#squad-list");
 const squadEmpty = document.querySelector("#squad-empty");
 const trashList = document.querySelector("#trash-list");
@@ -404,10 +413,10 @@ const inlineGraphState = {
   quarter: {}
 };
 const periodAccordionState = {
-  week: { goals: true, checkins: true, shared: false, snapshots: false },
-  month: { goals: true, checkins: true, shared: false, snapshots: false },
-  year: { goals: true, checkins: true, shared: false, snapshots: false },
-  quarter: { goals: true, checkins: true, shared: false, snapshots: false }
+  week: { goals: true, checkins: false, shared: false, snapshots: false },
+  month: { goals: true, checkins: false, shared: false, snapshots: false },
+  year: { goals: true, checkins: false, shared: false, snapshots: false },
+  quarter: { goals: true, checkins: false, shared: false, snapshots: false }
 };
 const flippedScheduleDays = {};
 const graphModalState = {
@@ -423,6 +432,7 @@ let goalCustomWeekTargetsDraft = [];
 let goalCustomMonthTargetsDraft = [];
 let goalCustomWeekTargetsEdited = false;
 let goalCustomMonthTargetsEdited = false;
+let goalMetricsDraft = [];
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
 scheduleDate.value = getDateKey(normalizeDate(new Date()));
@@ -514,6 +524,7 @@ if (trendsMetricSelect) {
   trendsMetricSelect.value = "consistency";
 }
 updateGoalTypeFields();
+renderGoalMetricsDraft();
 setAuthMode("signin");
 initializeAuth();
 applyPasswordVisibilityToggle();
@@ -876,6 +887,15 @@ if (activeUserButton) {
   });
 }
 
+if (settingsShortcutButton) {
+  settingsShortcutButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    setActiveTabSafe("settings", { renderImmediate: true });
+  });
+}
+
 if (activeUserPointsButton) {
   activeUserPointsButton.addEventListener("click", () => {
     if (!currentUser || !isPointStoreRewardsEnabled()) {
@@ -1024,6 +1044,47 @@ if (goalCustomMonthGrid) {
   });
 }
 
+if (goalMetricAddButton) {
+  goalMetricAddButton.addEventListener("click", () => {
+    addGoalMetricToDraft();
+  });
+}
+
+if (goalMetricName) {
+  goalMetricName.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    addGoalMetricToDraft();
+  });
+}
+
+if (goalMetricUnit) {
+  goalMetricUnit.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    addGoalMetricToDraft();
+  });
+}
+
+if (goalMetricsDraftList) {
+  goalMetricsDraftList.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("button[data-action='remove-goal-metric']");
+    if (!removeButton) {
+      return;
+    }
+    const metricId = String(removeButton.dataset.id || "");
+    if (!metricId) {
+      return;
+    }
+    goalMetricsDraft = goalMetricsDraft.filter((metric) => metric.id !== metricId);
+    renderGoalMetricsDraft();
+  });
+}
+
 goalForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!currentUser) {
@@ -1049,6 +1110,9 @@ goalForm.addEventListener("submit", (event) => {
   const customMonthlyTargets = customMonthlyEnabled
     ? normalizeCustomTargetList(goalCustomMonthTargetsDraft, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal)
     : [];
+  const progressMetrics = normalizeProgressMetricList(goalMetricsDraft, {
+    fallbackUnit: unit
+  });
   const rewardWeeklyPoints = normalizeGoalPoints(goalRewardWeeklyPoints ? goalRewardWeeklyPoints.value : 1, 1);
   const rewardMonthlyPoints = normalizeGoalPoints(goalRewardMonthlyPoints ? goalRewardMonthlyPoints.value : 3, 3);
   const rewardYearlyPoints = normalizeGoalPoints(goalRewardYearlyPoints ? goalRewardYearlyPoints.value : 10, 10);
@@ -1067,6 +1131,7 @@ goalForm.addEventListener("submit", (event) => {
     weeklyGoal,
     monthlyGoal,
     yearlyGoal,
+    progressMetrics,
     customWeeklyEnabled,
     customWeeklyTargets,
     customMonthlyEnabled,
@@ -1093,9 +1158,14 @@ goalForm.addEventListener("submit", (event) => {
   if (goalTags) {
     goalTags.value = "";
   }
-  if (goalTags) {
-    goalTags.value = "";
+  if (goalMetricName) {
+    goalMetricName.value = "";
   }
+  if (goalMetricUnit) {
+    goalMetricUnit.value = "";
+  }
+  goalMetricsDraft = [];
+  renderGoalMetricsDraft();
   resetGoalTargetsToDefaults();
   if (goalRewardWeeklyPoints) {
     goalRewardWeeklyPoints.value = "1";
@@ -1149,6 +1219,7 @@ if (manageGoalsForm) {
       const priorityInput = row.querySelector("input[data-field='priority']");
       const tagsInput = row.querySelector("input[data-field='tags']");
       const unitInput = row.querySelector("input[data-field='unit']");
+      const progressMetricsInput = row.querySelector("input[data-field='progressMetrics']");
       const weeklyInput = row.querySelector("input[data-field='weeklyGoal']");
       const monthlyInput = row.querySelector("input[data-field='monthlyGoal']");
       const yearlyInput = row.querySelector("input[data-field='yearlyGoal']");
@@ -1194,6 +1265,13 @@ if (manageGoalsForm) {
         priority: normalizeGoalPriority(priorityInput ? priorityInput.value : tracker.priority, tracker.priority),
         tags: normalizeGoalTags(tagsInput ? tagsInput.value : tracker.tags),
         unit: unitValue,
+        progressMetrics: normalizeProgressMetricList(
+          parseProgressMetricsText(progressMetricsInput ? progressMetricsInput.value : ""),
+          {
+            fallbackUnit: unitValue,
+            existingMetrics: getTrackerProgressMetrics(tracker)
+          }
+        ),
         weeklyGoal: normalizeGoalTargetInt(weeklyInput.value, tracker.weeklyGoal),
         monthlyGoal: normalizeGoalTargetInt(monthlyInput.value, tracker.monthlyGoal),
         yearlyGoal: normalizeGoalTargetInt(yearlyInput.value, tracker.yearlyGoal),
@@ -1553,12 +1631,14 @@ entryForm.addEventListener("submit", (event) => {
   if (amount < 0) {
     return;
   }
+  const metricValues = collectEntryMetricValuesFromForm(tracker);
 
   entries.unshift({
     id: createId(),
     trackerId: tracker.id,
     date: dateValue,
     amount,
+    metricValues,
     notes: String(entryNotes.value || "").trim(),
     createdAt: new Date().toISOString()
   });
@@ -1797,13 +1877,15 @@ entryListAll.addEventListener("submit", (event) => {
   const date = String(form.elements.date.value || "");
   const amount = normalizePositiveAmount(form.elements.amount.value, entry.amount);
   const notes = String(form.elements.notes.value || "").trim();
-  if (!trackers.some((item) => item.id === trackerId) || !isDateKey(date) || amount < 0) {
+  const tracker = trackers.find((item) => item.id === trackerId);
+  if (!tracker || !isDateKey(date) || amount < 0) {
     return;
   }
 
   entry.trackerId = trackerId;
   entry.date = date;
   entry.amount = amount;
+  entry.metricValues = filterEntryMetricValuesByTracker(entry.metricValues, tracker);
   entry.notes = notes;
 
   saveEntries();
@@ -2243,6 +2325,7 @@ if (squadForm) {
     }
     const name = String(squadNameInput.value || "").trim();
     const notes = String(squadNotesInput ? squadNotesInput.value : "").trim();
+    const weeklyGoal = normalizeGoalTargetInt(squadWeeklyGoalInput ? squadWeeklyGoalInput.value : 0, 0);
     if (!name) {
       return;
     }
@@ -2250,12 +2333,16 @@ if (squadForm) {
       id: createId(),
       name,
       notes,
+      weeklyGoal,
       memberEmails: [],
       goalIds: [],
       createdAt: new Date().toISOString()
     });
     saveSquads();
     squadForm.reset();
+    if (squadWeeklyGoalInput) {
+      squadWeeklyGoalInput.value = "0";
+    }
     renderSocialTab();
   });
 }
@@ -2277,6 +2364,23 @@ if (squadList) {
       }
       saveDeletedItem("squad", squad.name, { squad: { ...squad } });
       squads = squads.filter((item) => item.id !== squadId);
+      saveSquads();
+      renderSocialTab();
+      return;
+    }
+
+    const saveWeeklyGoalButton = event.target.closest("button[data-action='save-squad-weekly-goal']");
+    if (saveWeeklyGoalButton) {
+      const squadId = String(saveWeeklyGoalButton.dataset.id || "");
+      const squad = squads.find((item) => item.id === squadId);
+      if (!squad) {
+        return;
+      }
+      const weeklyGoalInput = squadList.querySelector(`input[data-squad-weekly-goal='${escapeCssSelector(squadId)}']`);
+      if (!weeklyGoalInput) {
+        return;
+      }
+      squad.weeklyGoal = normalizeGoalTargetInt(weeklyGoalInput.value, normalizeGoalTargetInt(squad.weeklyGoal, 0));
       saveSquads();
       renderSocialTab();
       return;
@@ -3612,6 +3716,10 @@ function renderAuthState() {
     activeUserButton.textContent = username;
     activeUserButton.disabled = !isAuthenticated;
   }
+  if (settingsShortcutButton) {
+    settingsShortcutButton.hidden = !isAuthenticated;
+    settingsShortcutButton.disabled = !isAuthenticated;
+  }
   if (activeUserPointsButton) {
     const showPointsButton = isAuthenticated && isPointStoreRewardsEnabled();
     activeUserPointsButton.hidden = !showPointsButton;
@@ -3982,6 +4090,7 @@ function renderSquadList() {
     return;
   }
   const activeTrackers = trackers.filter((item) => !item.archived && normalizeGoalType(item.goalType) !== "bucket");
+  const currentWeekRange = getWeekRange(normalizeDate(new Date()));
   const trackerOptions = activeTrackers
     .map((tracker) => `<option value="${tracker.id}">${escapeHtml(tracker.name)}</option>`)
     .join("");
@@ -3993,6 +4102,23 @@ function renderSquadList() {
         .map((goalId) => trackers.find((tracker) => tracker.id === goalId))
         .filter(Boolean);
       const goalCount = squadGoalTrackers.length;
+      const squadWeeklyGoal = normalizeGoalTargetInt(squad.weeklyGoal, 0);
+      const squadGoalIdSet = new Set(squadGoalTrackers.map((tracker) => tracker.id));
+      const weeklyProgress = entries.reduce((total, entry) => {
+        if (!entry || !squadGoalIdSet.has(entry.trackerId) || !isDateKey(entry.date)) {
+          return total;
+        }
+        const entryDate = parseDateKey(entry.date);
+        if (entryDate < currentWeekRange.start || entryDate > currentWeekRange.end) {
+          return total;
+        }
+        return addAmount(total, Number(entry.amount || 0));
+      }, 0);
+      const weeklyPercent = squadWeeklyGoal > 0 ? Math.min(percent(weeklyProgress, squadWeeklyGoal), 100) : 0;
+      const weeklyProgressFillClass = weeklyPercent >= 100 ? "progress-hit" : "progress-on-pace";
+      const weeklyGoalLabel = squadWeeklyGoal > 0
+        ? `${formatAmount(weeklyProgress)}/${formatAmount(squadWeeklyGoal)}`
+        : `${formatAmount(weeklyProgress)}`;
       const latestEntryByGoal = squadGoalTrackers.map((tracker) => {
         const latest = entries
           .filter((entry) => entry.trackerId === tracker.id && isDateKey(entry.date))
@@ -4011,7 +4137,18 @@ function renderSquadList() {
             <strong>${escapeHtml(squad.name)}</strong>
             <button class="btn btn-danger" type="button" data-action="delete-squad" data-id="${squad.id}">Delete</button>
           </div>
-          <p class="metric-line">${escapeHtml(squad.notes || "No squad notes")} | ${goalCount} goal${goalCount === 1 ? "" : "s"}</p>
+          <p class="metric-line">${escapeHtml(squad.notes || "No squad notes")} | ${goalCount} goal${goalCount === 1 ? "" : "s"} | Weekly Goal ${formatAmount(squadWeeklyGoal)}</p>
+          <div class="progress progress-with-label">
+            <span class="progress-fill ${weeklyProgressFillClass}" style="width:${weeklyPercent}%"></span>
+            <span class="progress-label progress-label-track">Week Progress ${escapeHtml(weeklyGoalLabel)}</span>
+          </div>
+          <div class="actions">
+            <label class="inline-control">
+              Squad Weekly Goal
+              <input data-squad-weekly-goal="${escapeAttr(squad.id)}" type="number" min="0" max="1000000" value="${squadWeeklyGoal}" />
+            </label>
+            <button class="btn" type="button" data-action="save-squad-weekly-goal" data-id="${squad.id}">Save Weekly Goal</button>
+          </div>
           ${latestMarkup}
           <div class="actions">
             <label class="inline-control">
@@ -4152,6 +4289,15 @@ function renderManageGoals() {
         </td>
         <td>
           <input data-field="unit" type="text" maxlength="20" value="${escapeHtml(tracker.unit || "units")}" ${getLockedUnitForGoalType(tracker.goalType) ? "disabled" : ""} required />
+        </td>
+        <td>
+          <input
+            data-field="progressMetrics"
+            type="text"
+            maxlength="360"
+            value="${escapeAttr(formatProgressMetricsForInput(getTrackerProgressMetrics(tracker)))}"
+            placeholder="Max Reps (reps), Weight (lbs)"
+          />
         </td>
         <td>
           <input data-field="weeklyGoal" type="number" min="0" max="1000000" value="${tracker.weeklyGoal}" required />
@@ -4310,12 +4456,17 @@ function renderSoloEntrySection(standardTrackers) {
       const amountLabel = isBinaryGoalType(tracker && tracker.goalType)
         ? (entry.amount > 0 ? "Yes" : "No")
         : `Amount ${formatAmount(entry.amount)}`;
+      const metricDetails = formatEntryMetricDetails(entry, tracker);
+      const metricMarkup = metricDetails
+        ? `<p class="muted small">${escapeHtml(metricDetails)}</p>`
+        : "";
       const notes = entry.notes ? `<p class="muted small">${escapeHtml(entry.notes)}</p>` : "";
       return `
         <li class="quick-item today-entry-item" style="--stagger:${index}">
           <div>
             <strong>${escapeHtml(tracker ? tracker.name : "Unknown Goal")}</strong>
             <p class="muted small">${timeLabel} | ${amountLabel}</p>
+            ${metricMarkup}
             ${notes}
           </div>
         </li>
@@ -4739,7 +4890,13 @@ function renderEntryListTab() {
   entryListEmpty.style.display = "none";
   entryListEmpty.textContent = "No entries yet.";
   const entryMarkup = sortedEntries
-    .map((entry, index) => `
+    .map((entry, index) => {
+      const tracker = trackerById.get(entry.trackerId) || null;
+      const metricDetails = formatEntryMetricDetails(entry, tracker);
+      const metricMarkup = metricDetails
+        ? `<p class="muted small entry-metric-line">${escapeHtml(metricDetails)}</p>`
+        : "";
+      return `
       <li class="entry-card" style="--stagger:${index + snapshotCount}">
         <form data-action="edit-entry" data-id="${entry.id}" class="entry-edit-form">
           <div class="form-grid form-grid-entry">
@@ -4756,6 +4913,7 @@ function renderEntryListTab() {
               <input name="amount" type="number" min="0" step="0.01" value="${formatAmount(entry.amount)}" required />
             </label>
           </div>
+          ${metricMarkup}
           <label>
             Notes
             <textarea name="notes" rows="2" maxlength="280">${escapeHtml(entry.notes || "")}</textarea>
@@ -4766,7 +4924,8 @@ function renderEntryListTab() {
           </div>
         </form>
       </li>
-    `)
+    `;
+    })
     .join("");
   entryListAll.innerHTML = `${snapshotMarkup}${entryMarkup}`;
 }
@@ -7010,7 +7169,7 @@ function resetPeriodAccordionState() {
   Object.keys(periodAccordionState).forEach((periodName) => {
     periodAccordionState[periodName] = {
       goals: true,
-      checkins: true,
+      checkins: false,
       shared: false,
       snapshots: false
     };
@@ -9527,6 +9686,8 @@ function initializeData() {
     milestoneNotificationKeys = new Set();
     smartReminderNotificationKeys = new Set();
     settings = getDefaultSettings();
+    goalMetricsDraft = [];
+    renderGoalMetricsDraft();
     return;
   }
 
@@ -9549,6 +9710,8 @@ function initializeData() {
   goalHitNotificationKeys = loadGoalHitNotificationKeys();
   milestoneNotificationKeys = loadNotificationKeySet(MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY);
   smartReminderNotificationKeys = loadNotificationKeySet(SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY);
+  goalMetricsDraft = [];
+  renderGoalMetricsDraft();
 
   if (entries.length < 1 && loadedTrackers.legacyLogs.length > 0) {
     entries = migrateLegacyLogs(loadedTrackers.legacyLogs, trackers);
@@ -9589,6 +9752,9 @@ function loadTrackers() {
         || (trackerGoalType === "floating" && !String(item.unit || "").trim()
           ? "items"
           : normalizeGoalUnit(item.unit));
+      const progressMetrics = normalizeProgressMetricList(item.progressMetrics, {
+        fallbackUnit: loadedUnit
+      });
       const customWeeklyEnabled = Boolean(item.customWeeklyEnabled);
       const customWeeklyTargets = normalizeCustomTargetList(item.customWeeklyTargets, GOAL_TEMPLATE_WEEK_COUNT, weeklyGoal);
       const customMonthlyEnabled = Boolean(item.customMonthlyEnabled);
@@ -9603,6 +9769,7 @@ function loadTrackers() {
         priority: normalizeGoalPriority(item.priority, 0),
         tags: normalizeGoalTags(item.tags),
         unit: loadedUnit,
+        progressMetrics,
         weeklyGoal,
         monthlyGoal,
         yearlyGoal,
@@ -9650,6 +9817,7 @@ function loadEntries() {
         trackerId: typeof item.trackerId === "string" ? item.trackerId : "",
         date: isDateKey(item.date) ? item.date : getDateKey(normalizeDate(new Date())),
         amount: normalizePositiveAmount(item.amount, 0),
+        metricValues: normalizeEntryMetricValues(item.metricValues),
         notes: typeof item.notes === "string" ? item.notes.trim() : "",
         createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
       }))
@@ -9882,6 +10050,7 @@ function loadSquads() {
         id: item.id,
         name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Untitled squad",
         notes: typeof item.notes === "string" ? item.notes.trim() : "",
+        weeklyGoal: normalizeGoalTargetInt(item.weeklyGoal, 0),
         memberEmails: Array.isArray(item.memberEmails)
           ? item.memberEmails.map((value) => normalizeEmail(value)).filter(Boolean)
           : [],
@@ -10416,6 +10585,291 @@ function normalizeGoalTags(value) {
   return normalized.slice(0, 12);
 }
 
+function parseProgressMetricsText(value) {
+  const raw = String(value || "");
+  if (!raw.trim()) {
+    return [];
+  }
+  return raw
+    .split(/[,\n;|]/g)
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .map((part) => {
+      const match = part.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+      if (match) {
+        return {
+          name: match[1],
+          unit: match[2]
+        };
+      }
+      return {
+        name: part,
+        unit: ""
+      };
+    });
+}
+
+function normalizeProgressMetricName(value) {
+  const raw = String(value || "").trim().replace(/\s+/g, " ");
+  return raw.slice(0, 60);
+}
+
+function normalizeProgressMetricUnit(value, fallback = "units") {
+  const raw = String(value || "").trim().replace(/\s+/g, " ");
+  if (raw) {
+    return raw.slice(0, 20);
+  }
+  return normalizeGoalUnit(fallback).slice(0, 20);
+}
+
+function getProgressMetricKey(name, unit) {
+  return `${String(name || "").trim().toLowerCase()}|${String(unit || "").trim().toLowerCase()}`;
+}
+
+function normalizeProgressMetricList(value, options = {}) {
+  const source = Array.isArray(value) ? value : [];
+  const fallbackUnit = normalizeProgressMetricUnit(options.fallbackUnit || "units", "units");
+  const existingMetrics = Array.isArray(options.existingMetrics) ? options.existingMetrics : [];
+  const existingByKey = new Map();
+  existingMetrics.forEach((metric) => {
+    if (!metric || typeof metric !== "object") {
+      return;
+    }
+    const name = normalizeProgressMetricName(metric.name);
+    if (!name) {
+      return;
+    }
+    const unit = normalizeProgressMetricUnit(metric.unit, fallbackUnit);
+    const id = String(metric.id || "").trim();
+    if (!id) {
+      return;
+    }
+    existingByKey.set(getProgressMetricKey(name, unit), id);
+  });
+
+  const normalized = [];
+  const seen = new Set();
+  source.forEach((item) => {
+    let metricId = "";
+    let rawName = "";
+    let rawUnit = "";
+    if (typeof item === "string") {
+      const parsed = parseProgressMetricsText(item)[0] || null;
+      rawName = parsed ? parsed.name : "";
+      rawUnit = parsed ? parsed.unit : "";
+    } else if (item && typeof item === "object") {
+      metricId = String(item.id || "").trim();
+      rawName = item.name;
+      rawUnit = item.unit;
+    } else {
+      return;
+    }
+
+    const name = normalizeProgressMetricName(rawName);
+    if (!name) {
+      return;
+    }
+    const unit = normalizeProgressMetricUnit(rawUnit, fallbackUnit);
+    const key = getProgressMetricKey(name, unit);
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    const existingId = existingByKey.get(key);
+    const id = String(metricId || existingId || createId()).trim();
+    if (!id) {
+      return;
+    }
+    normalized.push({
+      id,
+      name,
+      unit
+    });
+  });
+  return normalized.slice(0, 12);
+}
+
+function getTrackerProgressMetrics(tracker) {
+  if (!tracker || typeof tracker !== "object") {
+    return [];
+  }
+  const normalized = normalizeProgressMetricList(tracker.progressMetrics, {
+    fallbackUnit: tracker.unit
+  });
+  tracker.progressMetrics = normalized;
+  return normalized;
+}
+
+function formatProgressMetricsForInput(metrics) {
+  return normalizeProgressMetricList(metrics).map((metric) => `${metric.name} (${metric.unit})`).join(", ");
+}
+
+function renderGoalMetricsDraft() {
+  if (!goalMetricsDraftList || !goalMetricsDraftEmpty) {
+    return;
+  }
+  if (!Array.isArray(goalMetricsDraft) || goalMetricsDraft.length < 1) {
+    goalMetricsDraft = [];
+    goalMetricsDraftList.innerHTML = "";
+    goalMetricsDraftEmpty.style.display = "block";
+    return;
+  }
+  goalMetricsDraftEmpty.style.display = "none";
+  goalMetricsDraftList.innerHTML = goalMetricsDraft
+    .map((metric, index) => `
+      <li class="quick-item progress-metric-item" style="--stagger:${index}">
+        <div>
+          <strong>${escapeHtml(metric.name)}</strong>
+          <p class="muted small">${escapeHtml(metric.unit)}</p>
+        </div>
+        <button class="btn btn-danger" type="button" data-action="remove-goal-metric" data-id="${escapeAttr(metric.id)}">Remove</button>
+      </li>
+    `)
+    .join("");
+}
+
+function addGoalMetricToDraft() {
+  if (!goalMetricName) {
+    return;
+  }
+  const metricName = normalizeProgressMetricName(goalMetricName.value);
+  if (!metricName) {
+    return;
+  }
+  const nextMetric = {
+    name: metricName,
+    unit: goalMetricUnit ? goalMetricUnit.value : ""
+  };
+  const fallbackUnit = goalUnit ? goalUnit.value : "units";
+  const nextMetrics = normalizeProgressMetricList(
+    [...goalMetricsDraft, nextMetric],
+    {
+      fallbackUnit,
+      existingMetrics: goalMetricsDraft
+    }
+  );
+  if (nextMetrics.length === goalMetricsDraft.length) {
+    return;
+  }
+  goalMetricsDraft = nextMetrics;
+  goalMetricName.value = "";
+  if (goalMetricUnit) {
+    goalMetricUnit.value = "";
+  }
+  goalMetricName.focus();
+  renderGoalMetricsDraft();
+}
+
+function normalizeEntryMetricValues(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const normalized = {};
+  Object.entries(value).forEach(([metricIdRaw, metricValue]) => {
+    const metricId = String(metricIdRaw || "").trim();
+    if (!metricId) {
+      return;
+    }
+    const amount = normalizePositiveAmount(metricValue, -1);
+    if (amount < 0) {
+      return;
+    }
+    normalized[metricId] = amount;
+  });
+  return normalized;
+}
+
+function filterEntryMetricValuesByTracker(value, tracker) {
+  const normalized = normalizeEntryMetricValues(value);
+  const metrics = getTrackerProgressMetrics(tracker);
+  if (metrics.length < 1) {
+    return {};
+  }
+  const metricIds = new Set(metrics.map((metric) => metric.id));
+  const filtered = {};
+  Object.entries(normalized).forEach(([metricId, amount]) => {
+    if (!metricIds.has(metricId)) {
+      return;
+    }
+    filtered[metricId] = amount;
+  });
+  return filtered;
+}
+
+function collectEntryMetricValuesFromForm(tracker) {
+  if (!entryMetricsGrid) {
+    return {};
+  }
+  const metrics = getTrackerProgressMetrics(tracker);
+  if (metrics.length < 1) {
+    return {};
+  }
+  const metricIds = new Set(metrics.map((metric) => metric.id));
+  const metricValues = {};
+  const controls = Array.from(entryMetricsGrid.querySelectorAll("input[data-metric-id]"));
+  controls.forEach((control) => {
+    const metricId = String(control.dataset.metricId || "").trim();
+    if (!metricIds.has(metricId)) {
+      return;
+    }
+    const raw = String(control.value || "").trim();
+    if (!raw) {
+      return;
+    }
+    const amount = normalizePositiveAmount(raw, -1);
+    if (amount < 0) {
+      return;
+    }
+    metricValues[metricId] = amount;
+  });
+  return metricValues;
+}
+
+function renderEntryMetricInputs(tracker) {
+  if (!entryMetricsWrap || !entryMetricsGrid) {
+    return;
+  }
+  const metrics = getTrackerProgressMetrics(tracker);
+  if (metrics.length < 1) {
+    entryMetricsWrap.hidden = true;
+    entryMetricsGrid.innerHTML = "";
+    return;
+  }
+  entryMetricsWrap.hidden = false;
+  entryMetricsGrid.innerHTML = metrics
+    .map((metric) => `
+      <label>
+        ${escapeHtml(metric.name)} (${escapeHtml(metric.unit)})
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          data-metric-id="${escapeAttr(metric.id)}"
+          placeholder="0"
+        />
+      </label>
+    `)
+    .join("");
+}
+
+function formatEntryMetricDetails(entry, tracker) {
+  if (!entry || !tracker) {
+    return "";
+  }
+  const metrics = getTrackerProgressMetrics(tracker);
+  if (metrics.length < 1) {
+    return "";
+  }
+  const metricValues = filterEntryMetricValuesByTracker(entry.metricValues, tracker);
+  const detailParts = metrics
+    .filter((metric) => metricValues[metric.id] !== undefined)
+    .map((metric) => `${metric.name}: ${formatAmount(metricValues[metric.id])} ${metric.unit}`);
+  if (detailParts.length < 1) {
+    return "";
+  }
+  return `Metrics | ${detailParts.join(" | ")}`;
+}
+
 function formatGoalTags(value) {
   return normalizeGoalTags(value).join(", ");
 }
@@ -10827,6 +11281,7 @@ function updateEntryFormMode() {
   } else if (entryYesNo) {
     entryYesNo.value = "yes";
   }
+  renderEntryMetricInputs(tracker || null);
 }
 
 function formatAmountWithUnit(value, unit) {

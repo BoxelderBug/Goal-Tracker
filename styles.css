@@ -286,6 +286,25 @@ body::before {
   color: var(--brand-strong);
 }
 
+.btn-settings-shortcut {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  line-height: 1;
+  border-color: var(--line);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  color: var(--muted);
+}
+
+.btn-settings-shortcut:hover,
+.btn-settings-shortcut:focus-visible {
+  border-color: var(--brand);
+  color: var(--brand-strong);
+}
+
 .btn-points-shortcut {
   border-color: var(--goal-hit-line);
   background: linear-gradient(180deg, var(--success-soft) 0%, #ffffff 100%);
@@ -945,6 +964,45 @@ label {
 
 .form-grid-entry {
   grid-template-columns: 1fr 1.5fr 1fr;
+}
+
+.progress-metrics-builder {
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.progress-metrics-builder .snapshot-panel-head {
+  margin-bottom: 0;
+}
+
+.progress-metrics-controls {
+  align-items: end;
+}
+
+.progress-metrics-actions {
+  display: flex;
+  align-items: end;
+}
+
+.progress-metric-item {
+  border-radius: 10px;
+}
+
+.entry-metrics-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.entry-metric-line {
+  margin: 2px 0 0;
 }
 
 .goal-template-toggle-row {
@@ -2716,7 +2774,7 @@ strong.pace-off,
   }
 
   #manage-table {
-    min-width: 920px;
+    min-width: 1060px;
   }
 
   #checkin-table {
