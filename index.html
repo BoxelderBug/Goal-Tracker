@@ -83,7 +83,12 @@
           <div class="hero-actions">
             <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" hidden></button>
             <button id="settings-shortcut-btn" class="btn btn-nav-compact btn-settings-shortcut" type="button" aria-label="Settings" title="Settings" hidden>
-              <span aria-hidden="true">&#9881;</span>
+              <span class="settings-shortcut-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                  <path d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"></path>
+                  <path d="m19.15 14.38.06-.2c.15-.54.23-1.1.23-1.68s-.08-1.14-.23-1.68l-.06-.2 1.58-1.22a.75.75 0 0 0 .19-.96l-1.5-2.6a.75.75 0 0 0-.9-.32l-1.9.76-.14-.13a7.52 7.52 0 0 0-2.9-1.68l-.2-.06-.3-2.02a.75.75 0 0 0-.74-.64h-3a.75.75 0 0 0-.74.64l-.3 2.02-.2.06a7.52 7.52 0 0 0-2.9 1.68l-.14.13-1.9-.76a.75.75 0 0 0-.9.32l-1.5 2.6a.75.75 0 0 0 .19.96l1.58 1.22-.06.2A6.2 6.2 0 0 0 4.62 12c0 .58.08 1.14.23 1.68l.06.2L3.33 15.1a.75.75 0 0 0-.19.96l1.5 2.6a.75.75 0 0 0 .9.32l1.9-.76.14.13a7.52 7.52 0 0 0 2.9 1.68l.2.06.3 2.02a.75.75 0 0 0 .74.64h3a.75.75 0 0 0 .74-.64l.3-2.02.2-.06a7.52 7.52 0 0 0 2.9-1.68l.14-.13 1.9.76a.75.75 0 0 0 .9-.32l1.5-2.6a.75.75 0 0 0-.19-.96l-1.58-1.22Z"></path>
+                </svg>
+              </span>
               <span class="visually-hidden">Settings</span>
             </button>
             <button id="active-user-points-btn" class="btn btn-nav-compact btn-points-shortcut" type="button" hidden></button>
@@ -123,6 +128,7 @@
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="entry">Add Entry</button>
+              <button class="menu-btn" type="button" data-tab="missed-entries">Missed Entries</button>
               <button class="menu-btn" type="button" data-tab="bucket-entry">Bucket List Entry</button>
               <button class="menu-btn" type="button" data-tab="checkin-entry">Add Check-in</button>
               <button class="menu-btn" type="button" data-tab="entry-list">Entry List</button>
@@ -205,10 +211,32 @@
       <section class="panel tab-panel active" data-tab-panel="manage">
         <h2>Manage Goals</h2>
         <form id="goal-form" class="form-block">
-          <div class="form-grid form-grid-2">
+          <div class="form-grid form-grid-3">
             <label>
+              Setup Mode
+              <select id="goal-setup-mode">
+                <option value="standard">Standard Goal</option>
+                <option value="goalsplus-running">Goals+</option>
+              </select>
+            </label>
+            <label id="goal-name-text-label">
               Goal Name
               <input id="goal-name" type="text" maxlength="90" placeholder="Miles walked, pages read, sales calls..." required />
+            </label>
+            <label id="goal-name-goals-plus-label" hidden>
+              Goals+ Option
+              <select id="goal-name-goals-plus" disabled>
+                <option value="running-easy">Running - Easy Run</option>
+                <option value="running-tempo">Running - Tempo Run</option>
+                <option value="running-long">Running - Long Run</option>
+                <option value="running-norwegian4x4">Running - Norwegian 4x4</option>
+                <option value="running-intervals">Running - Intervals</option>
+                <option value="running-hill-repeats">Running - Hill Repeats</option>
+                <option value="running-fartlek">Running - Fartlek</option>
+                <option value="running-recovery">Running - Recovery Run</option>
+                <option value="running-progression">Running - Progression Run</option>
+                <option value="running-threshold">Running - Threshold Run</option>
+              </select>
             </label>
             <label>
               Goal Type
@@ -226,13 +254,6 @@
               <p class="muted small">Use Goals+ for common goals with expanded tracking.</p>
             </div>
             <div class="form-grid form-grid-3 goals-plus-config-grid">
-              <label>
-                Setup Mode
-                <select id="goal-setup-mode">
-                  <option value="standard">Standard Goal</option>
-                  <option value="goalsplus-running">Goals+ Running</option>
-                </select>
-              </label>
               <label id="goal-plus-running-workout-label" hidden>
                 Running Option
                 <select id="goal-plus-running-workout">
@@ -249,15 +270,34 @@
                 </select>
               </label>
               <label id="goal-plus-running-work-interval-label" hidden>
-                Work Interval (sec)
-                <input id="goal-plus-running-work-interval" type="number" min="1" max="3600" value="240" />
+                Work Speed (mph)
+                <input id="goal-plus-running-work-interval" type="number" min="0.1" max="20" step="0.1" value="8.0" />
               </label>
               <label id="goal-plus-running-recovery-interval-label" hidden>
-                Recovery Interval (sec)
-                <input id="goal-plus-running-recovery-interval" type="number" min="1" max="3600" value="180" />
+                Recovery Speed (mph)
+                <input id="goal-plus-running-recovery-interval" type="number" min="0.1" max="20" step="0.1" value="4.0" />
               </label>
             </div>
             <p id="goal-plus-running-note" class="muted small" hidden>Running Goals+ entries include workout type, distance, and time with automatic pace and estimated VO2.</p>
+          </section>
+          <section id="goal-migrate-wrap" class="progress-metrics-builder" aria-label="Goal migration">
+            <div class="snapshot-panel-head">
+              <h3>Migration</h3>
+              <p class="muted small">Move tracking history from an existing goal into this new goal.</p>
+            </div>
+            <div class="form-grid form-grid-2">
+              <label>
+                Migrate From Goal
+                <select id="goal-migrate-source">
+                  <option value="">Don't migrate</option>
+                </select>
+              </label>
+              <label class="check-inline">
+                <input id="goal-migrate-archive-source" type="checkbox" checked />
+                Archive source goal after transfer
+              </label>
+            </div>
+            <p class="muted small">Transfers entries, schedules, and goal journal links.</p>
           </section>
           <div class="form-grid form-grid-3">
             <label>
@@ -273,26 +313,32 @@
               <input id="goal-tags" type="text" maxlength="140" placeholder="fitness, finance, health" />
             </label>
           </div>
-          <section class="progress-metrics-builder" aria-label="Progress metrics">
+          <section class="progress-metrics-builder" aria-label="Additional tracking">
             <div class="snapshot-panel-head">
-              <h3>Progress Metrics</h3>
-              <p class="muted small">Optional sub-metrics for this goal. Example: Max Reps (reps), Weight Lifted (lbs).</p>
+              <h3>Additional Tracking</h3>
+              <p class="muted small">Turn on to add optional sub-metrics for this goal. Example: Max Reps (reps), Weight Lifted (lbs).</p>
             </div>
-            <div class="form-grid form-grid-3 progress-metrics-controls">
-              <label>
-                Metric Name
-                <input id="goal-metric-name" type="text" maxlength="60" placeholder="Max Reps, Pages Read..." />
-              </label>
-              <label>
-                Metric Unit
-                <input id="goal-metric-unit" type="text" maxlength="20" placeholder="reps, lbs, pages" />
-              </label>
-              <div class="progress-metrics-actions">
-                <button id="goal-metric-add-btn" class="btn" type="button">Add Metric</button>
+            <label class="check-inline">
+              <input id="goal-additional-tracking-enabled" type="checkbox" />
+              Enable additional tracking
+            </label>
+            <div id="goal-additional-tracking-fields" hidden>
+              <div class="form-grid form-grid-3 progress-metrics-controls">
+                <label>
+                  Metric Name
+                  <input id="goal-metric-name" type="text" maxlength="60" placeholder="Max Reps, Pages Read..." />
+                </label>
+                <label>
+                  Metric Unit
+                  <input id="goal-metric-unit" type="text" maxlength="20" placeholder="reps, lbs, pages" />
+                </label>
+                <div class="progress-metrics-actions">
+                  <button id="goal-metric-add-btn" class="btn" type="button">Add Metric</button>
+                </div>
               </div>
+              <ul id="goal-metrics-draft-list" class="card-list compact-list"></ul>
+              <p id="goal-metrics-draft-empty" class="muted small">No additional tracking metrics yet.</p>
             </div>
-            <ul id="goal-metrics-draft-list" class="card-list compact-list"></ul>
-            <p id="goal-metrics-draft-empty" class="muted small">No progress metrics yet.</p>
           </section>
           <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
           <div class="form-grid form-grid-3">
@@ -381,8 +427,10 @@
       <label class="inline-control entry-mode-control">
         Entry Mode
         <select id="entry-mode-select">
-          <option value="solo">Solo Entry</option>
+          <option value="solo">Add Goal Entry</option>
           <option value="week">Week Update</option>
+          <option value="update-all-year">Update All</option>
+          <option value="update-single-goal-year">Update Single Goal (Year)</option>
         </select>
       </label>
 
@@ -410,9 +458,13 @@
               <option value="no">No</option>
             </select>
           </label>
+          <label class="check-inline">
+            <input id="entry-not-applicable" type="checkbox" />
+            Mark as N/A
+          </label>
         </div>
         <section id="entry-metrics-wrap" class="entry-metrics-wrap" hidden>
-          <p class="muted small">Progress Metrics</p>
+          <p class="muted small">Additional Tracking</p>
           <div id="entry-metrics-grid" class="form-grid form-grid-3"></div>
         </section>
         <section id="entry-goals-plus-running-wrap" class="entry-metrics-wrap" hidden>
@@ -431,6 +483,7 @@
                 <option value="recovery">Recovery Run</option>
                 <option value="progression">Progression Run</option>
                 <option value="threshold">Threshold Run</option>
+                <option value="custom">Custom Workout</option>
               </select>
             </label>
             <label>
@@ -442,12 +495,24 @@
               <input id="entry-goals-plus-duration" type="number" min="0" step="0.01" placeholder="0.00" />
             </label>
             <label id="entry-goals-plus-work-interval-label" hidden>
-              Work Interval (sec)
-              <input id="entry-goals-plus-work-interval" type="number" min="1" max="3600" />
+              Work Speed (mph)
+              <input id="entry-goals-plus-work-interval" type="number" min="0.1" max="20" step="0.1" />
             </label>
             <label id="entry-goals-plus-recovery-interval-label" hidden>
-              Recovery Interval (sec)
-              <input id="entry-goals-plus-recovery-interval" type="number" min="1" max="3600" />
+              Recovery Speed (mph)
+              <input id="entry-goals-plus-recovery-interval" type="number" min="0.1" max="20" step="0.1" />
+            </label>
+            <label id="entry-goals-plus-custom-exercise-label" hidden>
+              Exercise
+              <input id="entry-goals-plus-custom-exercise" type="text" maxlength="80" placeholder="Kettlebell swings, push press..." />
+            </label>
+            <label id="entry-goals-plus-custom-reps-label" hidden>
+              Reps
+              <input id="entry-goals-plus-custom-reps" type="number" min="0" step="1" placeholder="0" />
+            </label>
+            <label id="entry-goals-plus-custom-weight-label" hidden>
+              Weight
+              <input id="entry-goals-plus-custom-weight" type="number" min="0" step="0.01" placeholder="0.00" />
             </label>
           </div>
           <p id="entry-goals-plus-derived" class="muted small">Enter distance and time to calculate pace and estimated VO2.</p>
@@ -493,6 +558,79 @@
       <p id="week-entry-status" class="muted small"></p>
       </section>
 
+      <section id="year-update-all-section" hidden>
+      <div class="panel-head week-update-head">
+        <div>
+          <h3>Update All (Year)</h3>
+          <p class="muted">Edit all existing goal entries for the selected year.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="year-update-all-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="year-update-all-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="year-update-all-next" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="year-update-all-range" class="muted"></p>
+        </div>
+      </div>
+      <form id="year-update-all-form" class="form-block">
+        <div class="table-wrap">
+          <table class="data-table" aria-label="All yearly entries">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Goal</th>
+                <th>Amount</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="year-update-all-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Save Year Updates</button>
+        </div>
+      </form>
+      <p id="year-update-all-empty" class="empty-state">No entries for this year.</p>
+      <p id="year-update-all-status" class="muted small"></p>
+      </section>
+
+      <section id="year-single-goal-section" hidden>
+      <div class="panel-head week-update-head">
+        <div>
+          <h3>Update Single Goal (Year)</h3>
+          <p class="muted">Pick one goal and edit all of its entries for the selected year.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="year-single-goal-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="year-single-goal-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="year-single-goal-next" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="year-single-goal-range" class="muted"></p>
+        </div>
+      </div>
+      <form id="year-single-goal-form" class="form-block">
+        <label class="inline-control">
+          Goal
+          <select id="year-single-goal-select"></select>
+        </label>
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Single goal yearly entries">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="year-single-goal-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Save Goal Year Updates</button>
+        </div>
+      </form>
+      <p id="year-single-goal-empty" class="empty-state">No entries for this goal in the selected year.</p>
+      <p id="year-single-goal-status" class="muted small"></p>
+      </section>
+
       <h3>CSV Upload</h3>
       <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
       <form id="csv-upload-form" class="form-block">
@@ -503,6 +641,13 @@
         <button class="btn" type="submit">Upload CSV</button>
       </form>
       <p id="csv-upload-status" class="muted small"></p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="missed-entries" hidden>
+      <h2>Missed Entries</h2>
+      <p class="muted">Goals missing updates based on your missed-entry threshold in Settings.</p>
+      <ul id="missed-entries-list" class="card-list compact-list"></ul>
+      <p id="missed-entries-empty" class="empty-state">No missed entries right now.</p>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="goal-journal" hidden>
