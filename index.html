@@ -79,9 +79,10 @@
     <div id="app-shell" hidden>
       <header class="hero">
         <div class="hero-top">
+          <button id="hero-home-btn" class="hero-title-btn menu-btn" type="button" data-tab="home">Placeholder Goal Tracker</button>
           <div class="hero-actions">
-            <div class="user-actions-panel">
-              <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" hidden></button>
+            <div class="user-actions-panel user-account-dropdown" data-dropdown>
+              <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" data-dropdown-toggle hidden></button>
               <button id="settings-shortcut-btn" class="btn btn-nav-compact btn-settings-shortcut" type="button" aria-label="Settings" title="Settings" hidden>
                 <span class="settings-shortcut-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" role="presentation" focusable="false">
@@ -108,22 +109,19 @@
                 </section>
               </div>
               <button id="logout-btn" class="btn" type="button">Logout</button>
+              <div class="dropdown-menu user-account-menu">
+                <button class="menu-btn" type="button" data-tab="manage">Manage Goals</button>
+                <button class="menu-btn" type="button" data-tab="social" data-social-section="friends">Friends</button>
+                <button class="menu-btn" type="button" data-tab="social" data-social-section="squads">Squads</button>
+              </div>
             </div>
           </div>
         </div>
-        <h1>Placeholder Goal Tracker</h1>
       </header>
 
       <section class="panel tab-strip-panel">
         <button id="mobile-menu-toggle" class="btn mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-groups">Menu</button>
         <div id="main-nav-groups" class="nav-groups" aria-label="Tracker sections">
-          <div class="dropdown" data-dropdown>
-            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Home</button>
-            <div class="dropdown-menu">
-              <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
-            </div>
-          </div>
-
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
             <div class="dropdown-menu">
@@ -147,6 +145,7 @@
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Views</button>
             <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
               <button class="menu-btn" type="button" data-tab="week">Week</button>
               <button class="menu-btn" type="button" data-tab="month">Month</button>
               <button class="menu-btn" type="button" data-tab="year">Year</button>
@@ -164,12 +163,6 @@
             </div>
           </div>
 
-          <div class="dropdown" data-dropdown>
-            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Profile</button>
-            <div class="dropdown-menu">
-              <button class="menu-btn" type="button" data-tab="social">Friends & Squads</button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -194,18 +187,6 @@
             <p id="home-reminders-empty" class="empty-state">No reminders to show.</p>
           </section>
         </div>
-        <section class="snapshot-panel">
-          <div class="snapshot-panel-head">
-            <h3>Quick Actions</h3>
-            <p class="muted small">Jump straight to common tasks.</p>
-          </div>
-          <div class="actions">
-            <button class="btn" type="button" data-action="jump-tab" data-tab-target="entry">Add Entry</button>
-            <button class="btn" type="button" data-action="jump-tab" data-tab-target="week">Open Week View</button>
-            <button class="btn" type="button" data-action="jump-tab" data-tab-target="manage">Manage Goals</button>
-            <button class="btn" type="button" data-action="jump-tab" data-tab-target="social">Social</button>
-          </div>
-        </section>
       </section>
 
       <section class="panel tab-panel active" data-tab-panel="manage">

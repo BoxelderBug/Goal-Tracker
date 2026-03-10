@@ -315,6 +315,8 @@ const friendNameInput = document.querySelector("#friend-name");
 const friendEmailInput = document.querySelector("#friend-email");
 const friendList = document.querySelector("#friend-list");
 const friendEmpty = document.querySelector("#friend-empty");
+const friendsSettingsSection = document.querySelector("#friends-settings-section");
+const squadSettingsSection = document.querySelector("#squad-settings-section");
 const pointStoreSettingsSection = document.querySelector("#point-store-settings-section");
 const pointStoreToggleForm = document.querySelector("#point-store-toggle-form");
 const pointStoreEnabledSelect = document.querySelector("#point-store-enabled-select");
@@ -441,6 +443,7 @@ let rewardPurchases = [];
 let pointTransactions = [];
 let settings = getDefaultSettings();
 let activeTab = "manage";
+let activeSocialSection = "friends";
 let entryMode = "solo";
 let entryListSortMode = "date_desc";
 let entryListTypeFilter = "all";
@@ -762,8 +765,16 @@ menuButtons.forEach((button) => {
     if (!currentUser) {
       return;
     }
+    const targetTab = String(button.dataset.tab || "").trim();
+    if (!targetTab) {
+      return;
+    }
+    const socialSection = String(button.dataset.socialSection || "").trim().toLowerCase();
     closeAllDropdownMenus();
-    setActiveTabSafe(button.dataset.tab, { renderImmediate: true });
+    setActiveTabSafe(targetTab, { renderImmediate: true });
+    if (targetTab === "social" && socialSection) {
+      activateSocialSection(socialSection, { scroll: true });
+    }
     if (isMobileMenuMode()) {
       setMobileMenuOpen(false);
     }
@@ -964,6 +975,31 @@ function setActiveTabSafe(tabName, options = {}) {
   }
 }
 
+function getSocialSectionElement(sectionName) {
+  const normalizedSection = String(sectionName || "").trim().toLowerCase();
+  if (normalizedSection === "squads") {
+    return squadSettingsSection;
+  }
+  if (normalizedSection === "friends") {
+    return friendsSettingsSection;
+  }
+  return null;
+}
+
+function activateSocialSection(sectionName, options = {}) {
+  const targetSection = getSocialSectionElement(sectionName);
+  if (!targetSection) {
+    return;
+  }
+  activeSocialSection = String(sectionName || "").trim().toLowerCase();
+  if (!options.scroll) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    targetSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 function applyChangePasswordVisibility() {
   const visible = Boolean(changePasswordShow && changePasswordShow.checked);
   if (changePasswordCurrent) {
@@ -1089,6 +1125,7 @@ registerForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", async () => {
+  closeAllDropdownMenus();
   if (firebaseConfigured && firebaseAuth) {
     try {
       await signOut(firebaseAuth);
@@ -1101,21 +1138,12 @@ logoutButton.addEventListener("click", async () => {
   render();
 });
 
-if (activeUserButton) {
-  activeUserButton.addEventListener("click", () => {
-    if (!currentUser) {
-      return;
-    }
-    activeTab = "settings";
-    renderTabs();
-  });
-}
-
 if (settingsShortcutButton) {
   settingsShortcutButton.addEventListener("click", () => {
     if (!currentUser) {
       return;
     }
+    closeAllDropdownMenus();
     setActiveTabSafe("settings", { renderImmediate: true });
   });
 }
@@ -1125,6 +1153,7 @@ if (activeUserPointsButton) {
     if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
+    closeAllDropdownMenus();
     activeTab = "point-store";
     renderTabs();
     renderPointStoreTab();
@@ -4362,7 +4391,12 @@ function renderTabs() {
   });
 
   menuButtons.forEach((button) => {
-    const isActive = button.dataset.tab === activeTab;
+    const buttonTab = String(button.dataset.tab || "").trim();
+    const socialSection = String(button.dataset.socialSection || "").trim().toLowerCase();
+    let isActive = buttonTab === activeTab;
+    if (buttonTab === "social" && socialSection) {
+      isActive = activeTab === "social" && socialSection === activeSocialSection;
+    }
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-current", isActive ? "page" : "false");
   });
@@ -4556,19 +4590,35 @@ function renderHomeTab() {
   const now = normalizeDate(new Date());
   const activeGoals = trackers.filter((item) => !item.archived).length;
   const weekRange = getWeekRange(now);
+  const weekTotalDays = getRangeDays(weekRange);
+  const weekElapsedDays = getElapsedDays(weekRange, now);
   const weekIndex = buildEntryIndex(entries);
+  const activeWeekGoals = trackers.filter((tracker) => !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket");
+  const measurableWeekGoals = activeWeekGoals.filter((tracker) => {
+    const target = getTrackerTargetForPeriod(tracker, "week", weekRange);
+    return !isFloatingGoalType(tracker.goalType) && target > 0;
+  });
   let hitThisWeek = 0;
-  trackers.forEach((tracker) => {
-    if (tracker.archived || normalizeGoalType(tracker.goalType) === "bucket") {
-      return;
-    }
+  const onPaceGoals = [];
+  const offPaceGoals = [];
+  measurableWeekGoals.forEach((tracker) => {
     const target = getTrackerTargetForPeriod(tracker, "week", weekRange);
     const progress = sumTrackerRange(weekIndex, tracker.id, weekRange);
-    if (target > 0 && progress >= target) {
+    if (progress >= target) {
       hitThisWeek += 1;
     }
+    const avgPerDay = safeDivide(progress, weekElapsedDays);
+    const projected = avgPerDay * weekTotalDays;
+    if (projected >= target) {
+      onPaceGoals.push(tracker.name);
+    } else {
+      offPaceGoals.push(tracker.name);
+    }
   });
-  const hitPct = activeGoals > 0 ? Math.round((hitThisWeek / activeGoals) * 100) : 0;
+  const measurableWeekGoalCount = measurableWeekGoals.length;
+  const hitPct = measurableWeekGoalCount > 0 ? Math.round((hitThisWeek / measurableWeekGoalCount) * 100) : 0;
+  const projectedHitPct = measurableWeekGoalCount > 0 ? Math.round((onPaceGoals.length / measurableWeekGoalCount) * 100) : 0;
+  const projectedDetailText = buildProjectedWeekHitDetailText(onPaceGoals, offPaceGoals, measurableWeekGoalCount);
 
   homeSummary.innerHTML = `
     <article class="summary-card">
@@ -4580,8 +4630,14 @@ function renderHomeTab() {
       <strong>${hitPct}%</strong>
     </article>
     <article class="summary-card">
-      <p>Open Squads</p>
-      <strong>${squads.length}</strong>
+      <p>Projected Week Hit Rate</p>
+      <div class="summary-projected-wrap">
+        <strong>${projectedHitPct}%</strong>
+        <span class="pace-chip-wrap">
+          <span class="pace-chip pace-detail">Hover</span>
+          <span class="pace-detail-popover">${escapeHtml(projectedDetailText)}</span>
+        </span>
+      </div>
     </article>
   `;
 
@@ -4622,6 +4678,26 @@ function renderHomeTab() {
       `)
       .join("");
   }
+}
+
+function summarizeGoalNamesForDetail(names, limit = 6) {
+  const list = Array.isArray(names) ? names.filter(Boolean) : [];
+  if (list.length < 1) {
+    return "None";
+  }
+  if (list.length <= limit) {
+    return list.join(", ");
+  }
+  return `${list.slice(0, limit).join(", ")} +${list.length - limit} more`;
+}
+
+function buildProjectedWeekHitDetailText(onPaceGoals, offPaceGoals, measurableGoalCount) {
+  if (measurableGoalCount < 1) {
+    return "No measurable weekly goals.";
+  }
+  const onPaceText = summarizeGoalNamesForDetail(onPaceGoals);
+  const offPaceText = summarizeGoalNamesForDetail(offPaceGoals);
+  return `On pace: ${onPaceText}. Off pace: ${offPaceText}.`;
 }
 
 function renderMissedEntriesTab() {

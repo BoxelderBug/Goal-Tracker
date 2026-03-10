@@ -245,7 +245,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -253,17 +253,54 @@ body::before {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
 }
 
 .user-actions-panel {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
+  gap: 8px;
+  padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, var(--surface-soft) 58%, var(--brand-soft) 100%);
   box-shadow: var(--shadow-soft);
+}
+
+.user-actions-panel > .btn,
+.user-actions-panel .btn-notifications {
+  min-height: 40px;
+  border-radius: 12px;
+  border-color: var(--line);
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  color: var(--text);
+  box-shadow: 0 6px 12px rgba(0, 70, 63, 0.1);
+}
+
+.user-actions-panel .btn-nav-compact {
+  min-height: 40px;
+  font-size: 0.92rem;
+  letter-spacing: normal;
+  padding: 8px 14px;
+}
+
+.user-account-dropdown {
+  position: relative;
+}
+
+.user-account-menu {
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 220px;
+  z-index: 240;
+}
+
+.user-account-dropdown.open .user-account-menu,
+.user-account-dropdown:hover .user-account-menu,
+.user-account-dropdown:focus-within .user-account-menu {
+  display: flex;
+  animation: menu-in 0.16s ease both;
 }
 
 .skip-link {
@@ -285,10 +322,33 @@ body::before {
 }
 
 .btn-user-link {
-  border-color: var(--line);
-  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
-  color: var(--text);
   font-weight: 700;
+}
+
+.user-account-dropdown .btn-user-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 148px;
+  padding: 8px 14px;
+  border-radius: 12px;
+}
+
+.user-account-dropdown .btn-user-link::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transform-origin: center;
+  transition: transform 0.18s ease;
+  opacity: 0.72;
+}
+
+.user-account-dropdown.open .btn-user-link::after {
+  transform: rotate(-135deg) translateY(-1px);
 }
 
 .btn-user-link:hover,
@@ -301,21 +361,17 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  min-width: 38px;
-  height: 38px;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
   padding: 0;
-  border-radius: 999px;
-  border-color: var(--brand);
-  background: linear-gradient(180deg, var(--brand-soft) 0%, var(--surface) 100%);
-  color: var(--brand-strong);
-  box-shadow: 0 8px 16px rgba(0, 70, 63, 0.14);
+  color: var(--text);
 }
 
 .btn-settings-shortcut:hover,
 .btn-settings-shortcut:focus-visible {
   border-color: var(--brand-strong);
-  box-shadow: 0 10px 20px rgba(0, 70, 63, 0.18);
+  box-shadow: 0 8px 14px rgba(0, 70, 63, 0.14);
 }
 
 .settings-shortcut-icon {
@@ -335,9 +391,16 @@ body::before {
 }
 
 .btn-points-shortcut {
-  border-color: var(--goal-hit-line);
-  background: linear-gradient(180deg, var(--success-soft) 0%, #ffffff 100%);
-  color: var(--goal-hit-line);
+  font-weight: 700;
+}
+
+.user-actions-panel #logout-btn {
+  border-radius: 12px;
+  padding-inline: 14px;
+}
+
+.user-account-menu .menu-btn {
+  min-height: 38px;
   font-weight: 700;
 }
 
@@ -349,32 +412,28 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border-radius: 999px;
   position: relative;
-  border-color: var(--brand);
-  background: linear-gradient(180deg, var(--brand-soft) 0%, var(--surface) 100%);
-  box-shadow: 0 8px 16px rgba(0, 70, 63, 0.14);
 }
 
 .btn-notifications:hover,
 .btn-notifications:focus-visible {
   border-color: var(--brand-strong);
-  box-shadow: 0 10px 20px rgba(0, 70, 63, 0.18);
+  box-shadow: 0 8px 14px rgba(0, 70, 63, 0.14);
 }
 
 .notifications-icon {
   font-size: 1rem;
   line-height: 1;
-  color: var(--brand-strong);
+  color: currentColor;
 }
 
 .btn-notifications[aria-expanded="true"] {
   border-color: var(--brand-strong);
   background: linear-gradient(180deg, var(--btn-active-bg) 0%, var(--brand-strong) 100%);
-  box-shadow: 0 12px 24px rgba(0, 76, 69, 0.22);
+  box-shadow: 0 10px 18px rgba(0, 76, 69, 0.2);
 }
 
 .btn-notifications[aria-expanded="true"] .notifications-icon {
@@ -455,13 +514,39 @@ body::before {
   color: var(--brand-strong);
 }
 
-.hero h1 {
-  margin: 6px 0 8px;
+.hero-title-btn {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
   font-family: "Sora", sans-serif;
   letter-spacing: -0.03em;
   line-height: 1.06;
   font-size: clamp(2.1rem, 5.2vw, 3.2rem);
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
   text-wrap: balance;
+  flex: 1 1 auto;
+  min-width: 260px;
+  border-radius: 0;
+}
+
+.hero-title-btn:hover,
+.hero-title-btn:focus-visible {
+  color: var(--brand-strong);
+  transform: none;
+  box-shadow: none;
+  background: none;
+  border-color: transparent;
+}
+
+.hero-title-btn.active {
+  color: var(--brand-strong);
+  background: none;
+  box-shadow: none;
+  border: 0;
 }
 
 .subtitle {
@@ -1244,6 +1329,13 @@ textarea {
   margin-top: 5px;
   font-size: 1.25rem;
   letter-spacing: -0.02em;
+}
+
+.summary-projected-wrap {
+  margin-top: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .card-list {
@@ -2865,13 +2957,24 @@ strong.pace-off,
     border-radius: 16px;
   }
 
+  .user-account-dropdown .btn-user-link {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .user-account-dropdown .user-account-menu {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+
   .notifications-panel {
     right: auto;
     left: 0;
     width: min(420px, 94vw);
   }
 
-  .hero h1 {
+  .hero-title-btn {
     font-size: clamp(1.7rem, 8vw, 2.2rem);
   }
 
