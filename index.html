@@ -79,39 +79,39 @@
     <div id="app-shell" hidden>
       <header class="hero">
         <div class="hero-top">
-          <p class="eyebrow">Goal System</p>
           <div class="hero-actions">
-            <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" hidden></button>
-            <button id="settings-shortcut-btn" class="btn btn-nav-compact btn-settings-shortcut" type="button" aria-label="Settings" title="Settings" hidden>
-              <span class="settings-shortcut-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
-                  <path d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"></path>
-                  <path d="m19.15 14.38.06-.2c.15-.54.23-1.1.23-1.68s-.08-1.14-.23-1.68l-.06-.2 1.58-1.22a.75.75 0 0 0 .19-.96l-1.5-2.6a.75.75 0 0 0-.9-.32l-1.9.76-.14-.13a7.52 7.52 0 0 0-2.9-1.68l-.2-.06-.3-2.02a.75.75 0 0 0-.74-.64h-3a.75.75 0 0 0-.74.64l-.3 2.02-.2.06a7.52 7.52 0 0 0-2.9 1.68l-.14.13-1.9-.76a.75.75 0 0 0-.9.32l-1.5 2.6a.75.75 0 0 0 .19.96l1.58 1.22-.06.2A6.2 6.2 0 0 0 4.62 12c0 .58.08 1.14.23 1.68l.06.2L3.33 15.1a.75.75 0 0 0-.19.96l1.5 2.6a.75.75 0 0 0 .9.32l1.9-.76.14.13a7.52 7.52 0 0 0 2.9 1.68l.2.06.3 2.02a.75.75 0 0 0 .74.64h3a.75.75 0 0 0 .74-.64l.3-2.02.2-.06a7.52 7.52 0 0 0 2.9-1.68l.14-.13 1.9.76a.75.75 0 0 0 .9-.32l1.5-2.6a.75.75 0 0 0-.19-.96l-1.58-1.22Z"></path>
-                </svg>
-              </span>
-              <span class="visually-hidden">Settings</span>
-            </button>
-            <button id="active-user-points-btn" class="btn btn-nav-compact btn-points-shortcut" type="button" hidden></button>
-            <div class="notifications-wrap">
-              <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel" hidden>
-                <span class="notifications-icon" aria-hidden="true">&#128276;</span>
-                <span class="visually-hidden">Notifications</span>
-                <span id="notifications-unread-count" class="notifications-badge" hidden>0</span>
+            <div class="user-actions-panel">
+              <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" hidden></button>
+              <button id="settings-shortcut-btn" class="btn btn-nav-compact btn-settings-shortcut" type="button" aria-label="Settings" title="Settings" hidden>
+                <span class="settings-shortcut-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                    <path d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"></path>
+                    <path d="m19.15 14.38.06-.2c.15-.54.23-1.1.23-1.68s-.08-1.14-.23-1.68l-.06-.2 1.58-1.22a.75.75 0 0 0 .19-.96l-1.5-2.6a.75.75 0 0 0-.9-.32l-1.9.76-.14-.13a7.52 7.52 0 0 0-2.9-1.68l-.2-.06-.3-2.02a.75.75 0 0 0-.74-.64h-3a.75.75 0 0 0-.74.64l-.3 2.02-.2.06a7.52 7.52 0 0 0-2.9 1.68l-.14.13-1.9-.76a.75.75 0 0 0-.9.32l-1.5 2.6a.75.75 0 0 0 .19.96l1.58 1.22-.06.2A6.2 6.2 0 0 0 4.62 12c0 .58.08 1.14.23 1.68l.06.2L3.33 15.1a.75.75 0 0 0-.19.96l1.5 2.6a.75.75 0 0 0 .9.32l1.9-.76.14.13a7.52 7.52 0 0 0 2.9 1.68l.2.06.3 2.02a.75.75 0 0 0 .74.64h3a.75.75 0 0 0 .74-.64l.3-2.02.2-.06a7.52 7.52 0 0 0 2.9-1.68l.14-.13 1.9.76a.75.75 0 0 0 .9-.32l1.5-2.6a.75.75 0 0 0-.19-.96l-1.58-1.22Z"></path>
+                  </svg>
+                </span>
+                <span class="visually-hidden">Settings</span>
               </button>
-              <section id="notifications-panel" class="notifications-panel hidden" aria-hidden="true" aria-label="Notifications">
-                <div class="notifications-head">
-                  <h3>Notifications</h3>
-                  <button id="notifications-mark-read-btn" class="btn btn-nav-compact" type="button">Mark All Read</button>
-                </div>
-                <ul id="notifications-list" class="card-list compact-list"></ul>
-                <p id="notifications-empty" class="empty-state">No notifications yet.</p>
-              </section>
+              <button id="active-user-points-btn" class="btn btn-nav-compact btn-points-shortcut" type="button" hidden></button>
+              <div class="notifications-wrap">
+                <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel" hidden>
+                  <span class="notifications-icon" aria-hidden="true">&#128276;</span>
+                  <span class="visually-hidden">Notifications</span>
+                  <span id="notifications-unread-count" class="notifications-badge" hidden>0</span>
+                </button>
+                <section id="notifications-panel" class="notifications-panel hidden" aria-hidden="true" aria-label="Notifications">
+                  <div class="notifications-head">
+                    <h3>Notifications</h3>
+                    <button id="notifications-mark-read-btn" class="btn btn-nav-compact" type="button">Mark All Read</button>
+                  </div>
+                  <ul id="notifications-list" class="card-list compact-list"></ul>
+                  <p id="notifications-empty" class="empty-state">No notifications yet.</p>
+                </section>
+              </div>
+              <button id="logout-btn" class="btn" type="button">Logout</button>
             </div>
-            <button id="logout-btn" class="btn" type="button">Logout</button>
           </div>
         </div>
         <h1>Placeholder Goal Tracker</h1>
-        <p class="subtitle">Manage goals and check-ins, log activity, review trend graphs, and control week boundaries in settings.</p>
       </header>
 
       <section class="panel tab-strip-panel">
@@ -132,13 +132,15 @@
               <button class="menu-btn" type="button" data-tab="bucket-entry">Bucket List Entry</button>
               <button class="menu-btn" type="button" data-tab="checkin-entry">Add Check-in</button>
               <button class="menu-btn" type="button" data-tab="entry-list">Entry List</button>
+              <button class="menu-btn" type="button" data-tab="entry-csv">Import/Export CSV</button>
             </div>
           </div>
 
           <div class="dropdown" data-dropdown>
-            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Goal Planning</button>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Planning</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="goal-schedule">Goal Schedule</button>
+              <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
             </div>
           </div>
 
@@ -156,7 +158,7 @@
           </div>
 
           <div class="dropdown" data-dropdown>
-            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Reflection</button>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Review</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
             </div>
@@ -165,8 +167,6 @@
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Profile</button>
             <div class="dropdown-menu">
-              <button class="menu-btn active" type="button" data-tab="manage">Manage Goals</button>
-              <button class="menu-btn" type="button" data-tab="checkins">Manage Check-ins</button>
               <button class="menu-btn" type="button" data-tab="social">Friends & Squads</button>
             </div>
           </div>
@@ -222,20 +222,10 @@
             <label id="goal-name-text-label">
               Goal Name
               <input id="goal-name" type="text" maxlength="90" placeholder="Miles walked, pages read, sales calls..." required />
-            </label>
-            <label id="goal-name-goals-plus-label" hidden>
-              Goals+ Option
-              <select id="goal-name-goals-plus" disabled>
-                <option value="running-easy">Running - Easy Run</option>
-                <option value="running-tempo">Running - Tempo Run</option>
-                <option value="running-long">Running - Long Run</option>
-                <option value="running-norwegian4x4">Running - Norwegian 4x4</option>
-                <option value="running-intervals">Running - Intervals</option>
-                <option value="running-hill-repeats">Running - Hill Repeats</option>
-                <option value="running-fartlek">Running - Fartlek</option>
-                <option value="running-recovery">Running - Recovery Run</option>
-                <option value="running-progression">Running - Progression Run</option>
-                <option value="running-threshold">Running - Threshold Run</option>
+              <select id="goal-name-goals-plus" hidden disabled>
+                <option value="running">Running</option>
+                <option value="golf">Golf</option>
+                <option value="disc-golf">Disc Golf</option>
               </select>
             </label>
             <label>
@@ -251,7 +241,7 @@
           <section id="goal-setup-wrap" class="progress-metrics-builder" aria-label="Goal setup">
             <div class="snapshot-panel-head">
               <h3>Goal Setup</h3>
-              <p class="muted small">Use Goals+ for common goals with expanded tracking.</p>
+              <p class="muted small">Use Goals+ for running or golf/disc golf score tracking.</p>
             </div>
             <div class="form-grid form-grid-3 goals-plus-config-grid">
               <label id="goal-plus-running-workout-label" hidden>
@@ -517,6 +507,15 @@
           </div>
           <p id="entry-goals-plus-derived" class="muted small">Enter distance and time to calculate pace and estimated VO2.</p>
         </section>
+        <section id="entry-goals-plus-golf-wrap" class="entry-metrics-wrap" hidden>
+          <p id="entry-goals-plus-golf-note" class="muted small">Goals+ Golf Entry</p>
+          <div class="form-grid form-grid-3">
+            <label>
+              Score
+              <input id="entry-goals-plus-golf-score" type="number" min="1" step="1" placeholder="72" />
+            </label>
+          </div>
+        </section>
         <label>
           Notes
           <textarea id="entry-notes" rows="2" maxlength="280" placeholder="Optional note for this entry"></textarea>
@@ -597,7 +596,7 @@
       <div class="panel-head week-update-head">
         <div>
           <h3>Update Single Goal (Year)</h3>
-          <p class="muted">Pick one goal and edit all of its entries for the selected year.</p>
+          <p class="muted">Pick one goal and edit each year-to-date day. Use Status to leave no entry, set a value, or mark N/A.</p>
         </div>
         <div class="panel-actions">
           <button id="year-single-goal-prev" class="btn btn-nav-compact" type="button">Prev</button>
@@ -612,10 +611,11 @@
           <select id="year-single-goal-select"></select>
         </label>
         <div class="table-wrap">
-          <table class="data-table" aria-label="Single goal yearly entries">
+          <table class="data-table" aria-label="Single goal year-to-date entries">
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Status</th>
                 <th>Amount</th>
                 <th>Notes</th>
               </tr>
@@ -627,25 +627,15 @@
           <button class="btn btn-primary" type="submit">Save Goal Year Updates</button>
         </div>
       </form>
-      <p id="year-single-goal-empty" class="empty-state">No entries for this goal in the selected year.</p>
+      <p id="year-single-goal-empty" class="empty-state">No year-to-date rows for this goal.</p>
       <p id="year-single-goal-status" class="muted small"></p>
       </section>
 
-      <h3>CSV Upload</h3>
-      <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
-      <form id="csv-upload-form" class="form-block">
-        <label>
-          CSV File
-          <input id="csv-upload-file" type="file" accept=".csv,text/csv" required />
-        </label>
-        <button class="btn" type="submit">Upload CSV</button>
-      </form>
-      <p id="csv-upload-status" class="muted small"></p>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="missed-entries" hidden>
       <h2>Missed Entries</h2>
-      <p class="muted">Goals missing updates based on your missed-entry threshold in Settings.</p>
+      <p class="muted">Every date missing goal entries, plus past periods that have not been closed out yet.</p>
       <ul id="missed-entries-list" class="card-list compact-list"></ul>
       <p id="missed-entries-empty" class="empty-state">No missed entries right now.</p>
     </section>
@@ -664,8 +654,12 @@
             <select id="goal-journal-goal"></select>
           </label>
           <label>
-            Title
-            <input id="goal-journal-title" type="text" maxlength="120" placeholder="What changed today?" />
+            Subject Options
+            <select id="goal-journal-title">
+              <option value="General Journal">General Journal</option>
+              <option value="Week Planning">Week Planning</option>
+              <option value="Week Review">Week Review</option>
+            </select>
           </label>
         </div>
         <label>
@@ -780,8 +774,29 @@
           </select>
         </label>
       </div>
+      <div id="entry-list-focus-wrap" class="entry-list-focus" hidden>
+        <p id="entry-list-focus-text" class="muted small"></p>
+        <button id="entry-list-focus-clear" class="btn btn-nav-compact" type="button">Clear Focus</button>
+      </div>
       <ul id="entry-list-all" class="card-list"></ul>
       <p id="entry-list-empty" class="empty-state">No entries yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="entry-csv" hidden>
+      <h2>CSV Import/Export</h2>
+      <p class="muted">Import entries from CSV or export your entries in the same layout.</p>
+      <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
+      <form id="csv-upload-form" class="form-block">
+        <label>
+          CSV File
+          <input id="csv-upload-file" type="file" accept=".csv,text/csv" required />
+        </label>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Import CSV</button>
+          <button id="csv-export-button" class="btn" type="button">Export CSV</button>
+        </div>
+      </form>
+      <p id="csv-upload-status" class="muted small"></p>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="goal-schedule" hidden>
@@ -795,34 +810,40 @@
         </div>
       </div>
 
-      <form id="schedule-form" class="form-block">
-        <div class="form-grid form-grid-4">
+      <details class="schedule-disclosure">
+        <summary>Add Schedule Item</summary>
+        <form id="schedule-form" class="form-block">
+          <div class="form-grid form-grid-4">
+            <label>
+              Goal
+              <select id="schedule-goal"></select>
+            </label>
+            <label>
+              Date
+              <input id="schedule-date" type="date" required />
+            </label>
+            <label>
+              Start Time
+              <input id="schedule-start-time" type="time" value="09:00" required />
+            </label>
+            <label>
+              End Time
+              <input id="schedule-end-time" type="time" value="10:00" required />
+            </label>
+          </div>
           <label>
-            Goal
-            <select id="schedule-goal"></select>
+            Notes
+            <input id="schedule-notes" type="text" maxlength="180" placeholder="Optional schedule note" />
           </label>
-          <label>
-            Date
-            <input id="schedule-date" type="date" required />
-          </label>
-          <label>
-            Start Time
-            <input id="schedule-start-time" type="time" value="09:00" required />
-          </label>
-          <label>
-            End Time
-            <input id="schedule-end-time" type="time" value="10:00" required />
-          </label>
-        </div>
-        <label>
-          Notes
-          <input id="schedule-notes" type="text" maxlength="180" placeholder="Optional schedule note" />
-        </label>
-        <button class="btn btn-primary" type="submit">Add Schedule Item</button>
-      </form>
+          <button class="btn btn-primary" type="submit">Add Schedule Item</button>
+        </form>
+      </details>
 
-      <div id="schedule-list" class="schedule-calendar" aria-live="polite"></div>
-      <p id="schedule-empty" class="empty-state">No schedule items in this week.</p>
+      <details class="schedule-disclosure">
+        <summary>Weekly Calendar</summary>
+        <div id="schedule-list" class="schedule-calendar" aria-live="polite"></div>
+        <p id="schedule-empty" class="empty-state">No schedule items in this week.</p>
+      </details>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="week" hidden>
@@ -1074,7 +1095,7 @@
       <div class="panel-head">
         <div>
           <h2>Goals+ View</h2>
-          <p class="muted">Hover Goals+ to review your running stats.</p>
+          <p class="muted">Hover Goals+ to review running and golf stats.</p>
         </div>
       </div>
       <div id="goals-plus-summary" class="summary-grid"></div>
@@ -1186,6 +1207,16 @@
 
       <section class="panel tab-panel" data-tab-panel="settings" hidden>
       <h2>Settings</h2>
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Setup</h3>
+          <p class="muted small">Manage your goals and check-ins.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="manage">Manage Goals</button>
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="checkins">Manage Check-ins</button>
+        </div>
+      </section>
       <form id="settings-form" class="form-block">
         <label>
           Week Definition

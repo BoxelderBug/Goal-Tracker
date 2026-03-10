@@ -255,6 +255,17 @@ body::before {
   gap: 10px;
 }
 
+.user-actions-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  box-shadow: var(--shadow-soft);
+}
+
 .skip-link {
   position: absolute;
   top: -42px;
@@ -909,6 +920,64 @@ h3 {
   display: none;
 }
 
+.schedule-disclosure {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  overflow: hidden;
+}
+
+.schedule-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+}
+
+.schedule-disclosure > summary::after {
+  content: "\25BE";
+  font-size: 0.72rem;
+  transition: transform 0.18s ease;
+}
+
+.schedule-disclosure[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.schedule-disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.schedule-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.schedule-disclosure .form-block {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.schedule-disclosure .schedule-calendar {
+  margin-top: 0;
+  padding: 10px 10px 6px;
+}
+
+.schedule-disclosure .empty-state {
+  margin: 0 10px 10px;
+}
+
 .view-filters-grid {
   display: grid;
   gap: 8px;
@@ -1367,6 +1436,24 @@ textarea {
   margin-bottom: 10px;
 }
 
+.entry-list-focus {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.entry-list-focus p {
+  margin: 0;
+}
+
 .week-update-head {
   margin-top: 8px;
 }
@@ -1609,16 +1696,13 @@ textarea {
 }
 
 .schedule-delete-btn {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
   border-radius: 999px;
   border: 1px solid var(--btn-border);
   background: var(--btn-bg);
   color: var(--brand-strong);
-  font-size: 0.64rem;
-  line-height: 1;
-  padding: 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  padding: 3px 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2771,7 +2855,14 @@ strong.pace-off,
 
   .hero-actions {
     width: 100%;
+    justify-content: flex-end;
+  }
+
+  .user-actions-panel {
+    width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+    border-radius: 16px;
   }
 
   .notifications-panel {

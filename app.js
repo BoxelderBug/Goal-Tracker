@@ -43,6 +43,7 @@ const GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-goal-hit-notificati
 const MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-milestone-notification-keys-v1";
 const SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-smart-reminder-notification-keys-v1";
 const ONBOARDING_DISMISSED_STORAGE_KEY = "goal-tracker-onboarding-dismissed-v1";
+const GOAL_JOURNAL_SUBJECT_DEFAULT = "General Journal";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
 const SESSION_STORAGE_KEY = "goal-tracker-session-v1";
@@ -56,6 +57,9 @@ const GOAL_TEMPLATE_WEEK_COUNT = 52;
 const GOAL_TEMPLATE_MONTH_COUNT = 12;
 const GOALS_PLUS_SETUP_STANDARD = "standard";
 const GOALS_PLUS_SETUP_RUNNING = "goalsplus-running";
+const GOALS_PLUS_SETUP_GOLF = "goalsplus-golf";
+const GOALS_PLUS_GOLF_STANDARD = "golf";
+const GOALS_PLUS_GOLF_DISC = "disc-golf";
 const NORWEGIAN_DEFAULT_WORK_SPEED_MPH = 8;
 const NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH = 4;
 const TREADMILL_SPEED_MAX_MPH = 20;
@@ -75,17 +79,14 @@ const RUNNING_WORKOUT_OPTIONS = [
 const RUNNING_WORKOUT_LABEL_BY_VALUE = new Map(
   RUNNING_WORKOUT_OPTIONS.map((item) => [item.value, item.label])
 );
+const GOALS_PLUS_GOLF_TYPE_LABEL_BY_VALUE = new Map([
+  [GOALS_PLUS_GOLF_STANDARD, "Golf"],
+  [GOALS_PLUS_GOLF_DISC, "Disc Golf"]
+]);
 const GOALS_PLUS_NAME_OPTIONS = [
-  { value: "running-easy", label: "Running - Easy Run", runningWorkout: "easy" },
-  { value: "running-tempo", label: "Running - Tempo Run", runningWorkout: "tempo" },
-  { value: "running-long", label: "Running - Long Run", runningWorkout: "long" },
-  { value: "running-norwegian4x4", label: "Running - Norwegian 4x4", runningWorkout: "norwegian4x4" },
-  { value: "running-intervals", label: "Running - Intervals", runningWorkout: "intervals" },
-  { value: "running-hill-repeats", label: "Running - Hill Repeats", runningWorkout: "hill-repeats" },
-  { value: "running-fartlek", label: "Running - Fartlek", runningWorkout: "fartlek" },
-  { value: "running-recovery", label: "Running - Recovery Run", runningWorkout: "recovery" },
-  { value: "running-progression", label: "Running - Progression Run", runningWorkout: "progression" },
-  { value: "running-threshold", label: "Running - Threshold Run", runningWorkout: "threshold" }
+  { value: "running", label: "Running", mode: GOALS_PLUS_SETUP_RUNNING, runningWorkout: "easy" },
+  { value: GOALS_PLUS_GOLF_STANDARD, label: "Golf", mode: GOALS_PLUS_SETUP_GOLF, golfType: GOALS_PLUS_GOLF_STANDARD },
+  { value: GOALS_PLUS_GOLF_DISC, label: "Disc Golf", mode: GOALS_PLUS_SETUP_GOLF, golfType: GOALS_PLUS_GOLF_DISC }
 ];
 const GOALS_PLUS_NAME_OPTION_BY_VALUE = new Map(
   GOALS_PLUS_NAME_OPTIONS.map((item) => [item.value, item])
@@ -129,7 +130,6 @@ const mobileQuickActions = document.querySelector("#mobile-quick-actions");
 const goalForm = document.querySelector("#goal-form");
 const goalName = document.querySelector("#goal-name");
 const goalNameTextLabel = document.querySelector("#goal-name-text-label");
-const goalNameGoalsPlusLabel = document.querySelector("#goal-name-goals-plus-label");
 const goalNameGoalsPlus = document.querySelector("#goal-name-goals-plus");
 const goalType = document.querySelector("#goal-type");
 const goalUnit = document.querySelector("#goal-unit");
@@ -205,6 +205,9 @@ const entryGoalsPlusCustomExercise = document.querySelector("#entry-goals-plus-c
 const entryGoalsPlusCustomReps = document.querySelector("#entry-goals-plus-custom-reps");
 const entryGoalsPlusCustomWeight = document.querySelector("#entry-goals-plus-custom-weight");
 const entryGoalsPlusDerived = document.querySelector("#entry-goals-plus-derived");
+const entryGoalsPlusGolfWrap = document.querySelector("#entry-goals-plus-golf-wrap");
+const entryGoalsPlusGolfScore = document.querySelector("#entry-goals-plus-golf-score");
+const entryGoalsPlusGolfNote = document.querySelector("#entry-goals-plus-golf-note");
 const entryNotes = document.querySelector("#entry-notes");
 const todayEntriesList = document.querySelector("#today-entries-list");
 const todayEntriesEmpty = document.querySelector("#today-entries-empty");
@@ -266,9 +269,13 @@ const entryListSort = document.querySelector("#entry-list-sort");
 const entryListTypeFilterSelect = document.querySelector("#entry-list-type-filter");
 const entryListStatusFilterSelect = document.querySelector("#entry-list-status-filter");
 const entryListBucketFilterSelect = document.querySelector("#entry-list-bucket-filter");
+const entryListFocusWrap = document.querySelector("#entry-list-focus-wrap");
+const entryListFocusText = document.querySelector("#entry-list-focus-text");
+const entryListFocusClearButton = document.querySelector("#entry-list-focus-clear");
 const csvUploadForm = document.querySelector("#csv-upload-form");
 const csvUploadFile = document.querySelector("#csv-upload-file");
 const csvUploadStatus = document.querySelector("#csv-upload-status");
+const csvExportButton = document.querySelector("#csv-export-button");
 const goalJournalForm = document.querySelector("#goal-journal-form");
 const goalJournalDate = document.querySelector("#goal-journal-date");
 const goalJournalGoal = document.querySelector("#goal-journal-goal");
@@ -439,6 +446,7 @@ let entryListSortMode = "date_desc";
 let entryListTypeFilter = "all";
 let entryListStatusFilter = "active";
 let entryListBucketFilter = "all";
+let entryListFocusRange = null;
 let authMode = "signin";
 let scheduleWeekAnchor = normalizeDate(new Date());
 let weekEntryAnchor = normalizeDate(new Date());
@@ -520,6 +528,7 @@ const graphModalState = {
   trackerId: "",
   avgMode: "week",
   historyMetric: "avg",
+  historyScope: "period",
   historyGraphType: "bar"
 };
 const goalTargetInputTouched = { weekly: false, monthly: false, yearly: false };
@@ -893,6 +902,17 @@ if (yearSingleGoalSelect) {
     yearSingleGoalSelectedId = String(yearSingleGoalSelect.value || "");
     yearSingleGoalStatusMessage = "";
     renderYearSingleGoalSection(getStandardEntryTrackers());
+  });
+}
+
+if (yearSingleGoalBody) {
+  yearSingleGoalBody.addEventListener("change", (event) => {
+    const stateInput = event.target.closest("select[data-field='state']");
+    if (!stateInput) {
+      return;
+    }
+    const row = stateInput.closest("tr[data-date]");
+    syncYearSingleGoalRowControlState(row);
   });
 }
 
@@ -1326,12 +1346,12 @@ goalForm.addEventListener("submit", (event) => {
   }
   const goalsPlus = buildGoalsPlusConfigFromForm();
   const selectedGoalType = normalizeGoalType(goalType ? goalType.value : "quantity");
-  const normalizedGoalType = goalsPlus.mode === GOALS_PLUS_SETUP_RUNNING ? "quantity" : selectedGoalType;
+  const normalizedGoalType = goalsPlus.mode !== GOALS_PLUS_SETUP_STANDARD ? "quantity" : selectedGoalType;
   if (normalizedGoalType === "bucket" && !isBucketListEnabled()) {
     return;
   }
   const goalsPlusNameOption = getGoalsPlusNameOption(goalNameGoalsPlus ? goalNameGoalsPlus.value : GOALS_PLUS_NAME_OPTIONS[0].value);
-  const name = goalsPlus.mode === GOALS_PLUS_SETUP_RUNNING
+  const name = goalsPlus.mode !== GOALS_PLUS_SETUP_STANDARD
     ? goalsPlusNameOption.label
     : goalName.value.trim();
   const lockedUnit = getLockedUnitForGoalType(normalizedGoalType);
@@ -1928,8 +1948,15 @@ entryForm.addEventListener("submit", (event) => {
   }
   const metricValues = markNotApplicable ? {} : collectEntryMetricValuesFromForm(tracker);
   const goalsPlusEntryData = markNotApplicable ? null : collectGoalsPlusEntryDataFromForm(tracker);
-  if (!markNotApplicable && goalsPlusEntryData && goalsPlusEntryData.distance > 0) {
+  if (!markNotApplicable && goalsPlusEntryData && goalsPlusEntryData.mode === GOALS_PLUS_SETUP_GOLF && goalsPlusEntryData.score <= 0) {
+    alert("Enter a golf score greater than 0 for Goals+ golf entries.");
+    return;
+  }
+  if (!markNotApplicable && goalsPlusEntryData && goalsPlusEntryData.mode === GOALS_PLUS_SETUP_RUNNING && goalsPlusEntryData.distance > 0) {
     amount = goalsPlusEntryData.distance;
+  }
+  if (!markNotApplicable && goalsPlusEntryData && goalsPlusEntryData.mode === GOALS_PLUS_SETUP_GOLF && goalsPlusEntryData.score > 0) {
+    amount = goalsPlusEntryData.score;
   }
 
   entries.unshift({
@@ -1976,6 +2003,9 @@ entryForm.addEventListener("submit", (event) => {
   }
   if (entryGoalsPlusCustomWeight) {
     entryGoalsPlusCustomWeight.value = "";
+  }
+  if (entryGoalsPlusGolfScore) {
+    entryGoalsPlusGolfScore.value = "";
   }
   updateEntryGoalsPlusDerivedLabel();
   entryNotes.value = "";
@@ -2116,7 +2146,7 @@ if (yearUpdateAllForm) {
       entry.notApplicable = isEntryNotApplicable(entry) && amountValue <= 0;
       entry.notes = String(notesInput ? notesInput.value : "").trim();
       entry.metricValues = filterEntryMetricValuesByTracker(entry.metricValues, tracker);
-      entry.goalsPlus = isGoalsPlusRunningTracker(tracker) ? normalizeGoalsPlusEntryData(entry) : null;
+      entry.goalsPlus = isGoalsPlusTracker(tracker) ? normalizeGoalsPlusEntryData(entry) : null;
       changedCount += 1;
     });
     if (invalidRows.length > 0) {
@@ -2140,41 +2170,162 @@ if (yearSingleGoalForm) {
     if (!tracker) {
       return;
     }
-    const rows = Array.from(yearSingleGoalBody ? yearSingleGoalBody.querySelectorAll("tr[data-entry-id]") : []);
-    if (rows.length < 1) {
+    const yearToDateRange = getYearToDateRangeForAnchor(yearEntryAnchor);
+    const validDateKeys = new Set(getDateKeysForRange(yearToDateRange));
+    const rows = Array.from(yearSingleGoalBody ? yearSingleGoalBody.querySelectorAll("tr[data-date]") : []);
+    if (rows.length < 1 || validDateKeys.size < 1) {
       return;
     }
-    const invalidRows = [];
-    let changedCount = 0;
-    rows.forEach((row) => {
-      const entryId = String(row.dataset.entryId || "");
-      const entry = entries.find((item) => item.id === entryId);
-      if (!entry || entry.trackerId !== selectedGoalId) {
+
+    const existingEntriesByDate = new Map();
+    entries.forEach((entry) => {
+      if (!entry || entry.trackerId !== selectedGoalId || !validDateKeys.has(entry.date)) {
         return;
       }
-      const dateInput = row.querySelector("input[data-field='date']");
-      const amountInput = row.querySelector("input[data-field='amount']");
-      const notesInput = row.querySelector("textarea[data-field='notes']");
-      const dateValue = String(dateInput ? dateInput.value : "");
-      const amountValue = normalizePositiveAmount(amountInput ? amountInput.value : "", -1);
-      if (!isDateKey(dateValue) || amountValue < 0) {
-        invalidRows.push(entryId);
-        return;
+      if (!existingEntriesByDate.has(entry.date)) {
+        existingEntriesByDate.set(entry.date, []);
       }
-      entry.date = dateValue;
-      entry.amount = amountValue;
-      entry.notApplicable = isEntryNotApplicable(entry) && amountValue <= 0;
-      entry.notes = String(notesInput ? notesInput.value : "").trim();
-      entry.metricValues = filterEntryMetricValuesByTracker(entry.metricValues, tracker);
-      entry.goalsPlus = isGoalsPlusRunningTracker(tracker) ? normalizeGoalsPlusEntryData(entry) : null;
-      changedCount += 1;
+      existingEntriesByDate.get(entry.date).push(entry);
     });
+    existingEntriesByDate.forEach((entryList) => {
+      entryList.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    });
+
+    const invalidRows = [];
+    const updatePlans = [];
+
+    rows.forEach((row) => {
+      const dateValue = String(row.dataset.date || "");
+      if (!validDateKeys.has(dateValue) || !isDateKey(dateValue)) {
+        invalidRows.push(dateValue || "Unknown date");
+        return;
+      }
+      const stateInput = row.querySelector("select[data-field='state']");
+      const amountInput = row.querySelector("[data-field='amount']");
+      const notesInput = row.querySelector("textarea[data-field='notes']");
+      const stateValue = String(stateInput ? stateInput.value : "none");
+      const existingEntries = existingEntriesByDate.get(dateValue) || [];
+      const primaryEntry = existingEntries[0] || null;
+      const duplicateEntries = existingEntries.slice(1);
+
+      if (!["none", "value", "na"].includes(stateValue)) {
+        invalidRows.push(formatDate(parseDateKey(dateValue)));
+        return;
+      }
+
+      if (stateValue === "none") {
+        updatePlans.push({
+          dateValue,
+          stateValue,
+          amountValue: 0,
+          notesValue: "",
+          primaryEntryId: primaryEntry ? primaryEntry.id : "",
+          existingEntryIds: existingEntries.map((entry) => entry.id),
+          duplicateEntryIds: duplicateEntries.map((entry) => entry.id)
+        });
+        return;
+      }
+
+      let amountValue = 0;
+      if (stateValue === "value") {
+        if (isBinaryGoalType(tracker.goalType)) {
+          const binaryValue = String(amountInput ? amountInput.value : "").toLowerCase();
+          if (binaryValue === "yes") {
+            amountValue = 1;
+          } else if (binaryValue === "no") {
+            amountValue = 0;
+          } else {
+            invalidRows.push(formatDate(parseDateKey(dateValue)));
+            return;
+          }
+        } else {
+          amountValue = normalizePositiveAmount(amountInput ? amountInput.value : "", -1);
+          if (amountValue < 0) {
+            invalidRows.push(formatDate(parseDateKey(dateValue)));
+            return;
+          }
+        }
+      }
+
+      const notesValue = String(notesInput ? notesInput.value : "").trim();
+      updatePlans.push({
+        dateValue,
+        stateValue,
+        amountValue,
+        notesValue,
+        primaryEntryId: primaryEntry ? primaryEntry.id : "",
+        existingEntryIds: existingEntries.map((entry) => entry.id),
+        duplicateEntryIds: duplicateEntries.map((entry) => entry.id)
+      });
+    });
+
     if (invalidRows.length > 0) {
-      alert(`Fix invalid values in ${invalidRows.length} row${invalidRows.length === 1 ? "" : "s"} before saving.`);
+      const sampleRows = invalidRows.slice(0, 4).join(", ");
+      alert(`Fix invalid values in ${invalidRows.length} row${invalidRows.length === 1 ? "" : "s"} before saving: ${sampleRows}${invalidRows.length > 4 ? "..." : ""}`);
       return;
     }
+
+    const entryById = new Map(entries.map((entry) => [entry.id, entry]));
+    const entryIdsToRemove = new Set();
+    let valueCount = 0;
+    let notApplicableCount = 0;
+    let clearedCount = 0;
+    let insertedCount = 0;
+
+    updatePlans.forEach((plan) => {
+      if (plan.stateValue === "none") {
+        if (plan.existingEntryIds.length > 0) {
+          plan.existingEntryIds.forEach((entryId) => {
+            entryIdsToRemove.add(entryId);
+          });
+          clearedCount += 1;
+        }
+        return;
+      }
+
+      const markNotApplicable = plan.stateValue === "na";
+      const primaryEntry = plan.primaryEntryId ? entryById.get(plan.primaryEntryId) : null;
+      if (primaryEntry) {
+        primaryEntry.amount = markNotApplicable ? 0 : plan.amountValue;
+        primaryEntry.notApplicable = markNotApplicable;
+        primaryEntry.notes = plan.notesValue;
+        primaryEntry.metricValues = markNotApplicable ? {} : filterEntryMetricValuesByTracker(primaryEntry.metricValues, tracker);
+        primaryEntry.goalsPlus = markNotApplicable ? null : (isGoalsPlusTracker(tracker) ? normalizeGoalsPlusEntryData(primaryEntry) : null);
+        plan.duplicateEntryIds.forEach((entryId) => {
+          entryIdsToRemove.add(entryId);
+        });
+      } else {
+        const nextEntry = {
+          id: createId(),
+          trackerId: selectedGoalId,
+          date: plan.dateValue,
+          amount: markNotApplicable ? 0 : plan.amountValue,
+          notApplicable: markNotApplicable,
+          goalsPlus: null,
+          metricValues: {},
+          notes: plan.notesValue,
+          createdAt: new Date().toISOString()
+        };
+        entries.unshift(nextEntry);
+        entryById.set(nextEntry.id, nextEntry);
+        insertedCount += 1;
+      }
+
+      if (markNotApplicable) {
+        notApplicableCount += 1;
+      } else {
+        valueCount += 1;
+        notifyAccountabilityPartnerEntryUpdate(tracker, plan.amountValue, plan.dateValue);
+      }
+    });
+
+    if (entryIdsToRemove.size > 0) {
+      entries = entries.filter((entry) => !entryIdsToRemove.has(entry.id));
+    }
+
     saveEntries();
-    yearSingleGoalStatusMessage = `Saved ${changedCount} entr${changedCount === 1 ? "y" : "ies"} for ${tracker.name} in ${yearEntryAnchor.getFullYear()}.`;
+    const updatedDayCount = valueCount + notApplicableCount + clearedCount;
+    yearSingleGoalStatusMessage = `Saved ${updatedDayCount} day${updatedDayCount === 1 ? "" : "s"} for ${tracker.name} in ${yearEntryAnchor.getFullYear()} (${valueCount} value, ${notApplicableCount} N/A, ${clearedCount} no entry, ${insertedCount} new).`;
     renderEntryTab();
   });
 }
@@ -2313,7 +2464,7 @@ entryListAll.addEventListener("submit", (event) => {
   entry.date = date;
   entry.amount = amount;
   entry.notApplicable = isEntryNotApplicable(entry) && amount <= 0;
-  entry.goalsPlus = isGoalsPlusRunningTracker(tracker) ? normalizeGoalsPlusEntryData(entry) : null;
+  entry.goalsPlus = isGoalsPlusTracker(tracker) ? normalizeGoalsPlusEntryData(entry) : null;
   entry.metricValues = filterEntryMetricValuesByTracker(entry.metricValues, tracker);
   entry.notes = notes;
 
@@ -2428,6 +2579,26 @@ if (csvUploadForm) {
   });
 }
 
+if (csvExportButton) {
+  csvExportButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    const result = exportEntriesToCsv();
+    if (result.error) {
+      if (csvUploadStatus) {
+        csvUploadStatus.textContent = result.error;
+      }
+      return;
+    }
+    const blob = new Blob([result.csvText], { type: "text/csv;charset=utf-8" });
+    triggerBlobDownload(blob, result.filename);
+    if (csvUploadStatus) {
+      csvUploadStatus.textContent = result.message;
+    }
+  });
+}
+
 if (goalJournalForm) {
   goalJournalForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -2459,7 +2630,7 @@ if (goalJournalForm) {
       goalJournalDate.value = getDateKey(normalizeDate(new Date()));
     }
     if (goalJournalTitle) {
-      goalJournalTitle.value = "";
+      goalJournalTitle.value = GOAL_JOURNAL_SUBJECT_DEFAULT;
     }
     if (goalJournalContent) {
       goalJournalContent.value = "";
@@ -2484,6 +2655,38 @@ if (goalJournalList) {
     goalJournalEntries = goalJournalEntries.filter((item) => item.id !== journalId);
     saveGoalJournalEntries();
     renderGoalJournalTab();
+  });
+}
+
+if (missedEntriesList) {
+  missedEntriesList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const periodButton = event.target.closest("button[data-action='open-period-entry-list']");
+    if (!periodButton) {
+      return;
+    }
+    const periodName = normalizePeriodMode(periodButton.dataset.period);
+    const startKey = String(periodButton.dataset.start || "");
+    const endKey = String(periodButton.dataset.end || "");
+    if (!isDateKey(startKey) || !isDateKey(endKey)) {
+      return;
+    }
+    openEntryListForRange(periodName, {
+      start: parseDateKey(startKey),
+      end: parseDateKey(endKey)
+    });
+  });
+}
+
+if (entryListFocusClearButton) {
+  entryListFocusClearButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    clearEntryListFocusRange();
+    renderEntryListTab();
   });
 }
 
@@ -3301,6 +3504,7 @@ function handleGraphCardActions(event) {
   graphModalState.trackerId = id;
   graphModalState.avgMode = normalizeAverageMode(period);
   graphModalState.historyMetric = "avg";
+  graphModalState.historyScope = "period";
   graphModalState.historyGraphType = "bar";
   renderPeriodTabs();
 }
@@ -3311,6 +3515,7 @@ function closeGraphModal() {
   graphModalState.trackerId = "";
   graphModalState.avgMode = "week";
   graphModalState.historyMetric = "avg";
+  graphModalState.historyScope = "period";
   graphModalState.historyGraphType = "bar";
   if (graphModal) {
     graphModal.classList.add("hidden");
@@ -3393,6 +3598,7 @@ function renderGraphModal() {
     index,
     normalizeAverageMode(graphModalState.avgMode || graphModalState.period),
     normalizeHistoryMetric(graphModalState.historyMetric),
+    normalizeHistoryScope(graphModalState.historyScope),
     normalizeHistoryGraphType(graphModalState.historyGraphType)
   );
   graphModalBody.innerHTML += createExpandedTargetStatusMarkup(tracker, index, normalizeDate(new Date()));
@@ -3511,7 +3717,7 @@ function getTrackerPeriodStatus(tracker, periodName, index, now) {
   };
 }
 
-function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric, historyGraphType) {
+function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index, averageMode, historyMetric, historyScope, historyGraphType) {
   const unit = normalizeGoalUnit(tracker.unit);
   const focusDate = normalizeDate(range && range.start ? range.start : new Date());
   const focusDateKey = getDateKey(focusDate);
@@ -3530,10 +3736,11 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
 
   const selectedMode = normalizePeriodMode(averageMode || periodName);
   const selectedMetric = normalizeHistoryMetric(historyMetric);
+  const selectedScope = normalizeHistoryScope(historyScope);
   const selectedGraphType = normalizeHistoryGraphType(historyGraphType);
   const lookbackCount = getHistoryLookbackCount(selectedMetric);
   const averageRange = getCurrentRangeForMode(selectedMode, focusDate);
-  const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric);
+  const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric, selectedScope);
   const maxMetricValue = Math.max(...history.map((item) => item.value), 1);
   const barsMarkup = history.map((item) => {
     const normalizedHeight = maxMetricValue > 0 ? Math.round((item.value / maxMetricValue) * 100) : 0;
@@ -3563,9 +3770,12 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const selectedMonthLabel = getPeriodRecordLabel("month", getMonthRange(focusDate));
   const selectedYearLabel = getPeriodRecordLabel("year", getYearRange(focusDate));
   const modeLabel = selectedMode === "month" ? "Months" : selectedMode === "year" ? "Years" : "Weeks";
+  const metricLabel = selectedMetric === "total" ? "Sum" : "Average/day";
+  const scopeLabel = selectedScope === "total" ? "Total" : "Period";
+  const disableScopeControl = selectedMetric === "hit";
   const historyTitle = selectedMetric === "hit"
     ? `Goal Hit vs last ${lookbackCount} ${modeLabel.toLowerCase()}`
-    : `${selectedMetric === "total" ? "Total" : "Average/day"} vs last ${lookbackCount} periods`;
+    : `${metricLabel} (${scopeLabel}) vs last ${lookbackCount} periods`;
   const unitSuffix = selectedMetric === "hit" ? "" : ` (${escapeHtml(unit)})`;
   const viewMarkup = selectedGraphType === "line"
     ? `<div class="avg-line-wrap">${lineMarkup}</div>`
@@ -3612,8 +3822,15 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
               Metric
               <select data-action="set-history-metric-select" class="avg-control-select">
                 <option value="avg" ${selectedMetric === "avg" ? "selected" : ""}>Average</option>
-                <option value="total" ${selectedMetric === "total" ? "selected" : ""}>Total</option>
+                <option value="total" ${selectedMetric === "total" ? "selected" : ""}>Sum</option>
                 <option value="hit" ${selectedMetric === "hit" ? "selected" : ""}>Goal Hit</option>
+              </select>
+            </label>
+            <label class="avg-control-label">
+              Scope
+              <select data-action="set-history-scope-select" class="avg-control-select" ${disableScopeControl ? "disabled" : ""}>
+                <option value="period" ${selectedScope === "period" ? "selected" : ""}>Period</option>
+                <option value="total" ${selectedScope === "total" ? "selected" : ""}>Total</option>
               </select>
             </label>
             <label class="avg-control-label">
@@ -3654,6 +3871,13 @@ function normalizeHistoryMetric(value) {
     return "hit";
   }
   return "avg";
+}
+
+function normalizeHistoryScope(value) {
+  if (value === "total") {
+    return "total";
+  }
+  return "period";
 }
 
 function normalizeHistoryGraphType(value) {
@@ -3840,8 +4064,9 @@ function formatCurrentPeriodText(total, unit, label) {
   return `${formatAmountWithUnit(total, unit)} | ${label}`;
 }
 
-function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg") {
+function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, metricType = "avg", scopeType = "period") {
   const selectedMetric = normalizeHistoryMetric(metricType);
+  const selectedScope = normalizeHistoryScope(scopeType);
   const lookbackCount = getHistoryLookbackCount(selectedMetric);
   const history = [];
   const firstEntryDate = getTrackerFirstEntryDate(tracker.id);
@@ -3852,8 +4077,11 @@ function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, me
         break;
       }
     }
-    const total = sumTrackerRange(index, tracker.id, compareRange);
-    const days = getRangeDays(compareRange);
+    const valueRange = selectedScope === "total" && selectedMetric !== "hit" && firstEntryDate
+      ? { start: firstEntryDate, end: compareRange.end }
+      : compareRange;
+    const total = sumTrackerRange(index, tracker.id, valueRange);
+    const days = getRangeDays(valueRange);
     let value = 0;
     if (selectedMetric === "total") {
       value = total;
@@ -3867,7 +4095,7 @@ function getAverageHistoryForPeriod(tracker, periodName, currentRange, index, me
       offset,
       value,
       label: getAverageBarLabel(periodName, offset),
-      rangeLabel: `${formatDate(compareRange.start)} to ${formatDate(compareRange.end)}`
+      rangeLabel: `${formatDate(valueRange.start)} to ${formatDate(valueRange.end)}`
     });
   }
   return history;
@@ -3927,6 +4155,13 @@ function handleViewControlChange(event) {
   const historyMetricSelect = event.target.closest("select[data-action='set-history-metric-select']");
   if (historyMetricSelect) {
     graphModalState.historyMetric = normalizeHistoryMetric(historyMetricSelect.value);
+    renderGraphModal();
+    return;
+  }
+
+  const historyScopeSelect = event.target.closest("select[data-action='set-history-scope-select']");
+  if (historyScopeSelect) {
+    graphModalState.historyScope = normalizeHistoryScope(historyScopeSelect.value);
     renderGraphModal();
     return;
   }
@@ -4399,26 +4634,232 @@ function renderMissedEntriesTab() {
     return;
   }
 
-  const missedItems = getMissedEntryItems(normalizeDate(new Date()));
-  if (missedItems.length < 1) {
+  const now = normalizeDate(new Date());
+  const missedItems = getMissingEntryDateItems(now);
+  const unclosedPeriodItems = getUnclosedPeriodItems(now);
+  if (missedItems.length < 1 && unclosedPeriodItems.length < 1) {
     missedEntriesList.innerHTML = "";
-    missedEntriesEmpty.textContent = "No missed entries right now.";
+    missedEntriesEmpty.textContent = "No missing entries or unclosed periods right now.";
     missedEntriesEmpty.style.display = "block";
     return;
   }
 
   missedEntriesEmpty.style.display = "none";
-  missedEntriesList.innerHTML = missedItems
-    .map((item, index) => `
-      <li class="quick-item" style="--stagger:${index}">
+  let rowIndex = 0;
+  const sections = [];
+  if (missedItems.length > 0) {
+    sections.push(`
+      <li class="quick-item" style="--stagger:${rowIndex}">
         <div>
-          <strong>${escapeHtml(item.tracker.name)}</strong>
-          <p class="muted small">${item.latestDateKey ? `Last entry ${formatDate(parseDateKey(item.latestDateKey))}` : "No entries yet"}</p>
+          <strong>Missing Entry Dates</strong>
+          <p class="muted small">Dates where one or more active goals have no entry.</p>
         </div>
-        <span class="pace-chip pace-off">${item.daysWithout}d</span>
+        <span class="pace-chip">${missedItems.length}</span>
       </li>
-    `)
-    .join("");
+    `);
+    rowIndex += 1;
+    missedItems.forEach((item) => {
+      sections.push(`
+        <li class="quick-item" style="--stagger:${rowIndex}">
+          <div>
+            <strong>${escapeHtml(formatDate(parseDateKey(item.dateKey)))}</strong>
+            <p class="muted small">${escapeHtml(getMissingEntryDateSummaryText(item.missingGoalNames))}</p>
+          </div>
+          <span class="pace-chip pace-off">${item.missingGoalNames.length}</span>
+        </li>
+      `);
+      rowIndex += 1;
+    });
+  }
+
+  if (unclosedPeriodItems.length > 0) {
+    sections.push(`
+      <li class="quick-item" style="--stagger:${rowIndex}">
+        <div>
+          <strong>Unclosed Periods</strong>
+          <p class="muted small">Past periods missing a close-out snapshot.</p>
+        </div>
+        <span class="pace-chip">${unclosedPeriodItems.length}</span>
+      </li>
+    `);
+    rowIndex += 1;
+    unclosedPeriodItems.forEach((item) => {
+      sections.push(`
+        <li class="quick-item" style="--stagger:${rowIndex}">
+          <div>
+            <strong>${escapeHtml(`Unclosed ${item.periodLabel}`)}</strong>
+            <p class="muted small">${escapeHtml(item.rangeLabel)}</p>
+          </div>
+          <button
+            class="btn btn-nav-compact"
+            type="button"
+            data-action="open-period-entry-list"
+            data-period="${item.periodName}"
+            data-start="${item.startKey}"
+            data-end="${item.endKey}"
+          >
+            Review Entries
+          </button>
+        </li>
+      `);
+      rowIndex += 1;
+    });
+  }
+
+  missedEntriesList.innerHTML = sections.join("");
+}
+
+function getMissingEntryDateItems(now = new Date()) {
+  const today = normalizeDate(now);
+  const todayKey = getDateKey(today);
+  const todayDay = dateKeyToDayNumber(todayKey);
+  const activeGoals = trackers
+    .filter((tracker) => tracker && !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket");
+  if (activeGoals.length < 1) {
+    return [];
+  }
+
+  const activeGoalIds = new Set(activeGoals.map((tracker) => tracker.id));
+  const goalStartDayMap = new Map(activeGoals.map((tracker) => [tracker.id, todayDay]));
+  const entryTrackerMapByDate = new Map();
+
+  entries.forEach((entry) => {
+    if (!entry || !activeGoalIds.has(entry.trackerId) || !isDateKey(entry.date) || entry.date > todayKey) {
+      return;
+    }
+    const dayNumber = dateKeyToDayNumber(entry.date);
+    const currentStartDay = goalStartDayMap.get(entry.trackerId);
+    if (typeof currentStartDay !== "number" || dayNumber < currentStartDay) {
+      goalStartDayMap.set(entry.trackerId, dayNumber);
+    }
+    if (!entryTrackerMapByDate.has(entry.date)) {
+      entryTrackerMapByDate.set(entry.date, new Set());
+    }
+    entryTrackerMapByDate.get(entry.date).add(entry.trackerId);
+  });
+
+  const firstDay = activeGoals.reduce((minimum, tracker) => {
+    const startDay = goalStartDayMap.get(tracker.id);
+    if (typeof startDay !== "number") {
+      return minimum;
+    }
+    return Math.min(minimum, startDay);
+  }, todayDay);
+  const missingByDate = [];
+  for (let dayNumber = firstDay; dayNumber <= todayDay; dayNumber += 1) {
+    const dateKey = dayNumberToDateKey(dayNumber);
+    const trackerSet = entryTrackerMapByDate.get(dateKey) || new Set();
+    const missingGoalNames = activeGoals
+      .filter((tracker) => {
+        const startDay = goalStartDayMap.get(tracker.id);
+        if (typeof startDay === "number" && dayNumber < startDay) {
+          return false;
+        }
+        return !trackerSet.has(tracker.id);
+      })
+      .map((tracker) => tracker.name);
+    if (missingGoalNames.length < 1) {
+      continue;
+    }
+    missingByDate.push({
+      dateKey,
+      missingGoalNames
+    });
+  }
+
+  missingByDate.sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  return missingByDate;
+}
+
+function getMissingEntryDateSummaryText(goalNames) {
+  const names = Array.isArray(goalNames) ? goalNames.filter(Boolean) : [];
+  if (names.length < 1) {
+    return "No goals missing.";
+  }
+  if (names.length <= 4) {
+    return names.join(", ");
+  }
+  return `${names.slice(0, 4).join(", ")} +${names.length - 4} more`;
+}
+
+function getUnclosedPeriodItems(now = new Date()) {
+  const today = normalizeDate(now);
+  const periodNames = isQuartersEnabled()
+    ? ["week", "month", "quarter", "year"]
+    : ["week", "month", "year"];
+  const earliestDate = getEarliestTrackableEntryDate(today);
+  const closedSnapshotKeys = new Set(
+    periodSnapshots
+      .filter((snapshot) => snapshot && isDateKey(snapshot.rangeStart) && isDateKey(snapshot.rangeEnd))
+      .map((snapshot) => `${normalizePeriodMode(snapshot.period)}|${snapshot.rangeStart}|${snapshot.rangeEnd}`)
+  );
+
+  const items = [];
+  periodNames.forEach((periodName) => {
+    let range = getCurrentRangeForMode(periodName, earliestDate);
+    while (range.end < today) {
+      const startKey = getDateKey(range.start);
+      const endKey = getDateKey(range.end);
+      const snapshotKey = `${periodName}|${startKey}|${endKey}`;
+      if (!closedSnapshotKeys.has(snapshotKey)) {
+        items.push({
+          periodName,
+          periodLabel: getSnapshotPeriodTitle(periodName),
+          startKey,
+          endKey,
+          rangeLabel: `${formatDate(range.start)} to ${formatDate(range.end)}`
+        });
+      }
+      range = getNextPeriodRange(periodName, range);
+    }
+  });
+
+  items.sort((a, b) => {
+    const endCompare = b.endKey.localeCompare(a.endKey);
+    if (endCompare !== 0) {
+      return endCompare;
+    }
+    return a.periodName.localeCompare(b.periodName);
+  });
+  return items.slice(0, 24);
+}
+
+function getEarliestTrackableEntryDate(fallbackDate = new Date()) {
+  const trackerTypeById = new Map(trackers.map((tracker) => [tracker.id, normalizeGoalType(tracker.goalType)]));
+  const datedEntries = entries
+    .filter((entry) => {
+      if (!entry || !isDateKey(entry.date)) {
+        return false;
+      }
+      const trackerType = trackerTypeById.get(entry.trackerId) || "";
+      return trackerType !== "bucket";
+    })
+    .map((entry) => parseDateKey(entry.date));
+  if (datedEntries.length < 1) {
+    return normalizeDate(fallbackDate);
+  }
+  datedEntries.sort((a, b) => a - b);
+  return normalizeDate(datedEntries[0]);
+}
+
+function getNextPeriodRange(periodName, range) {
+  if (periodName === "week") {
+    const start = addDays(range.start, 7);
+    return { start, end: addDays(start, 6) };
+  }
+  if (periodName === "month") {
+    const start = new Date(range.start.getFullYear(), range.start.getMonth() + 1, 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    return { start, end };
+  }
+  if (periodName === "quarter") {
+    const start = new Date(range.start.getFullYear(), range.start.getMonth() + 3, 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + 3, 0);
+    return { start, end };
+  }
+  const start = new Date(range.start.getFullYear() + 1, 0, 1);
+  const end = new Date(start.getFullYear(), 11, 31);
+  return { start, end };
 }
 
 function openOnboardingModal() {
@@ -4544,11 +4985,11 @@ function renderGoalsPlusTab() {
     return;
   }
 
-  const runningTrackers = trackers
-    .filter((tracker) => !tracker.archived && isGoalsPlusRunningTracker(tracker))
+  const goalsPlusTrackers = trackers
+    .filter((tracker) => !tracker.archived && isGoalsPlusTracker(tracker))
     .sort(compareTrackersByPriority);
 
-  if (runningTrackers.length < 1) {
+  if (goalsPlusTrackers.length < 1) {
     goalsPlusSummary.innerHTML = "";
     goalsPlusList.innerHTML = "";
     goalsPlusEmpty.style.display = "block";
@@ -4556,39 +4997,45 @@ function renderGoalsPlusTab() {
     return;
   }
 
-  const cards = runningTrackers.map((tracker) => {
+  const cards = goalsPlusTrackers.map((tracker) => {
     const config = getGoalsPlusRunningConfig(tracker);
     const entryItems = getGoalsPlusEntriesForTracker(tracker);
-    const stats = getGoalsPlusRunningStatsForEntries(entryItems);
+    const running = isGoalsPlusRunningTracker(tracker);
+    const stats = running
+      ? getGoalsPlusRunningStatsForEntries(entryItems)
+      : getGoalsPlusGolfStatsForEntries(entryItems);
     return {
       tracker,
       config,
-      stats
+      stats,
+      running
     };
   });
 
+  const runningCards = cards.filter((item) => item.running);
+  const golfCards = cards.filter((item) => !item.running);
   const totalEntries = cards.reduce((sum, item) => sum + item.stats.count, 0);
-  const totalMeasuredEntries = cards.reduce((sum, item) => sum + item.stats.measurableCount, 0);
-  const totalDistance = cards.reduce((sum, item) => addAmount(sum, item.stats.totalDistance), 0);
-  const weightedVo2 = cards.reduce((sum, item) => addAmount(sum, item.stats.avgVo2 * item.stats.measurableCount), 0);
-  const avgVo2 = totalMeasuredEntries > 0 ? Math.round((weightedVo2 / totalMeasuredEntries) * 10) / 10 : 0;
+  const totalDistance = runningCards.reduce((sum, item) => addAmount(sum, item.stats.totalDistance), 0);
+  const totalGolfScores = golfCards.reduce((sum, item) => sum + item.stats.scoredCount, 0);
+  const weightedGolfAverage = golfCards.reduce((sum, item) => addAmount(sum, item.stats.avgScore * item.stats.scoredCount), 0);
+  const avgGolfScore = totalGolfScores > 0 ? Math.round((weightedGolfAverage / totalGolfScores) * 10) / 10 : 0;
 
   goalsPlusSummary.innerHTML = `
     <article class="summary-card">
-      <p>Goals+ Running Goals</p>
+      <p>Goals+ Goals</p>
       <strong>${cards.length}</strong>
     </article>
     <article class="summary-card">
-      <p>Logged Runs</p>
+      <p>Logged Entries</p>
       <strong>${totalEntries}</strong>
     </article>
     <article class="summary-card">
-      <p>Total Distance</p>
-      <strong>${formatAmount(totalDistance)} mi</strong>
+      <p>Running Distance</p>
+      <strong>${runningCards.length > 0 ? `${formatAmount(totalDistance)} mi` : "n/a"}</strong>
     </article>
     <article class="summary-card">
-      <p>Average VO2</p>
-      <strong>${totalEntries > 0 ? formatAmount(avgVo2) : "n/a"}</strong>
+      <p>Golf Avg Score</p>
+      <strong>${totalGolfScores > 0 ? formatAmount(avgGolfScore) : "n/a"}</strong>
     </article>
   `;
 
@@ -4598,17 +5045,28 @@ function renderGoalsPlusTab() {
       const tracker = item.tracker;
       const config = item.config;
       const stats = item.stats;
-      const defaultsLine = config.runningWorkout === "norwegian4x4"
-        ? `Default workout: ${formatRunningWorkout(config.runningWorkout)} (${formatAmount(config.workSpeed)} mph/${formatAmount(config.recoverySpeed)} mph)`
-        : `Default workout: ${formatRunningWorkout(config.runningWorkout)}`;
-      const workoutMix = formatRunningWorkoutMix(stats.topWorkouts.slice(0, 4));
-      const detailText = stats.count > 0
-        ? `Entries ${stats.count} | Workout mix ${workoutMix} | ${
-          stats.measurableCount > 0
-            ? `Measured ${stats.measurableCount} | Total ${formatAmount(stats.totalDistance)} mi | Time ${formatAmount(stats.totalDurationMinutes)} min | Avg pace ${formatPaceFromMinutes(stats.avgPace)} | Best pace ${formatPaceFromMinutes(stats.bestPace)} | Avg VO2 ${formatAmount(stats.avgVo2)}`
-            : "No distance/time measurements yet."
-        }`
-        : "No workout entries yet.";
+      const running = item.running;
+      const defaultsLine = running
+        ? (config.runningWorkout === "norwegian4x4"
+          ? `Default workout: ${formatRunningWorkout(config.runningWorkout)} (${formatAmount(config.workSpeed)} mph/${formatAmount(config.recoverySpeed)} mph)`
+          : `Default workout: ${formatRunningWorkout(config.runningWorkout)}`)
+        : `Default mode: ${formatGoalsPlusGolfType(config.golfType)}`;
+      const workoutMix = running ? formatRunningWorkoutMix(stats.topWorkouts.slice(0, 4)) : "";
+      const detailText = running
+        ? (stats.count > 0
+          ? `Entries ${stats.count} | Workout mix ${workoutMix} | ${
+            stats.measurableCount > 0
+              ? `Measured ${stats.measurableCount} | Total ${formatAmount(stats.totalDistance)} mi | Time ${formatAmount(stats.totalDurationMinutes)} min | Avg pace ${formatPaceFromMinutes(stats.avgPace)} | Best pace ${formatPaceFromMinutes(stats.bestPace)} | Avg VO2 ${formatAmount(stats.avgVo2)}`
+              : "No distance/time measurements yet."
+          }`
+          : "No workout entries yet.")
+        : (stats.count > 0
+          ? `Entries ${stats.count} | ${
+            stats.scoredCount > 0
+              ? `Scored rounds ${stats.scoredCount} | Avg score ${formatAmount(stats.avgScore)} | Best score ${formatAmount(stats.bestScore)}`
+              : "No score data yet."
+          }`
+          : "No golf entries yet.");
       return `
         <li class="metric-card" style="--stagger:${index}">
           <div class="metric-top">
@@ -4628,13 +5086,23 @@ function renderGoalsPlusTab() {
           </div>
           <p class="metric-line">${escapeHtml(defaultsLine)}</p>
           <p class="metric-line">${escapeHtml(
-            stats.count > 0
-              ? `Workout mix ${workoutMix} | ${
-                stats.measurableCount > 0
-                  ? `Avg pace ${formatPaceFromMinutes(stats.avgPace)} | Avg VO2 ${formatAmount(stats.avgVo2)}`
-                  : "Add distance and time to unlock pace and VO2."
-              }`
-              : "Add running entries to start exercise tracking."
+            running
+              ? (
+                stats.count > 0
+                  ? `Workout mix ${workoutMix} | ${
+                    stats.measurableCount > 0
+                      ? `Avg pace ${formatPaceFromMinutes(stats.avgPace)} | Avg VO2 ${formatAmount(stats.avgVo2)}`
+                      : "Add distance and time to unlock pace and VO2."
+                  }`
+                  : "Add running entries to start exercise tracking."
+              )
+              : (
+                stats.count > 0
+                  ? (stats.scoredCount > 0
+                    ? `Rounds scored ${formatAmount(stats.scoredCount)} | Avg score ${formatAmount(stats.avgScore)} | Best score ${formatAmount(stats.bestScore)}`
+                    : "Add score values to start golf tracking.")
+                  : "Add golf entries to start score tracking."
+              )
           )}</p>
         </li>
       `;
@@ -4999,7 +5467,7 @@ function renderSoloEntrySection(standardTrackers) {
   entryTracker.innerHTML = standardTrackers
     .map((tracker) => {
       const trackerType = normalizeGoalType(tracker.goalType);
-      const goalsPlusSuffix = isGoalsPlusRunningTracker(tracker) ? " | Goals+" : "";
+      const goalsPlusSuffix = isGoalsPlusTracker(tracker) ? " | Goals+" : "";
       const suffix = trackerType === "floating"
         ? `${escapeHtml(tracker.unit || "items")} | Floating${goalsPlusSuffix}`
         : isBinaryGoalType(trackerType)
@@ -5109,7 +5577,7 @@ function renderWeekEntrySection(standardTrackers) {
         : type === "yesno"
         ? "Yes/No"
         : "Quantity";
-      const setupSuffix = isGoalsPlusRunningTracker(tracker) ? " | Goals+" : "";
+      const setupSuffix = isGoalsPlusTracker(tracker) ? " | Goals+" : "";
       const rowCells = weekDateKeys.map((dateKey) => {
         const key = `${tracker.id}|${dateKey}`;
         const cell = existingValues.get(key);
@@ -5165,6 +5633,12 @@ function renderGoalJournalTab() {
 
   if (!isDateKey(goalJournalDate.value)) {
     goalJournalDate.value = getDateKey(normalizeDate(new Date()));
+  }
+  if (
+    goalJournalTitle
+    && !["General Journal", "Week Planning", "Week Review"].includes(String(goalJournalTitle.value || ""))
+  ) {
+    goalJournalTitle.value = GOAL_JOURNAL_SUBJECT_DEFAULT;
   }
 
   const selectedGoalId = goalJournalGoal.value;
@@ -5374,6 +5848,35 @@ function renderCheckinEntryTab() {
     .join("");
 }
 
+function clearEntryListFocusRange() {
+  entryListFocusRange = null;
+}
+
+function openEntryListForRange(periodName, range) {
+  if (!range || !range.start || !range.end) {
+    return;
+  }
+  const normalizedPeriod = normalizePeriodMode(periodName);
+  const start = normalizeDate(range.start);
+  const end = normalizeDate(range.end);
+  const startKey = getDateKey(start);
+  const endKey = getDateKey(end);
+  if (!isDateKey(startKey) || !isDateKey(endKey) || end < start) {
+    return;
+  }
+  entryListFocusRange = {
+    periodName: normalizedPeriod,
+    startKey,
+    endKey
+  };
+  entryListSortMode = "date_desc";
+  entryListTypeFilter = "all";
+  entryListStatusFilter = "all";
+  entryListBucketFilter = "all";
+  setActiveTabSafe("entry-list", { renderImmediate: true });
+  renderEntryListTab();
+}
+
 function renderEntryListTab() {
   if (entryListSort) {
     entryListSort.value = entryListSortMode;
@@ -5388,7 +5891,23 @@ function renderEntryListTab() {
     entryListBucketFilterSelect.value = entryListBucketFilter;
   }
 
-  const snapshotCards = buildSnapshotEntryCardsMarkup(0);
+  const hasFocusRange = Boolean(
+    entryListFocusRange
+    && isDateKey(entryListFocusRange.startKey)
+    && isDateKey(entryListFocusRange.endKey)
+  );
+  if (entryListFocusWrap && entryListFocusText) {
+    if (hasFocusRange) {
+      const periodLabel = getSnapshotPeriodTitle(normalizePeriodMode(entryListFocusRange.periodName));
+      entryListFocusText.textContent = `Focused period: ${periodLabel} | ${formatDate(parseDateKey(entryListFocusRange.startKey))} to ${formatDate(parseDateKey(entryListFocusRange.endKey))}`;
+      entryListFocusWrap.hidden = false;
+    } else {
+      entryListFocusWrap.hidden = true;
+      entryListFocusText.textContent = "";
+    }
+  }
+
+  const snapshotCards = hasFocusRange ? { count: 0, markup: "" } : buildSnapshotEntryCardsMarkup(0);
   const snapshotMarkup = snapshotCards.markup;
   const snapshotCount = snapshotCards.count;
 
@@ -5396,7 +5915,7 @@ function renderEntryListTab() {
     if (snapshotCount < 1) {
       entryListAll.innerHTML = "";
       entryListEmpty.style.display = "block";
-      entryListEmpty.textContent = "No entries yet.";
+      entryListEmpty.textContent = hasFocusRange ? "No entries in the selected period." : "No entries yet.";
       return;
     }
     entryListEmpty.style.display = "none";
@@ -5434,6 +5953,9 @@ function renderEntryListTab() {
         return false;
       }
     }
+    if (hasFocusRange && (entry.date < entryListFocusRange.startKey || entry.date > entryListFocusRange.endKey)) {
+      return false;
+    }
     return true;
   });
 
@@ -5441,7 +5963,7 @@ function renderEntryListTab() {
     if (snapshotCount < 1) {
       entryListAll.innerHTML = "";
       entryListEmpty.style.display = "block";
-      entryListEmpty.textContent = "No entries match your filters.";
+      entryListEmpty.textContent = hasFocusRange ? "No entries in the selected period." : "No entries match your filters.";
       return;
     }
     entryListEmpty.style.display = "none";
@@ -5624,7 +6146,9 @@ function renderGoalScheduleTab() {
       const dateKey = getDateKey(date);
       const items = daySchedules.get(dateKey) || [];
       const isToday = dateKey === todayKey;
-      const isFlipped = Boolean(flippedScheduleDays[dateKey]);
+      const isFlipped = Object.prototype.hasOwnProperty.call(flippedScheduleDays, dateKey)
+        ? Boolean(flippedScheduleDays[dateKey])
+        : true;
       const dayTotalMinutes = items.reduce((total, item) => total + getScheduleMinutes(item), 0);
       const daySummaryLine = items.length > 0
         ? `${items.length} scheduled | ${formatDuration(dayTotalMinutes)} planned`
@@ -5643,17 +6167,13 @@ function renderGoalScheduleTab() {
             const tracker = trackerById.get(item.trackerId);
             const goalName = tracker ? tracker.name : "Archived/Unknown Goal";
             const timeLabel = `${escapeHtml(item.startTime || "--:--")} - ${escapeHtml(item.endTime || "--:--")}`;
-            const durationLabel = formatDuration(getScheduleMinutes(item));
-            const notes = item.notes ? `<p class="muted small">${escapeHtml(item.notes)}</p>` : "";
             return `
               <article class="schedule-event" style="--stagger:${itemIndex}">
                 <div class="schedule-item-top">
                   <strong class="schedule-goal-title" title="${escapeAttr(goalName)}">${escapeHtml(goalName)}</strong>
-                  <button class="schedule-delete-btn" type="button" data-action="delete-schedule" data-id="${item.id}" aria-label="Delete schedule item" title="Delete">x</button>
+                  <button class="schedule-delete-btn" type="button" data-action="delete-schedule" data-id="${item.id}" aria-label="Delete schedule item" title="Delete">Delete</button>
                 </div>
                 <p class="muted small schedule-event-time">${timeLabel}</p>
-                <p class="muted small">Duration: ${durationLabel}</p>
-                ${notes}
               </article>
             `;
           })
@@ -5957,8 +6477,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             </span>
         `;
 
-      const goalsPlusStats = getGoalsPlusRunningStatsForEntries(getGoalsPlusEntriesForTracker(tracker, range));
-      const goalsPlusWorkoutMix = formatRunningWorkoutMix(goalsPlusStats.topWorkouts.slice(0, 3));
+      const goalsPlusRunningStats = getGoalsPlusRunningStatsForEntries(getGoalsPlusEntriesForTracker(tracker, range));
+      const goalsPlusGolfStats = getGoalsPlusGolfStatsForEntries(getGoalsPlusEntriesForTracker(tracker, range));
+      const goalsPlusWorkoutMix = formatRunningWorkoutMix(goalsPlusRunningStats.topWorkouts.slice(0, 3));
       const goalsPlusChipMarkup = isGoalsPlusRunningTracker(tracker)
         ? `
             <span class="pace-chip-wrap">
@@ -5967,10 +6488,10 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
                 class="pace-chip pace-chip-detail"
                 data-action="toggle-pace-detail"
                 data-detail="${escapeAttr(
-                  goalsPlusStats.count > 0
-                    ? `Goals+ Running | Entries ${goalsPlusStats.count} | Workouts ${goalsPlusWorkoutMix} | ${
-                      goalsPlusStats.measurableCount > 0
-                        ? `Avg pace ${formatPaceFromMinutes(goalsPlusStats.avgPace)} | Best pace ${formatPaceFromMinutes(goalsPlusStats.bestPace)} | Avg VO2 ${formatAmount(goalsPlusStats.avgVo2)}`
+                  goalsPlusRunningStats.count > 0
+                    ? `Goals+ Running | Entries ${goalsPlusRunningStats.count} | Workouts ${goalsPlusWorkoutMix} | ${
+                      goalsPlusRunningStats.measurableCount > 0
+                        ? `Avg pace ${formatPaceFromMinutes(goalsPlusRunningStats.avgPace)} | Best pace ${formatPaceFromMinutes(goalsPlusRunningStats.bestPace)} | Avg VO2 ${formatAmount(goalsPlusRunningStats.avgVo2)}`
                         : "No distance/time measurements yet."
                     }`
                     : "Goals+ Running | No workout entries in this period yet."
@@ -5978,13 +6499,40 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
                 aria-expanded="false"
               >Goals+</button>
               <span class="pace-detail-popover">${
-                goalsPlusStats.count > 0
-                  ? `Entries ${escapeHtml(String(goalsPlusStats.count))} | Workouts ${escapeHtml(goalsPlusWorkoutMix)} | ${
-                    goalsPlusStats.measurableCount > 0
-                      ? `Avg pace ${escapeHtml(formatPaceFromMinutes(goalsPlusStats.avgPace))} | Best pace ${escapeHtml(formatPaceFromMinutes(goalsPlusStats.bestPace))} | Avg VO2 ${escapeHtml(formatAmount(goalsPlusStats.avgVo2))}`
+                goalsPlusRunningStats.count > 0
+                  ? `Entries ${escapeHtml(String(goalsPlusRunningStats.count))} | Workouts ${escapeHtml(goalsPlusWorkoutMix)} | ${
+                    goalsPlusRunningStats.measurableCount > 0
+                      ? `Avg pace ${escapeHtml(formatPaceFromMinutes(goalsPlusRunningStats.avgPace))} | Best pace ${escapeHtml(formatPaceFromMinutes(goalsPlusRunningStats.bestPace))} | Avg VO2 ${escapeHtml(formatAmount(goalsPlusRunningStats.avgVo2))}`
                       : "No distance/time measurements yet."
                   }`
                   : "No workout entries in this period yet."
+              }</span>
+            </span>
+          `
+        : isGoalsPlusGolfTracker(tracker)
+        ? `
+            <span class="pace-chip-wrap">
+              <button
+                type="button"
+                class="pace-chip pace-chip-detail"
+                data-action="toggle-pace-detail"
+                data-detail="${escapeAttr(
+                  goalsPlusGolfStats.count > 0
+                    ? `Goals+ ${formatGoalsPlusGolfType(getGoalsPlusRunningConfig(tracker).golfType)} | Entries ${goalsPlusGolfStats.count} | ${
+                      goalsPlusGolfStats.scoredCount > 0
+                        ? `Avg score ${formatAmount(goalsPlusGolfStats.avgScore)} | Best score ${formatAmount(goalsPlusGolfStats.bestScore)}`
+                        : "No score data yet."
+                    }`
+                    : "Goals+ Golf | No entries in this period yet."
+                )}"
+                aria-expanded="false"
+              >Goals+</button>
+              <span class="pace-detail-popover">${
+                goalsPlusGolfStats.count > 0
+                  ? (goalsPlusGolfStats.scoredCount > 0
+                    ? `Entries ${escapeHtml(String(goalsPlusGolfStats.count))} | Avg score ${escapeHtml(formatAmount(goalsPlusGolfStats.avgScore))} | Best score ${escapeHtml(formatAmount(goalsPlusGolfStats.bestScore))}`
+                    : `Entries ${escapeHtml(String(goalsPlusGolfStats.count))} | No score data yet.`)
+                  : "No golf entries in this period yet."
               }</span>
             </span>
           `
@@ -9396,6 +9944,7 @@ function resetStateForSignedOutUser() {
   entryListTypeFilter = "all";
   entryListStatusFilter = "active";
   entryListBucketFilter = "all";
+  clearEntryListFocusRange();
   periodGoalFilterState.week.type = "all";
   periodGoalFilterState.week.status = "active";
   periodGoalFilterState.week.tag = "all";
@@ -9523,6 +10072,7 @@ function resetUiStateForLogin() {
   entryListTypeFilter = "all";
   entryListStatusFilter = "active";
   entryListBucketFilter = "all";
+  clearEntryListFocusRange();
   periodGoalFilterState.week.type = "all";
   periodGoalFilterState.week.status = "active";
   periodGoalFilterState.week.tag = "all";
@@ -9678,6 +10228,9 @@ function resetUiStateForLogin() {
   if (entryGoalsPlusCustomWeight) {
     entryGoalsPlusCustomWeight.value = "";
   }
+  if (entryGoalsPlusGolfScore) {
+    entryGoalsPlusGolfScore.value = "";
+  }
   updateEntryGoalsPlusDerivedLabel();
   if (goalJournalDate) {
     goalJournalDate.value = getDateKey(normalizeDate(new Date()));
@@ -9686,7 +10239,7 @@ function resetUiStateForLogin() {
     goalJournalGoal.value = "";
   }
   if (goalJournalTitle) {
-    goalJournalTitle.value = "";
+    goalJournalTitle.value = GOAL_JOURNAL_SUBJECT_DEFAULT;
   }
   if (goalJournalContent) {
     goalJournalContent.value = "";
@@ -9860,6 +10413,75 @@ function importEntriesFromCsv(text) {
     error: "",
     message: `CSV import complete. Updated ${inserted} entries${skippedRows > 0 ? `, skipped ${skippedRows} invalid row(s)` : ""}${ignoredGoalColumns > 0 ? `, ignored ${ignoredGoalColumns} unmatched goal column(s)` : ""}.`
   };
+}
+
+function exportEntriesToCsv() {
+  if (!currentUser) {
+    return { error: "Sign in before exporting CSV.", csvText: "", filename: "", message: "" };
+  }
+
+  const goalColumns = trackers
+    .filter((tracker) => tracker && String(tracker.id || "") && String(tracker.name || "").trim())
+    .slice()
+    .sort(compareTrackersByPriority);
+  if (goalColumns.length < 1) {
+    return { error: "Create at least one goal before exporting CSV.", csvText: "", filename: "", message: "" };
+  }
+
+  const goalIds = new Set(goalColumns.map((tracker) => tracker.id));
+  const rowsByDate = new Map();
+  entries.forEach((entry) => {
+    if (!entry || !goalIds.has(entry.trackerId) || !isDateKey(entry.date)) {
+      return;
+    }
+    const amount = Math.round((Number(entry.amount) || 0) * 100) / 100;
+    if (!Number.isFinite(amount) || amount < 0) {
+      return;
+    }
+    if (!rowsByDate.has(entry.date)) {
+      rowsByDate.set(entry.date, new Map());
+    }
+    const totalsByGoal = rowsByDate.get(entry.date);
+    const prior = totalsByGoal.get(entry.trackerId) || 0;
+    totalsByGoal.set(entry.trackerId, addAmount(prior, amount));
+  });
+
+  if (rowsByDate.size < 1) {
+    return { error: "No entries found to export.", csvText: "", filename: "", message: "" };
+  }
+
+  const csvRows = [["Date", ...goalColumns.map((tracker) => tracker.name)]];
+  const orderedDateKeys = Array.from(rowsByDate.keys()).sort((a, b) => dateKeyToDayNumber(a) - dateKeyToDayNumber(b));
+  orderedDateKeys.forEach((dateKey) => {
+    const totalsByGoal = rowsByDate.get(dateKey);
+    const row = [dateKey];
+    goalColumns.forEach((tracker) => {
+      if (!totalsByGoal.has(tracker.id)) {
+        row.push("");
+        return;
+      }
+      row.push(formatEditableAmount(totalsByGoal.get(tracker.id)));
+    });
+    csvRows.push(row);
+  });
+
+  const csvText = csvRows
+    .map((row) => row.map(escapeCsvCell).join(","))
+    .join("\r\n");
+  return {
+    error: "",
+    csvText,
+    filename: `goal-tracker-entries-${getDateKey(normalizeDate(new Date()))}.csv`,
+    message: `CSV export complete. Downloaded ${orderedDateKeys.length} date row(s) across ${goalColumns.length} goal column(s).`
+  };
+}
+
+function escapeCsvCell(value) {
+  const text = String(value == null ? "" : value);
+  if (text.includes("\"") || text.includes(",") || text.includes("\n") || text.includes("\r")) {
+    return `"${text.replaceAll("\"", "\"\"")}"`;
+  }
+  return text;
 }
 
 function parseCsvRows(text) {
@@ -10450,6 +11072,9 @@ function loadTrackers() {
       const goalsPlus = normalizeGoalsPlusConfig(item.goalsPlus);
       if (goalsPlus.mode === GOALS_PLUS_SETUP_RUNNING && (!String(loadedUnit || "").trim() || loadedUnit === "units")) {
         loadedUnit = "miles";
+      }
+      if (goalsPlus.mode === GOALS_PLUS_SETUP_GOLF && (!String(loadedUnit || "").trim() || loadedUnit === "units")) {
+        loadedUnit = "strokes";
       }
       const hasLegacyPoints = item.goalPoints !== undefined && item.goalPoints !== null && item.goalPoints !== "";
       const legacyPoints = hasLegacyPoints ? normalizeGoalPoints(item.goalPoints, 1) : null;
@@ -11218,7 +11843,31 @@ function formatAmount(value) {
 }
 
 function normalizeGoalsPlusSetupMode(value) {
-  return value === GOALS_PLUS_SETUP_RUNNING ? GOALS_PLUS_SETUP_RUNNING : GOALS_PLUS_SETUP_STANDARD;
+  if (value === GOALS_PLUS_SETUP_RUNNING) {
+    return GOALS_PLUS_SETUP_RUNNING;
+  }
+  if (value === GOALS_PLUS_SETUP_GOLF) {
+    return GOALS_PLUS_SETUP_GOLF;
+  }
+  return GOALS_PLUS_SETUP_STANDARD;
+}
+
+function normalizeGoalsPlusGolfType(value) {
+  return value === GOALS_PLUS_GOLF_DISC ? GOALS_PLUS_GOLF_DISC : GOALS_PLUS_GOLF_STANDARD;
+}
+
+function formatGoalsPlusGolfType(value) {
+  const normalized = normalizeGoalsPlusGolfType(value);
+  return GOALS_PLUS_GOLF_TYPE_LABEL_BY_VALUE.get(normalized) || "Golf";
+}
+
+function normalizeGolfScore(value, fallback = 0) {
+  const normalizedFallback = Math.max(Math.floor(normalizePositiveAmount(fallback, 0)), 0);
+  const normalized = Math.floor(normalizePositiveAmount(value, -1));
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    return normalizedFallback;
+  }
+  return normalized;
 }
 
 function normalizeRunningWorkout(value) {
@@ -11281,23 +11930,34 @@ function normalizeCustomWorkoutReps(value, fallback = 0) {
 function normalizeGoalsPlusConfig(value) {
   const raw = value && typeof value === "object" ? value : {};
   const mode = normalizeGoalsPlusSetupMode(raw.mode);
-  if (mode !== GOALS_PLUS_SETUP_RUNNING) {
+  if (mode === GOALS_PLUS_SETUP_RUNNING) {
+    const runningWorkout = normalizeRunningWorkout(raw.runningWorkout);
+    const isNorwegian = runningWorkout === "norwegian4x4";
+    const rawWorkSpeed = raw.workSpeed ?? raw.workIntervalSec;
+    const rawRecoverySpeed = raw.recoverySpeed ?? raw.recoveryIntervalSec;
     return {
-      mode: GOALS_PLUS_SETUP_STANDARD,
-      runningWorkout: "easy",
-      workSpeed: 0,
-      recoverySpeed: 0
+      mode,
+      runningWorkout,
+      workSpeed: isNorwegian ? normalizeRunningSpeedMph(rawWorkSpeed, NORWEGIAN_DEFAULT_WORK_SPEED_MPH) : 0,
+      recoverySpeed: isNorwegian ? normalizeRunningSpeedMph(rawRecoverySpeed, NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH) : 0,
+      golfType: GOALS_PLUS_GOLF_STANDARD
     };
   }
-  const runningWorkout = normalizeRunningWorkout(raw.runningWorkout);
-  const isNorwegian = runningWorkout === "norwegian4x4";
-  const rawWorkSpeed = raw.workSpeed ?? raw.workIntervalSec;
-  const rawRecoverySpeed = raw.recoverySpeed ?? raw.recoveryIntervalSec;
+  if (mode === GOALS_PLUS_SETUP_GOLF) {
+    return {
+      mode,
+      runningWorkout: "easy",
+      workSpeed: 0,
+      recoverySpeed: 0,
+      golfType: normalizeGoalsPlusGolfType(raw.golfType)
+    };
+  }
   return {
-    mode,
-    runningWorkout,
-    workSpeed: isNorwegian ? normalizeRunningSpeedMph(rawWorkSpeed, NORWEGIAN_DEFAULT_WORK_SPEED_MPH) : 0,
-    recoverySpeed: isNorwegian ? normalizeRunningSpeedMph(rawRecoverySpeed, NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH) : 0
+    mode: GOALS_PLUS_SETUP_STANDARD,
+    runningWorkout: "easy",
+    workSpeed: 0,
+    recoverySpeed: 0,
+    golfType: GOALS_PLUS_GOLF_STANDARD
   };
 }
 
@@ -11316,6 +11976,15 @@ function getGoalsPlusSetupModeFromTracker(tracker) {
 
 function isGoalsPlusRunningTracker(tracker) {
   return getGoalsPlusSetupModeFromTracker(tracker) === GOALS_PLUS_SETUP_RUNNING;
+}
+
+function isGoalsPlusGolfTracker(tracker) {
+  return getGoalsPlusSetupModeFromTracker(tracker) === GOALS_PLUS_SETUP_GOLF;
+}
+
+function isGoalsPlusTracker(tracker) {
+  const mode = getGoalsPlusSetupModeFromTracker(tracker);
+  return mode === GOALS_PLUS_SETUP_RUNNING || mode === GOALS_PLUS_SETUP_GOLF;
 }
 
 function getPaceMinutesPerMile(distanceMiles, durationMinutes) {
@@ -11352,7 +12021,18 @@ function getEstimatedRunningVo2(distanceMiles, durationMinutes) {
 
 function normalizeGoalsPlusEntryData(entry) {
   const raw = entry && entry.goalsPlus && typeof entry.goalsPlus === "object" ? entry.goalsPlus : null;
-  if (!raw || normalizeGoalsPlusSetupMode(raw.mode) !== GOALS_PLUS_SETUP_RUNNING) {
+  if (!raw) {
+    return null;
+  }
+  const mode = normalizeGoalsPlusSetupMode(raw.mode);
+  if (mode === GOALS_PLUS_SETUP_GOLF) {
+    return {
+      mode: GOALS_PLUS_SETUP_GOLF,
+      golfType: normalizeGoalsPlusGolfType(raw.golfType),
+      score: normalizeGolfScore(raw.score, 0)
+    };
+  }
+  if (mode !== GOALS_PLUS_SETUP_RUNNING) {
     return null;
   }
   const runningWorkout = normalizeRunningWorkout(raw.runningWorkout);
@@ -11375,14 +12055,16 @@ function normalizeGoalsPlusEntryData(entry) {
     recoverySpeed: isNorwegian ? normalizeRunningSpeedMph(rawRecoverySpeed, 0) : 0,
     customExerciseName: isCustomWorkout ? normalizeCustomExerciseName(raw.customExerciseName) : "",
     customReps: isCustomWorkout ? normalizeCustomWorkoutReps(raw.customReps, 0) : 0,
-    customWeight: isCustomWorkout ? normalizePositiveAmount(raw.customWeight, 0) : 0
+    customWeight: isCustomWorkout ? normalizePositiveAmount(raw.customWeight, 0) : 0,
+    golfType: GOALS_PLUS_GOLF_STANDARD
   };
 }
 
 function getGoalsPlusEntriesForTracker(tracker, range = null) {
-  if (!isGoalsPlusRunningTracker(tracker)) {
+  if (!isGoalsPlusTracker(tracker)) {
     return [];
   }
+  const trackerMode = getGoalsPlusSetupModeFromTracker(tracker);
   const hasRange = Boolean(range && range.start && range.end);
   return entries
     .filter((entry) => {
@@ -11398,7 +12080,8 @@ function getGoalsPlusEntriesForTracker(tracker, range = null) {
           return false;
         }
       }
-      return Boolean(normalizeGoalsPlusEntryData(entry));
+      const normalizedGoalsPlus = normalizeGoalsPlusEntryData(entry);
+      return Boolean(normalizedGoalsPlus && normalizedGoalsPlus.mode === trackerMode);
     })
     .map((entry) => normalizeGoalsPlusEntryData(entry))
     .filter(Boolean);
@@ -11461,6 +12144,23 @@ function getGoalsPlusRunningStatsForEntries(entryItems) {
     avgVo2,
     workoutCounts,
     topWorkouts
+  };
+}
+
+function getGoalsPlusGolfStatsForEntries(entryItems) {
+  const list = Array.isArray(entryItems) ? entryItems : [];
+  const scores = list
+    .map((item) => normalizeGolfScore(item && item.score, 0))
+    .filter((score) => score > 0);
+  const totalScore = scores.reduce((sum, score) => sum + score, 0);
+  const scoredCount = scores.length;
+  const avgScore = scoredCount > 0 ? Math.round((totalScore / scoredCount) * 10) / 10 : 0;
+  const bestScore = scoredCount > 0 ? Math.min(...scores) : 0;
+  return {
+    count: list.length,
+    scoredCount,
+    avgScore,
+    bestScore
   };
 }
 
@@ -11713,6 +12413,53 @@ function getYearEntryRowsForTrackerIds(trackerIds, range) {
     });
 }
 
+function getYearToDateRangeForAnchor(anchorDate) {
+  const yearRange = getYearRange(anchorDate);
+  const today = normalizeDate(new Date());
+  if (yearRange.start > today) {
+    return {
+      start: yearRange.start,
+      end: addDays(yearRange.start, -1),
+      hasDates: false
+    };
+  }
+  const end = today < yearRange.end ? today : yearRange.end;
+  return {
+    start: yearRange.start,
+    end,
+    hasDates: end >= yearRange.start
+  };
+}
+
+function getDateKeysForRange(range) {
+  if (!range || !range.start || !range.end || range.end < range.start) {
+    return [];
+  }
+  const dateKeys = [];
+  for (let current = new Date(range.start); current <= range.end; current = addDays(current, 1)) {
+    dateKeys.push(getDateKey(current));
+  }
+  return dateKeys;
+}
+
+function syncYearSingleGoalRowControlState(row) {
+  if (!row) {
+    return;
+  }
+  const stateInput = row.querySelector("select[data-field='state']");
+  const amountInput = row.querySelector("[data-field='amount']");
+  const notesInput = row.querySelector("textarea[data-field='notes']");
+  const stateValue = String(stateInput ? stateInput.value : "none");
+
+  if (amountInput) {
+    amountInput.disabled = stateValue !== "value";
+  }
+  if (notesInput) {
+    notesInput.disabled = stateValue === "none";
+  }
+  row.dataset.state = stateValue;
+}
+
 function buildEntryGoalOptionsMarkup(trackersList, selectedId) {
   const selected = String(selectedId || "");
   return trackersList
@@ -11779,7 +12526,10 @@ function renderYearSingleGoalSection(standardTrackers) {
     return;
   }
   const range = getYearRange(yearEntryAnchor);
-  yearSingleGoalRange.textContent = String(range.start.getFullYear());
+  const yearToDateRange = getYearToDateRangeForAnchor(yearEntryAnchor);
+  yearSingleGoalRange.textContent = yearToDateRange.hasDates
+    ? `${range.start.getFullYear()} (YTD through ${formatDate(yearToDateRange.end)})`
+    : `${range.start.getFullYear()} (YTD not started yet)`;
   yearSingleGoalStatus.textContent = yearSingleGoalStatusMessage;
 
   if (standardTrackers.length < 1) {
@@ -11811,32 +12561,88 @@ function renderYearSingleGoalSection(standardTrackers) {
     return;
   }
 
-  const rows = getYearEntryRowsForTrackerIds([selectedGoalId], range);
-  if (rows.length < 1) {
-    yearSingleGoalForm.style.display = "block";
+  const tracker = standardTrackers.find((item) => item.id === selectedGoalId) || null;
+  if (!tracker) {
+    yearSingleGoalForm.style.display = "none";
     yearSingleGoalBody.innerHTML = "";
     yearSingleGoalEmpty.style.display = "block";
-    yearSingleGoalEmpty.textContent = "No entries for this goal in the selected year.";
+    yearSingleGoalEmpty.textContent = "Select a goal to view year entries.";
     return;
   }
 
+  const dateKeys = getDateKeysForRange(yearToDateRange).reverse();
+  if (dateKeys.length < 1) {
+    yearSingleGoalForm.style.display = "block";
+    yearSingleGoalBody.innerHTML = "";
+    yearSingleGoalEmpty.style.display = "block";
+    yearSingleGoalEmpty.textContent = `No year-to-date days available for ${range.start.getFullYear()} yet.`;
+    return;
+  }
+
+  const ytdEndKey = getDateKey(yearToDateRange.end);
+  const existingRows = getYearEntryRowsForTrackerIds([selectedGoalId], range)
+    .filter((entry) => entry.date <= ytdEndKey);
+  const latestEntryByDate = new Map();
+  existingRows.forEach((entry) => {
+    if (!latestEntryByDate.has(entry.date)) {
+      latestEntryByDate.set(entry.date, entry);
+    }
+  });
+  const binaryGoal = isBinaryGoalType(tracker.goalType);
+
   yearSingleGoalEmpty.style.display = "none";
   yearSingleGoalForm.style.display = "block";
-  yearSingleGoalBody.innerHTML = rows
-    .map((entry, index) => `
-      <tr class="goal-row" style="--stagger:${index}" data-entry-id="${entry.id}">
+  yearSingleGoalBody.innerHTML = dateKeys
+    .map((dateKey, index) => {
+      const entry = latestEntryByDate.get(dateKey) || null;
+      const rowState = entry
+        ? (isEntryNotApplicable(entry) ? "na" : "value")
+        : "none";
+      const amountValue = entry && !isEntryNotApplicable(entry)
+        ? formatEditableAmount(entry.amount)
+        : "";
+      const binaryValue = entry && entry.amount > 0 ? "yes" : "no";
+      const statusHelp = rowState === "none"
+        ? "No entry logged for this day yet."
+        : rowState === "na"
+        ? "Marked as not tracked."
+        : "Entry logged for this day.";
+      const amountControl = binaryGoal
+        ? `
+          <select data-field="amount" class="week-entry-value week-entry-value-select" ${rowState === "value" ? "" : "disabled"}>
+            <option value="yes" ${binaryValue === "yes" ? "selected" : ""}>Yes</option>
+            <option value="no" ${binaryValue === "no" ? "selected" : ""}>No</option>
+          </select>
+        `
+        : `
+          <input data-field="amount" type="number" min="0" step="0.01" value="${escapeAttr(amountValue)}" ${rowState === "value" ? "" : "disabled"} />
+        `;
+      return `
+      <tr class="goal-row" style="--stagger:${index}" data-date="${dateKey}" data-state="${rowState}">
         <td>
-          <input data-field="date" type="date" value="${escapeAttr(entry.date)}" required />
+          <input data-field="date" type="date" value="${escapeAttr(dateKey)}" readonly />
         </td>
         <td>
-          <input data-field="amount" type="number" min="0" step="0.01" value="${escapeAttr(formatEditableAmount(entry.amount))}" required />
+          <select data-field="state" class="week-entry-value-select">
+            <option value="none" ${rowState === "none" ? "selected" : ""}>No entry</option>
+            <option value="value" ${rowState === "value" ? "selected" : ""}>Value</option>
+            <option value="na" ${rowState === "na" ? "selected" : ""}>N/A</option>
+          </select>
         </td>
         <td>
-          <textarea data-field="notes" rows="2" maxlength="280">${escapeHtml(entry.notes || "")}</textarea>
+          ${amountControl}
+        </td>
+        <td>
+          <textarea data-field="notes" rows="2" maxlength="280" ${rowState === "none" ? "disabled" : ""}>${escapeHtml(entry ? entry.notes || "" : "")}</textarea>
+          <p class="muted small">${escapeHtml(statusHelp)}</p>
         </td>
       </tr>
-    `)
+    `;
+    })
     .join("");
+  Array.from(yearSingleGoalBody.querySelectorAll("tr[data-date]")).forEach((row) => {
+    syncYearSingleGoalRowControlState(row);
+  });
 }
 
 function addGoalMetricToDraft() {
@@ -11985,13 +12791,18 @@ function formatEntryMetricDetails(entry, tracker) {
 }
 
 function formatEntryGoalsPlusDetails(entry, tracker) {
-  if (!entry || !tracker || !isGoalsPlusRunningTracker(tracker)) {
+  if (!entry || !tracker || !isGoalsPlusTracker(tracker)) {
     return "";
   }
-  const running = normalizeGoalsPlusEntryData(entry);
-  if (!running) {
+  const goalsPlusEntry = normalizeGoalsPlusEntryData(entry);
+  if (!goalsPlusEntry) {
     return "";
   }
+  if (goalsPlusEntry.mode === GOALS_PLUS_SETUP_GOLF) {
+    const scoreText = goalsPlusEntry.score > 0 ? ` | Score ${formatAmount(goalsPlusEntry.score)}` : "";
+    return `Goals+ | ${formatGoalsPlusGolfType(goalsPlusEntry.golfType)}${scoreText}`;
+  }
+  const running = goalsPlusEntry;
   const intervalText = running.runningWorkout === "norwegian4x4" && running.workSpeed > 0 && running.recoverySpeed > 0
     ? ` | Speeds ${formatAmount(running.workSpeed)} mph/${formatAmount(running.recoverySpeed)} mph`
     : "";
@@ -12314,6 +13125,10 @@ function hasActiveGoalsPlusRunningTracker() {
   return trackers.some((tracker) => !tracker.archived && isGoalsPlusRunningTracker(tracker));
 }
 
+function hasActiveGoalsPlusTracker() {
+  return trackers.some((tracker) => !tracker.archived && isGoalsPlusTracker(tracker));
+}
+
 function formatEditableAmount(value) {
   const rounded = Math.round((Number(value) || 0) * 100) / 100;
   if (!Number.isFinite(rounded)) {
@@ -12460,24 +13275,28 @@ function updateGoalTypeFields() {
   if (goalSetupMode) {
     goalSetupMode.value = setupMode;
   }
-  const useGoalsPlusRunning = setupMode === GOALS_PLUS_SETUP_RUNNING;
+  const useGoalsPlus = setupMode !== GOALS_PLUS_SETUP_STANDARD;
   const goalsPlusNameOption = getGoalsPlusNameOption(goalNameGoalsPlus ? goalNameGoalsPlus.value : GOALS_PLUS_NAME_OPTIONS[0].value);
+  const selectedGoalsPlusMode = useGoalsPlus
+    ? normalizeGoalsPlusSetupMode(goalsPlusNameOption.mode)
+    : GOALS_PLUS_SETUP_STANDARD;
+  const useGoalsPlusRunning = selectedGoalsPlusMode === GOALS_PLUS_SETUP_RUNNING;
+  const useGoalsPlusGolf = selectedGoalsPlusMode === GOALS_PLUS_SETUP_GOLF;
   if (goalNameGoalsPlus) {
     goalNameGoalsPlus.value = goalsPlusNameOption.value;
   }
   if (goalNameTextLabel) {
-    goalNameTextLabel.hidden = useGoalsPlusRunning;
-  }
-  if (goalNameGoalsPlusLabel) {
-    goalNameGoalsPlusLabel.hidden = !useGoalsPlusRunning;
+    goalNameTextLabel.hidden = false;
   }
   if (goalName) {
-    goalName.disabled = useGoalsPlusRunning;
-    goalName.required = !useGoalsPlusRunning;
+    goalName.hidden = useGoalsPlus;
+    goalName.disabled = useGoalsPlus;
+    goalName.required = !useGoalsPlus;
   }
   if (goalNameGoalsPlus) {
-    goalNameGoalsPlus.disabled = !useGoalsPlusRunning;
-    goalNameGoalsPlus.required = useGoalsPlusRunning;
+    goalNameGoalsPlus.hidden = !useGoalsPlus;
+    goalNameGoalsPlus.disabled = !useGoalsPlus;
+    goalNameGoalsPlus.required = useGoalsPlus;
   }
   const runningWorkout = normalizeRunningWorkout(
     useGoalsPlusRunning
@@ -12516,7 +13335,7 @@ function updateGoalTypeFields() {
       goalPlusRunningRecoveryInterval.value = String(NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH);
     }
   }
-  if (useGoalsPlusRunning && goalType.value !== "quantity") {
+  if (useGoalsPlus && goalType.value !== "quantity") {
     goalType.value = "quantity";
   }
   if (goalRewardWeeklyPoints && (!goalRewardWeeklyPoints.value || Number(goalRewardWeeklyPoints.value) < 0)) {
@@ -12564,6 +13383,11 @@ function updateGoalTypeFields() {
       goalUnit.value = "miles";
     }
     goalUnit.placeholder = "miles";
+  } else if (useGoalsPlusGolf) {
+    if (!String(goalUnit.value || "").trim() || goalUnit.value === "units") {
+      goalUnit.value = "strokes";
+    }
+    goalUnit.placeholder = "strokes";
   } else {
     if (!String(goalUnit.value || "").trim()) {
       goalUnit.value = "units";
@@ -12575,10 +13399,17 @@ function updateGoalTypeFields() {
 
 function buildGoalsPlusConfigFromForm() {
   const setupMode = normalizeGoalsPlusSetupMode(goalSetupMode ? goalSetupMode.value : GOALS_PLUS_SETUP_STANDARD);
-  if (setupMode !== GOALS_PLUS_SETUP_RUNNING) {
+  if (setupMode === GOALS_PLUS_SETUP_STANDARD) {
     return normalizeGoalsPlusConfig({ mode: GOALS_PLUS_SETUP_STANDARD });
   }
   const selectedOption = getGoalsPlusNameOption(goalNameGoalsPlus ? goalNameGoalsPlus.value : GOALS_PLUS_NAME_OPTIONS[0].value);
+  const selectedMode = normalizeGoalsPlusSetupMode(selectedOption.mode);
+  if (selectedMode === GOALS_PLUS_SETUP_GOLF) {
+    return normalizeGoalsPlusConfig({
+      mode: GOALS_PLUS_SETUP_GOLF,
+      golfType: normalizeGoalsPlusGolfType(selectedOption.golfType)
+    });
+  }
   const runningWorkout = normalizeRunningWorkout(selectedOption.runningWorkout);
   const isNorwegian = runningWorkout === "norwegian4x4";
   return normalizeGoalsPlusConfig({
@@ -12615,6 +13446,18 @@ function updateEntryGoalsPlusDerivedLabel() {
   const pace = getPaceMinutesPerMile(distance, duration);
   const vo2 = getEstimatedRunningVo2(distance, duration);
   entryGoalsPlusDerived.textContent = `Estimated pace ${formatPaceFromMinutes(pace)} | Estimated VO2 ${formatAmount(vo2)}`;
+}
+
+function updateEntryGoalsPlusGolfLabel(tracker) {
+  if (!entryGoalsPlusGolfNote) {
+    return;
+  }
+  if (!isGoalsPlusGolfTracker(tracker)) {
+    entryGoalsPlusGolfNote.textContent = "Goals+ Golf Entry";
+    return;
+  }
+  const config = getGoalsPlusRunningConfig(tracker);
+  entryGoalsPlusGolfNote.textContent = `Goals+ ${formatGoalsPlusGolfType(config.golfType)} Entry`;
 }
 
 function syncEntryGoalsPlusWorkoutVisibility(workoutValue) {
@@ -12657,18 +13500,24 @@ function syncEntryGoalsPlusWorkoutVisibility(workoutValue) {
 }
 
 function renderEntryGoalsPlusRunningInputs(tracker) {
-  if (
-    !entryGoalsPlusRunningWrap
-    || !entryGoalsPlusRunningWorkout
-    || !entryGoalsPlusWorkIntervalLabel
-    || !entryGoalsPlusRecoveryIntervalLabel
-    || !entryGoalsPlusCustomExerciseLabel
-    || !entryGoalsPlusCustomRepsLabel
-    || !entryGoalsPlusCustomWeightLabel
-  ) {
+  const running = isGoalsPlusRunningTracker(tracker);
+  const golf = isGoalsPlusGolfTracker(tracker);
+  if (entryGoalsPlusRunningWrap) {
+    entryGoalsPlusRunningWrap.hidden = !running;
+  }
+  if (entryGoalsPlusGolfWrap) {
+    entryGoalsPlusGolfWrap.hidden = !golf;
+  }
+  if (entryGoalsPlusGolfScore) {
+    entryGoalsPlusGolfScore.disabled = !golf;
+  }
+  updateEntryGoalsPlusGolfLabel(tracker);
+  if (!entryGoalsPlusRunningWrap || !entryGoalsPlusRunningWorkout || !entryGoalsPlusWorkIntervalLabel || !entryGoalsPlusRecoveryIntervalLabel || !entryGoalsPlusCustomExerciseLabel || !entryGoalsPlusCustomRepsLabel || !entryGoalsPlusCustomWeightLabel) {
+    if (!golf && entryGoalsPlusGolfScore) {
+      entryGoalsPlusGolfScore.value = "";
+    }
     return;
   }
-  const running = isGoalsPlusRunningTracker(tracker);
   entryGoalsPlusRunningWrap.hidden = !running;
   if (!running) {
     if (entryGoalsPlusDistance) {
@@ -12692,6 +13541,9 @@ function renderEntryGoalsPlusRunningInputs(tracker) {
     if (entryGoalsPlusCustomWeight) {
       entryGoalsPlusCustomWeight.value = "";
     }
+    if (!golf && entryGoalsPlusGolfScore) {
+      entryGoalsPlusGolfScore.value = "";
+    }
     updateEntryGoalsPlusDerivedLabel();
     return;
   }
@@ -12714,6 +13566,14 @@ function renderEntryGoalsPlusRunningInputs(tracker) {
 }
 
 function collectGoalsPlusEntryDataFromForm(tracker) {
+  if (isGoalsPlusGolfTracker(tracker)) {
+    const config = getGoalsPlusRunningConfig(tracker);
+    return {
+      mode: GOALS_PLUS_SETUP_GOLF,
+      golfType: normalizeGoalsPlusGolfType(config.golfType),
+      score: normalizeGolfScore(entryGoalsPlusGolfScore ? entryGoalsPlusGolfScore.value : 0, 0)
+    };
+  }
   if (!isGoalsPlusRunningTracker(tracker)) {
     return null;
   }
@@ -12781,7 +13641,7 @@ function updateEntryFormMode() {
     return;
   }
   renderEntryMetricInputs(tracker || null);
-  const goalsPlusTracker = hasActiveGoalsPlusRunningTracker() ? tracker : null;
+  const goalsPlusTracker = hasActiveGoalsPlusTracker() ? tracker : null;
   renderEntryGoalsPlusRunningInputs(goalsPlusTracker || null);
 }
 
