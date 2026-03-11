@@ -1511,6 +1511,41 @@ textarea {
   margin-top: 14px;
 }
 
+.home-insights-panel,
+.home-chart-grid {
+  margin-top: 14px;
+}
+
+.home-chart-grid .snapshot-panel {
+  margin-top: 0;
+}
+
+#home-insights-summary {
+  margin-top: 10px;
+}
+
+#home-insights-list {
+  margin-top: 10px;
+}
+
+#home-activity-chart,
+#home-momentum-chart {
+  width: 100%;
+}
+
+#home-activity-chart:empty,
+#home-momentum-chart:empty {
+  display: none;
+}
+
+.home-dashboard-echart {
+  width: 100%;
+  height: 320px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+}
+
 .home-heatmap-panel {
   margin-top: 14px;
 }
@@ -3233,6 +3268,10 @@ strong.pace-off,
   }
 
   .graph-wrap.graph-wrap-expanded .graph-echart {
+    height: 260px;
+  }
+
+  .home-dashboard-echart {
     height: 260px;
   }
 

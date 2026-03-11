@@ -170,6 +170,13 @@ const manageEmpty = document.querySelector("#manage-empty");
 const manageTable = document.querySelector("#manage-table");
 const manageGoalsForm = document.querySelector("#manage-goals-form");
 const homeSummary = document.querySelector("#home-summary");
+const homeInsightsSummary = document.querySelector("#home-insights-summary");
+const homeInsightsList = document.querySelector("#home-insights-list");
+const homeInsightsEmpty = document.querySelector("#home-insights-empty");
+const homeActivityChart = document.querySelector("#home-activity-chart");
+const homeActivityEmpty = document.querySelector("#home-activity-empty");
+const homeMomentumChart = document.querySelector("#home-momentum-chart");
+const homeMomentumEmpty = document.querySelector("#home-momentum-empty");
 const homeMissedList = document.querySelector("#home-missed-list");
 const homeMissedEmpty = document.querySelector("#home-missed-empty");
 const homeRemindersList = document.querySelector("#home-reminders-list");
@@ -4840,6 +4847,395 @@ function getMissedEntryItems(now = new Date()) {
     .sort((a, b) => b.daysWithout - a.daysWithout);
 }
 
+function formatShortMonthDay(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function hasECharts3DLibrary() {
+  return Boolean(window.echarts && (window.echarts.graphicGL || window.echarts.ComponentModel3D));
+}
+
+function getHomeMomentumRows(weekIndex, nowDate) {
+  const currentWeekRange = getWeekRange(nowDate);
+  const previousWeekRange = getWeekRange(addDays(nowDate, -7));
+  return trackers
+    .filter((tracker) => (
+      tracker
+      && !tracker.archived
+      && normalizeGoalType(tracker.goalType) !== "bucket"
+      && !isFloatingGoalType(tracker.goalType)
+    ))
+    .map((tracker) => {
+      const currentTarget = getTrackerTargetForPeriod(tracker, "week", currentWeekRange);
+      const previousTarget = getTrackerTargetForPeriod(tracker, "week", previousWeekRange);
+      if (currentTarget <= 0 && previousTarget <= 0) {
+        return null;
+      }
+      const currentProgress = sumTrackerRange(weekIndex, tracker.id, currentWeekRange);
+      const previousProgress = sumTrackerRange(weekIndex, tracker.id, previousWeekRange);
+      const currentPct = currentTarget > 0 ? (currentProgress / currentTarget) * 100 : 0;
+      const previousPct = previousTarget > 0 ? (previousProgress / previousTarget) * 100 : 0;
+      const deltaPct = currentPct - previousPct;
+      return {
+        tracker,
+        currentTarget,
+        currentProgress,
+        currentPct,
+        previousTarget,
+        previousProgress,
+        previousPct,
+        deltaPct,
+        priority: normalizeGoalPriority(tracker.priority, 0)
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildHomeActivityTrendOption(labels, dailyValues, rollingValues) {
+  const maxDaily = dailyValues.length > 0 ? Math.max(...dailyValues) : 0;
+  const yMax = Math.max(5, Math.ceil(maxDaily * 1.2));
+  return {
+    animationDuration: 260,
+    backgroundColor: "transparent",
+    legend: {
+      top: 0,
+      textStyle: { color: "#3f6a63", fontSize: 11, fontWeight: 700 },
+      itemHeight: 8
+    },
+    grid: {
+      left: 44,
+      right: 14,
+      top: 28,
+      bottom: 34,
+      containLabel: true
+    },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "line" },
+      formatter: function (items) {
+        if (!Array.isArray(items) || items.length < 1) {
+          return "";
+        }
+        const idx = Number(items[0].dataIndex) || 0;
+        const dayTotal = Number(dailyValues[idx]) || 0;
+        const rolling = Number(rollingValues[idx]) || 0;
+        return `${escapeHtml(labels[idx] || "")}<br>Daily: ${formatAmount(dayTotal)}<br>7-day avg: ${formatAmount(rolling)}`;
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: labels,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#bfded9" } },
+      axisLabel: {
+        color: "#4a716a",
+        fontSize: 10,
+        interval: function (index) {
+          return index % 3 === 0;
+        }
+      }
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: yMax,
+      splitNumber: 4,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: "#deece9" } },
+      axisLabel: { color: "#4a716a", fontSize: 10 }
+    },
+    series: [
+      {
+        name: "Daily",
+        type: "bar",
+        data: dailyValues,
+        barWidth: "56%",
+        itemStyle: {
+          borderRadius: [4, 4, 0, 0],
+          color: "rgba(47, 159, 182, 0.75)"
+        }
+      },
+      {
+        name: "7-day avg",
+        type: "line",
+        data: rollingValues,
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 5,
+        lineStyle: { width: 2.4, color: "#177a52" },
+        itemStyle: { color: "#177a52" }
+      }
+    ]
+  };
+}
+
+function buildHomeMomentum3DOption(rows) {
+  const zClampMin = -120;
+  const zClampMax = 120;
+  return {
+    animationDuration: 300,
+    tooltip: {
+      formatter: function (params) {
+        const meta = params && params.data ? params.data.meta : null;
+        if (!meta) {
+          return "";
+        }
+        return `${escapeHtml(meta.tracker.name)}<br>Weekly completion: ${formatAmount(meta.currentPct)}%<br>Priority: ${formatAmount(meta.priority)}<br>Momentum delta: ${meta.deltaPct >= 0 ? "+" : ""}${formatAmount(meta.deltaPct)}%`;
+      }
+    },
+    grid3D: {
+      boxWidth: 120,
+      boxDepth: 80,
+      boxHeight: 60,
+      axisLine: { lineStyle: { color: "#9ac9c2" } },
+      axisPointer: { lineStyle: { color: "#2f9fb6" } },
+      viewControl: {
+        projection: "perspective",
+        alpha: 20,
+        beta: 38,
+        distance: 170
+      },
+      light: {
+        main: { intensity: 1.05, shadow: false },
+        ambient: { intensity: 0.35 }
+      }
+    },
+    xAxis3D: {
+      type: "value",
+      name: "Completion %",
+      min: 0,
+      max: 200,
+      axisLabel: { formatter: "{value}%", color: "#3d6a64", fontSize: 10 }
+    },
+    yAxis3D: {
+      type: "value",
+      name: "Priority",
+      min: 0,
+      axisLabel: { color: "#3d6a64", fontSize: 10 }
+    },
+    zAxis3D: {
+      type: "value",
+      name: "Delta %",
+      min: zClampMin,
+      max: zClampMax,
+      axisLabel: {
+        color: "#3d6a64",
+        fontSize: 10,
+        formatter: function (value) {
+          const numeric = Number(value) || 0;
+          return `${numeric >= 0 ? "+" : ""}${numeric}%`;
+        }
+      }
+    },
+    series: [
+      {
+        type: "scatter3D",
+        data: rows.map((row) => {
+          const x = Math.max(Math.min(row.currentPct, 200), 0);
+          const z = Math.max(Math.min(row.deltaPct, zClampMax), zClampMin);
+          const size = Math.max(10, Math.min(22, 10 + (row.priority * 0.08)));
+          const color = row.deltaPct >= 0 ? "#1f9b6c" : "#d26a72";
+          return {
+            name: row.tracker.name,
+            value: [x, row.priority, z],
+            symbolSize: size,
+            itemStyle: { color, opacity: 0.9 },
+            meta: row
+          };
+        })
+      }
+    ]
+  };
+}
+
+function buildHomeMomentum2DFallbackOption(rows) {
+  return {
+    animationDuration: 260,
+    backgroundColor: "transparent",
+    grid: {
+      left: 52,
+      right: 14,
+      top: 20,
+      bottom: 42,
+      containLabel: true
+    },
+    tooltip: {
+      formatter: function (params) {
+        const meta = params && params.data ? params.data.meta : null;
+        if (!meta) {
+          return "";
+        }
+        return `${escapeHtml(meta.tracker.name)}<br>Weekly completion: ${formatAmount(meta.currentPct)}%<br>Momentum delta: ${meta.deltaPct >= 0 ? "+" : ""}${formatAmount(meta.deltaPct)}%<br>Priority: ${formatAmount(meta.priority)}`;
+      }
+    },
+    xAxis: {
+      type: "value",
+      name: "Completion %",
+      min: 0,
+      max: 200,
+      axisLabel: { formatter: "{value}%", color: "#456f69", fontSize: 10 },
+      splitLine: { lineStyle: { color: "#deece9" } }
+    },
+    yAxis: {
+      type: "value",
+      name: "Delta %",
+      min: -120,
+      max: 120,
+      axisLabel: {
+        color: "#456f69",
+        fontSize: 10,
+        formatter: function (value) {
+          const numeric = Number(value) || 0;
+          return `${numeric >= 0 ? "+" : ""}${numeric}%`;
+        }
+      },
+      splitLine: { lineStyle: { color: "#deece9" } }
+    },
+    series: [
+      {
+        type: "scatter",
+        data: rows.map((row) => ({
+          value: [Math.max(Math.min(row.currentPct, 200), 0), Math.max(Math.min(row.deltaPct, 120), -120)],
+          symbolSize: Math.max(10, Math.min(22, 10 + (row.priority * 0.08))),
+          itemStyle: {
+            color: row.deltaPct >= 0 ? "#1f9b6c" : "#d26a72",
+            opacity: 0.85
+          },
+          meta: row
+        }))
+      }
+    ]
+  };
+}
+
+function renderHomeInsights(weekRows) {
+  if (!homeInsightsSummary || !homeInsightsList || !homeInsightsEmpty) {
+    return;
+  }
+  if (!Array.isArray(weekRows) || weekRows.length < 1) {
+    homeInsightsSummary.innerHTML = "";
+    homeInsightsList.innerHTML = "";
+    homeInsightsEmpty.style.display = "block";
+    return;
+  }
+  const sortedByCompletion = [...weekRows].sort((a, b) => b.currentPct - a.currentPct);
+  const sortedByDelta = [...weekRows].sort((a, b) => b.deltaPct - a.deltaPct);
+  const bestGoal = sortedByCompletion[0];
+  const biggestGain = sortedByDelta[0];
+  const needsAttention = [...sortedByCompletion].reverse()[0];
+  const improvingCount = weekRows.filter((row) => row.deltaPct > 0).length;
+  const avgDelta = safeDivide(weekRows.reduce((total, row) => total + row.deltaPct, 0), weekRows.length);
+  homeInsightsSummary.innerHTML = `
+    <article class="summary-card">
+      <p>Top Completion</p>
+      <strong>${bestGoal ? `${formatAmount(bestGoal.currentPct)}%` : "N/A"}</strong>
+    </article>
+    <article class="summary-card">
+      <p>Improving Goals</p>
+      <strong>${improvingCount}/${weekRows.length}</strong>
+    </article>
+    <article class="summary-card">
+      <p>Avg Momentum</p>
+      <strong>${avgDelta >= 0 ? "+" : ""}${formatAmount(avgDelta)}%</strong>
+    </article>
+  `;
+  const highlights = [
+    bestGoal
+      ? { label: "Best pace", row: bestGoal, detail: `${formatAmount(bestGoal.currentProgress)}/${formatAmount(bestGoal.currentTarget)} ${normalizeGoalUnit(bestGoal.tracker.unit)}` }
+      : null,
+    biggestGain
+      ? { label: "Biggest gain", row: biggestGain, detail: `${biggestGain.deltaPct >= 0 ? "+" : ""}${formatAmount(biggestGain.deltaPct)}% vs last week` }
+      : null,
+    needsAttention
+      ? { label: "Needs attention", row: needsAttention, detail: `${formatAmount(needsAttention.currentPct)}% complete this week` }
+      : null
+  ].filter(Boolean);
+  homeInsightsList.innerHTML = highlights
+    .map((item, index) => `
+      <li class="quick-item" style="--stagger:${index}">
+        <div>
+          <strong>${escapeHtml(item.label)} | ${escapeHtml(item.row.tracker.name)}</strong>
+          <p class="muted small">${escapeHtml(item.detail)}</p>
+        </div>
+        <span class="pace-chip ${item.row.deltaPct >= 0 ? "pace-on" : "pace-off"}">${item.row.deltaPct >= 0 ? "+" : ""}${formatAmount(item.row.deltaPct)}%</span>
+      </li>
+    `)
+    .join("");
+  homeInsightsEmpty.style.display = highlights.length < 1 ? "block" : "none";
+}
+
+function renderHomeActivityTrendChart(nowDate) {
+  if (!homeActivityChart || !homeActivityEmpty) {
+    return;
+  }
+  disposeEChartsInScope(homeActivityChart);
+  homeActivityChart.innerHTML = "";
+  homeActivityChart.style.display = "none";
+  const activeGoalIds = new Set(
+    trackers
+      .filter((tracker) => tracker && !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket")
+      .map((tracker) => tracker.id)
+  );
+  if (activeGoalIds.size < 1) {
+    homeActivityEmpty.style.display = "block";
+    return;
+  }
+  const dailyDates = Array.from({ length: 30 }, (_, index) => addDays(nowDate, -(29 - index)));
+  const labels = dailyDates.map((date) => formatShortMonthDay(date));
+  const dateKeySet = new Set(dailyDates.map((date) => getDateKey(date)));
+  const totalsByDate = new Map(dailyDates.map((date) => [getDateKey(date), 0]));
+  entries.forEach((entry) => {
+    if (!entry || !activeGoalIds.has(entry.trackerId) || !dateKeySet.has(entry.date)) {
+      return;
+    }
+    const prior = totalsByDate.get(entry.date) || 0;
+    totalsByDate.set(entry.date, addAmount(prior, Number(entry.amount || 0)));
+  });
+  const dailyValues = dailyDates.map((date) => totalsByDate.get(getDateKey(date)) || 0);
+  const hasActivity = dailyValues.some((value) => value > 0);
+  if (!hasActivity) {
+    homeActivityEmpty.style.display = "block";
+    return;
+  }
+  const rollingValues = dailyValues.map((_, index) => {
+    const start = Math.max(0, index - 6);
+    const windowValues = dailyValues.slice(start, index + 1);
+    return safeDivide(windowValues.reduce((sum, value) => sum + value, 0), windowValues.length);
+  });
+  const chartConfigId = registerEChartConfig({
+    option: buildHomeActivityTrendOption(labels, dailyValues, rollingValues)
+  });
+  homeActivityChart.innerHTML = `<div class="home-dashboard-echart js-echart" data-echart-config-id="${chartConfigId}" aria-label="30-day activity trend chart"></div>`;
+  homeActivityEmpty.style.display = "none";
+  homeActivityChart.style.display = "block";
+  initializeEChartsInScope(homeActivityChart);
+}
+
+function renderHomeMomentumChart(weekRows) {
+  if (!homeMomentumChart || !homeMomentumEmpty) {
+    return;
+  }
+  disposeEChartsInScope(homeMomentumChart);
+  homeMomentumChart.innerHTML = "";
+  homeMomentumChart.style.display = "none";
+  if (!Array.isArray(weekRows) || weekRows.length < 1) {
+    homeMomentumEmpty.style.display = "block";
+    return;
+  }
+  const option = hasECharts3DLibrary()
+    ? buildHomeMomentum3DOption(weekRows)
+    : buildHomeMomentum2DFallbackOption(weekRows);
+  const chartConfigId = registerEChartConfig({ option });
+  homeMomentumChart.innerHTML = `<div class="home-dashboard-echart js-echart" data-echart-config-id="${chartConfigId}" aria-label="Goal momentum chart"></div>`;
+  homeMomentumEmpty.style.display = "none";
+  homeMomentumChart.style.display = "block";
+  initializeEChartsInScope(homeMomentumChart);
+}
+
 function getHomeHeatmapWeekRanges(nowDate) {
   return Array.from({ length: 5 }, (_, index) => {
     const weeksBack = 4 - index;
@@ -5051,6 +5447,31 @@ function renderHomeTab() {
   }
   if (!currentUser) {
     homeSummary.innerHTML = "";
+    if (homeInsightsSummary) {
+      homeInsightsSummary.innerHTML = "";
+    }
+    if (homeInsightsList) {
+      homeInsightsList.innerHTML = "";
+    }
+    if (homeInsightsEmpty) {
+      homeInsightsEmpty.style.display = "none";
+    }
+    if (homeActivityChart) {
+      disposeEChartsInScope(homeActivityChart);
+      homeActivityChart.innerHTML = "";
+      homeActivityChart.style.display = "none";
+    }
+    if (homeActivityEmpty) {
+      homeActivityEmpty.style.display = "none";
+    }
+    if (homeMomentumChart) {
+      disposeEChartsInScope(homeMomentumChart);
+      homeMomentumChart.innerHTML = "";
+      homeMomentumChart.style.display = "none";
+    }
+    if (homeMomentumEmpty) {
+      homeMomentumEmpty.style.display = "none";
+    }
     homeMissedList.innerHTML = "";
     homeMissedEmpty.style.display = "none";
     homeRemindersList.innerHTML = "";
@@ -5098,6 +5519,7 @@ function renderHomeTab() {
   const hitPct = measurableWeekGoalCount > 0 ? Math.round((hitThisWeek / measurableWeekGoalCount) * 100) : 0;
   const projectedHitPct = measurableWeekGoalCount > 0 ? Math.round((onPaceGoals.length / measurableWeekGoalCount) * 100) : 0;
   const projectedDetailText = buildProjectedWeekHitDetailText(onPaceGoals, offPaceGoals, measurableWeekGoalCount);
+  const weekMomentumRows = getHomeMomentumRows(weekIndex, now);
 
   homeSummary.innerHTML = `
     <article class="summary-card">
@@ -5116,6 +5538,9 @@ function renderHomeTab() {
       <p class="summary-card-detail-text">${escapeHtml(projectedDetailText)}</p>
     </article>
   `;
+  renderHomeInsights(weekMomentumRows);
+  renderHomeActivityTrendChart(now);
+  renderHomeMomentumChart(weekMomentumRows);
   renderHomeGoalHeatmap(weekIndex, now);
 
   const missedItems = getMissedEntryItems(now).slice(0, 8);
