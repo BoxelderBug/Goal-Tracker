@@ -251,18 +251,23 @@ body::before {
 }
 
 .hero-top {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, var(--surface-soft) 56%, var(--brand-soft) 100%);
+  box-shadow: var(--shadow-soft);
 }
 
 .hero-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: auto;
+  gap: 8px;
+  margin-left: 0;
+  justify-self: end;
 }
 
 .user-actions-panel {
@@ -270,16 +275,16 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96) 0%, var(--surface-soft) 58%, var(--brand-soft) 100%);
-  box-shadow: var(--shadow-soft);
+  padding: 4px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
 }
 
 .user-actions-panel > .btn,
 .user-actions-panel .btn-notifications {
-  min-height: 40px;
+  min-height: 44px;
   border-radius: 12px;
   border-color: var(--line);
   background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
@@ -296,10 +301,10 @@ body::before {
 }
 
 .user-actions-panel .btn-nav-compact {
-  min-height: 40px;
-  font-size: 0.92rem;
+  min-height: 44px;
+  font-size: 0.98rem;
   letter-spacing: normal;
-  padding: 8px 14px;
+  padding: 9px 16px;
 }
 
 .user-account-dropdown {
@@ -379,9 +384,9 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
   padding: 0;
   color: var(--text);
 }
@@ -430,8 +435,8 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   position: relative;
 }
@@ -532,39 +537,42 @@ body::before {
   color: var(--brand-strong);
 }
 
-.hero-title-btn {
-  border: 0;
-  background: none;
-  box-shadow: none;
-  padding: 0;
+.hero-top .hero-title-btn {
+  border: 1px solid var(--brand-strong);
+  background: linear-gradient(180deg, var(--btn-active-bg) 0%, var(--brand-strong) 100%);
+  box-shadow: 0 10px 18px rgba(0, 76, 69, 0.24);
+  padding: 0 16px;
   margin: 0;
   font-family: "Sora", sans-serif;
   letter-spacing: -0.03em;
-  line-height: 1.06;
-  font-size: clamp(2.1rem, 5.2vw, 3.2rem);
+  line-height: 1;
+  font-size: clamp(1.9rem, 4.4vw, 3rem);
   font-weight: 700;
-  color: var(--text);
+  color: #ffffff;
   text-align: left;
   text-wrap: balance;
   flex: 1 1 auto;
   min-width: 260px;
-  border-radius: 0;
+  min-height: 56px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
 }
 
-.hero-title-btn:hover,
-.hero-title-btn:focus-visible {
-  color: var(--brand-strong);
-  transform: none;
-  box-shadow: none;
-  background: none;
-  border-color: transparent;
+.hero-top .hero-title-btn:hover,
+.hero-top .hero-title-btn:focus-visible {
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 22px rgba(0, 76, 69, 0.28);
+  background: linear-gradient(180deg, #0a9489 0%, var(--brand-strong) 100%);
+  border-color: var(--brand-strong);
 }
 
-.hero-title-btn.active {
-  color: var(--brand-strong);
-  background: none;
-  box-shadow: none;
-  border: 0;
+.hero-top .hero-title-btn.active {
+  color: #ffffff;
+  background: linear-gradient(180deg, #0a9489 0%, var(--brand-strong) 100%);
+  box-shadow: 0 14px 22px rgba(0, 76, 69, 0.28);
+  border-color: var(--brand-strong);
 }
 
 .subtitle {
@@ -3089,12 +3097,15 @@ strong.pace-off,
   }
 
   .hero-top {
-    align-items: flex-start;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 10px;
   }
 
   .hero-actions {
     width: 100%;
     justify-content: flex-end;
+    justify-self: stretch;
   }
 
   .user-actions-panel {
@@ -3123,6 +3134,8 @@ strong.pace-off,
 
   .hero-title-btn {
     font-size: clamp(1.7rem, 8vw, 2.2rem);
+    min-width: 0;
+    width: 100%;
   }
 
   .subtitle {
