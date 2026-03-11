@@ -5105,15 +5105,12 @@ function renderHomeTab() {
       <p>Week Hit Rate</p>
       <strong>${hitPct}%</strong>
     </article>
-    <article class="summary-card">
+    <article class="summary-card summary-card-detail" tabindex="0">
       <p>Projected Week Hit Rate</p>
       <div class="summary-projected-wrap">
         <strong>${projectedHitPct}%</strong>
-        <span class="pace-chip-wrap">
-          <span class="pace-chip pace-detail">Hover</span>
-          <span class="pace-detail-popover">${escapeHtml(projectedDetailText)}</span>
-        </span>
       </div>
+      <p class="summary-card-detail-text">${escapeHtml(projectedDetailText)}</p>
     </article>
   `;
   renderHomeGoalHeatmap(weekIndex, now);

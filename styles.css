@@ -1382,7 +1382,31 @@ textarea {
   margin-top: 5px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.summary-card-detail {
+  cursor: default;
+}
+
+.summary-card-detail .summary-card-detail-text {
+  margin: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-2px);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  transition: max-height 0.2s ease, opacity 0.2s ease, transform 0.2s ease, margin-top 0.2s ease;
+}
+
+.summary-card-detail:hover .summary-card-detail-text,
+.summary-card-detail:focus-within .summary-card-detail-text {
+  margin-top: 6px;
+  max-height: 84px;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .card-list {
