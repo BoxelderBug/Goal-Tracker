@@ -8638,9 +8638,6 @@ function buildCumulativeGraphEChartOption(config) {
         borderColor: "#ffffff",
         borderWidth: 1.2
       },
-      areaStyle: {
-        color: goalHit ? "rgba(39, 176, 125, 0.14)" : "rgba(0, 159, 148, 0.10)"
-      },
       data: currentDisplayValues
     },
     {
