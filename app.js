@@ -8610,7 +8610,8 @@ function buildCumulativeGraphEChartOption(config) {
     projectionMax,
     1
   );
-  const yAxisMax = addAmount(maxDataValue, Math.max(maxDataValue * 0.08, 0.5));
+  const yAxisMaxRaw = addAmount(maxDataValue, Math.max(maxDataValue * 0.08, 0.5));
+  const yAxisMax = Math.max(Math.ceil(yAxisMaxRaw / 5) * 5, 5);
 
   const formatAxisLabel = function (dateKey) {
     const parsed = parseDateKey(dateKey);
