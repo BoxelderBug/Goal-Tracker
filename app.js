@@ -3592,7 +3592,6 @@ function renderGraphModal() {
   const compareEnabled = getGoalCompareEnabled(graphModalState.period, tracker.id);
   const overlayRange = compareEnabled ? getOverlayRange(graphModalState.period, range) : null;
   const overlaySeries = overlayRange ? getAlignedOverlaySeries(index, tracker.id, range, overlayRange) : null;
-  const pointsEnabled = getGraphPointsEnabled(graphModalState.period, tracker.id);
   const projectionAllowed = shouldAllowProjectionLine(graphModalState.period, range, now);
   const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(graphModalState.period, tracker.id) : false;
   const projection = projectionAllowed && projectionEnabled
@@ -3614,19 +3613,15 @@ function renderGraphModal() {
   graphModalBody.innerHTML = `
     <div class="graph-modal-tools">
       <div class="graph-action-group">
-        <label class="check-inline check-compact graph-check">
-          <input type="checkbox" data-action="toggle-points" data-period="${graphModalState.period}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
-          Show points
-        </label>
         ${projectionControl}
       </div>
       ${createDownloadMenuMarkup(graphModalState.period, tracker.id, "modal")}
     </div>
   `;
   graphModalBody.innerHTML += createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
-    showCurrentPoints: pointsEnabled,
-    showOverlayPoints: pointsEnabled,
-    showProjectionPoints: pointsEnabled,
+    showCurrentPoints: true,
+    showOverlayPoints: true,
+    showProjectionPoints: true,
     large: true,
     periodName: graphModalState.period,
     trackerId: tracker.id,
@@ -4204,19 +4199,6 @@ function handleViewControlChange(event) {
   const historyGraphTypeSelect = event.target.closest("select[data-action='set-history-graph-type-select']");
   if (historyGraphTypeSelect) {
     graphModalState.historyGraphType = normalizeHistoryGraphType(historyGraphTypeSelect.value);
-    renderGraphModal();
-    return;
-  }
-
-  const pointsInput = event.target.closest("input[data-action='toggle-points']");
-  if (pointsInput) {
-    const period = pointsInput.dataset.period;
-    const id = pointsInput.dataset.id;
-    if (!period || !id || !graphPointsState[period]) {
-      return;
-    }
-    graphPointsState[period][id] = pointsInput.checked;
-    renderPeriodTabs();
     renderGraphModal();
     return;
   }
@@ -6612,7 +6594,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           ? (isOnPace ? "Hit" : "Missed")
           : (isOnPace ? "On pace" : "Off pace");
       const compareEnabled = isFloating ? false : getGoalCompareEnabled(periodName, tracker.id);
-      const pointsEnabled = getGraphPointsEnabled(periodName, tracker.id);
       const graphVisible = getInlineGraphVisible(periodName, tracker.id);
       const projectionAllowed = !isFloating && shouldAllowProjectionLine(periodName, range, now);
       const projectionEnabled = projectionAllowed ? getProjectionLineEnabled(periodName, tracker.id) : false;
@@ -6627,9 +6608,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           ? getProjectionSeries(index, tracker.id, range, chartRange, series)
           : null;
         graphMarkup = createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
-          showCurrentPoints: pointsEnabled,
-          showOverlayPoints: pointsEnabled,
-          showProjectionPoints: pointsEnabled,
+          showCurrentPoints: true,
+          showOverlayPoints: true,
+          showProjectionPoints: true,
           large: false,
           periodName,
           trackerId: tracker.id,
@@ -6766,10 +6747,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           <div class="graph-wrap ${graphVisible ? "graph-wrap-expanded" : "hidden"}">
             ${graphMarkup}
             <div class="graph-inline-controls graph-inline-controls-bottom">
-              <label class="check-inline check-compact graph-check">
-                <input type="checkbox" data-action="toggle-points" data-period="${periodName}" data-id="${tracker.id}" ${pointsEnabled ? "checked" : ""} />
-                Show points
-              </label>
               ${projectionAllowed ? `
               <label class="check-inline check-compact graph-check">
                 <input type="checkbox" data-action="toggle-projection" data-period="${periodName}" data-id="${tracker.id}" ${projectionEnabled ? "checked" : ""} />
@@ -8473,6 +8450,12 @@ function buildCumulativeGraphEChartOption(config) {
       projectionValues[point.dayIndex] = Number(point.cumulative) || 0;
     }
   });
+  const projectionStartIndex = projectionPoints.length > 0
+    ? Math.max(Math.min(Number(projectionPoints[0].dayIndex) || 0, domainDays - 1), 0)
+    : -1;
+  const currentDisplayValues = projectionStartIndex >= 0
+    ? currentCumulative.map((value, index) => (index <= projectionStartIndex ? value : null))
+    : currentCumulative;
 
   const projectionMax = projectionPoints.reduce((max, point) => Math.max(max, Number(point.cumulative) || 0), 0);
   const maxDataValue = Math.max(
@@ -8512,7 +8495,7 @@ function buildCumulativeGraphEChartOption(config) {
       areaStyle: {
         color: goalHit ? "rgba(39, 176, 125, 0.14)" : "rgba(0, 159, 148, 0.10)"
       },
-      data: currentCumulative
+      data: currentDisplayValues
     },
     {
       name: "Target",
@@ -8520,8 +8503,7 @@ function buildCumulativeGraphEChartOption(config) {
       symbol: "none",
       lineStyle: {
         width: 1.8,
-        color: "#111111",
-        type: "dashed"
+        color: "#111111"
       },
       data: dateKeys.map(() => target)
     }
@@ -8574,27 +8556,25 @@ function buildCumulativeGraphEChartOption(config) {
 
   return {
     animationDuration: 280,
+    backgroundColor: "#ddf9f5",
     color: ["#009f94"],
     grid: {
       left: 56,
       right: 20,
       top: 16,
-      bottom: weekTicks ? 58 : 40
+      bottom: weekTicks ? 58 : 40,
+      show: true,
+      backgroundColor: "#ddf9f5"
     },
     tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "line" },
-      formatter: function (items) {
-        if (!Array.isArray(items) || items.length < 1) {
+      trigger: "item",
+      formatter: function (item) {
+        if (!item) {
           return "";
         }
-        const dateKey = String(items[0].axisValue || "");
+        const dateKey = String(item.name || item.axisValue || "");
         const label = isDateKey(dateKey) ? formatDate(parseDateKey(dateKey)) : dateKey;
-        const lines = [label];
-        items.forEach((item) => {
-          lines.push(`${item.seriesName}: ${formatAmount(item.value)} ${unit}`);
-        });
-        return lines.join("<br>");
+        return `${label}<br>${item.seriesName}: ${formatAmount(item.value)} ${unit}`;
       }
     },
     xAxis: {
