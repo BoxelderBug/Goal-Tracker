@@ -213,7 +213,7 @@ body::before {
 }
 
 .page {
-  max-width: 1080px;
+  max-width: 1380px;
   margin: 0 auto;
   padding: 44px 18px 72px;
   display: grid;
@@ -224,6 +224,13 @@ body::before {
 
 #app-shell {
   display: grid;
+  gap: 16px;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  align-items: start;
   gap: 16px;
 }
 
@@ -673,6 +680,9 @@ body::before {
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-strong) 100%);
   border-color: var(--line);
   box-shadow: var(--shadow-soft);
+  align-self: start;
+  position: sticky;
+  top: 18px;
 }
 
 .tab-strip-panel::before {
@@ -687,10 +697,10 @@ body::before {
 }
 
 .nav-groups {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
 }
 
 .mobile-menu-toggle {
@@ -699,16 +709,20 @@ body::before {
 
 .tab-strip-panel .nav-groups > .btn,
 .tab-strip-panel .nav-groups .dropdown-toggle {
+  width: 100%;
   min-height: 38px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  text-align: left;
   padding-inline: 16px;
 }
 
 .tab-strip-panel .nav-groups > .dropdown {
-  display: inline-flex;
-  align-items: center;
+  display: grid;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
 }
 
 .dropdown {
@@ -746,6 +760,20 @@ body::before {
   right: 0;
   top: -10px;
   height: 10px;
+}
+
+.tab-strip-panel .dropdown-menu {
+  top: 0;
+  left: calc(100% + 10px);
+  min-width: 220px;
+}
+
+.tab-strip-panel .dropdown-menu::before {
+  left: -10px;
+  right: auto;
+  top: 0;
+  width: 10px;
+  height: 100%;
 }
 
 .dropdown.open .dropdown-menu {
@@ -2878,6 +2906,15 @@ strong.pace-off,
 }
 
 @media (max-width: 900px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tab-strip-panel {
+    position: static;
+    top: auto;
+  }
+
   .form-grid-2,
   .form-grid-3,
   .form-grid-4,
@@ -2958,9 +2995,23 @@ strong.pace-off,
     top: auto;
   }
 
+  .tab-strip-panel .dropdown-menu {
+    display: none;
+    position: static;
+    margin-top: 0;
+    width: 100%;
+    min-width: 0;
+    left: auto;
+    top: auto;
+  }
+
   .tab-strip-panel.mobile-menu-open .dropdown.open .dropdown-menu {
     display: grid;
     animation: none;
+  }
+
+  .tab-strip-panel .dropdown-menu::before {
+    display: none;
   }
 
   .dropdown:not(.open):hover .dropdown-menu,
