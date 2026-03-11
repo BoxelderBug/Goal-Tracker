@@ -1479,6 +1479,26 @@ textarea {
   margin-top: 14px;
 }
 
+.home-heatmap-panel {
+  margin-top: 14px;
+}
+
+#home-goal-heatmap {
+  width: 100%;
+}
+
+#home-goal-heatmap:empty {
+  display: none;
+}
+
+.home-heatmap-echart {
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+}
+
 .goal-card:focus-within,
 .metric-card:focus-within,
 .quick-item:focus-within,

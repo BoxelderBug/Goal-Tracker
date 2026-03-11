@@ -174,6 +174,8 @@ const homeMissedList = document.querySelector("#home-missed-list");
 const homeMissedEmpty = document.querySelector("#home-missed-empty");
 const homeRemindersList = document.querySelector("#home-reminders-list");
 const homeRemindersEmpty = document.querySelector("#home-reminders-empty");
+const homeGoalHeatmap = document.querySelector("#home-goal-heatmap");
+const homeGoalHeatmapEmpty = document.querySelector("#home-goal-heatmap-empty");
 const missedEntriesList = document.querySelector("#missed-entries-list");
 const missedEntriesEmpty = document.querySelector("#missed-entries-empty");
 
@@ -4826,6 +4828,211 @@ function getMissedEntryItems(now = new Date()) {
     .sort((a, b) => b.daysWithout - a.daysWithout);
 }
 
+function getHomeHeatmapWeekRanges(nowDate) {
+  return Array.from({ length: 5 }, (_, index) => {
+    const weeksBack = 4 - index;
+    const anchor = addDays(nowDate, -7 * weeksBack);
+    return getWeekRange(anchor);
+  });
+}
+
+function buildHomeHeatmapOption(config) {
+  const weekLabels = Array.isArray(config.weekLabels) ? config.weekLabels : [];
+  const goalLabels = Array.isArray(config.goalLabels) ? config.goalLabels : [];
+  const chartData = Array.isArray(config.chartData) ? config.chartData : [];
+  const visualMax = Math.max(Number(config.visualMax) || 120, 100);
+  const leftPadding = Math.max(Number(config.leftPadding) || 140, 120);
+  const showCellLabel = Boolean(config.showCellLabel);
+  return {
+    animationDuration: 260,
+    backgroundColor: "transparent",
+    grid: {
+      left: leftPadding,
+      right: 16,
+      top: 18,
+      bottom: 52,
+      containLabel: false
+    },
+    tooltip: {
+      position: "top",
+      formatter: function (params) {
+        const item = params && params.data ? params.data : null;
+        if (!item || !Array.isArray(item.value)) {
+          return "";
+        }
+        const goalName = escapeHtml(item.goalName || "");
+        const weekLabel = escapeHtml(item.weekLabel || "");
+        const target = Number(item.target) || 0;
+        const progress = Number(item.progress) || 0;
+        if (target <= 0) {
+          return `${goalName}<br>${weekLabel}<br>No weekly target`;
+        }
+        const pctText = Number.isFinite(item.pctRaw) ? `${formatAmount(item.pctRaw)}%` : "N/A";
+        return `${goalName}<br>${weekLabel}<br>${formatAmount(progress)} / ${formatAmount(target)} ${escapeHtml(item.unit || "units")}<br>${pctText}`;
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: weekLabels,
+      splitArea: { show: true },
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#b9d8d4" } },
+      axisLabel: {
+        color: "#3f6a63",
+        fontSize: 10,
+        fontWeight: 700
+      }
+    },
+    yAxis: {
+      type: "category",
+      data: goalLabels,
+      inverse: true,
+      splitArea: { show: true },
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#b9d8d4" } },
+      axisLabel: {
+        color: "#305a53",
+        fontSize: 10,
+        fontWeight: 700,
+        formatter: function (value) {
+          const label = String(value || "");
+          return label.length > 24 ? `${label.slice(0, 24)}...` : label;
+        }
+      }
+    },
+    visualMap: {
+      min: 0,
+      max: visualMax,
+      orient: "horizontal",
+      left: "center",
+      bottom: 6,
+      calculable: false,
+      text: [`${visualMax}%`, "0%"],
+      inRange: {
+        color: ["#d26a72", "#dea34d", "#7cc6b6", "#2f9fb6", "#1f9b6c"]
+      },
+      outOfRange: {
+        color: ["#d9e6e3"]
+      }
+    },
+    series: [
+      {
+        type: "heatmap",
+        data: chartData,
+        progressive: 0,
+        itemStyle: {
+          borderColor: "#ffffff",
+          borderWidth: 1
+        },
+        label: {
+          show: showCellLabel,
+          color: "#0f3f38",
+          fontWeight: 700,
+          fontSize: 10,
+          formatter: function (params) {
+            const item = params && params.data ? params.data : null;
+            if (!item || !Number.isFinite(item.pctRaw)) {
+              return "-";
+            }
+            return `${Math.round(item.pctRaw)}%`;
+          }
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: "rgba(5, 78, 69, 0.25)"
+          }
+        }
+      }
+    ]
+  };
+}
+
+function renderHomeGoalHeatmap(weekIndex, nowDate) {
+  if (!homeGoalHeatmap || !homeGoalHeatmapEmpty) {
+    return;
+  }
+  disposeEChartsInScope(homeGoalHeatmap);
+  homeGoalHeatmap.innerHTML = "";
+  homeGoalHeatmap.style.display = "none";
+  const weekRanges = getHomeHeatmapWeekRanges(nowDate);
+  const weekLabels = weekRanges.map((range) => `Wk ${formatDate(range.start)}`);
+  const weeklyTrackers = trackers.filter((tracker) => (
+    tracker
+    && !tracker.archived
+    && normalizeGoalType(tracker.goalType) !== "bucket"
+    && !isFloatingGoalType(tracker.goalType)
+  ));
+  const heatmapRows = weeklyTrackers
+    .map((tracker) => {
+      const weekValues = weekRanges.map((range) => {
+        const target = getTrackerTargetForPeriod(tracker, "week", range);
+        const progress = sumTrackerRange(weekIndex, tracker.id, range);
+        const pctRaw = target > 0 ? (progress / target) * 100 : null;
+        return {
+          target,
+          progress,
+          pctRaw
+        };
+      });
+      return {
+        tracker,
+        weekValues,
+        hasMeasurableWeek: weekValues.some((item) => item.target > 0)
+      };
+    })
+    .filter((row) => row.hasMeasurableWeek);
+
+  if (heatmapRows.length < 1) {
+    homeGoalHeatmapEmpty.style.display = "block";
+    return;
+  }
+
+  const goalLabels = heatmapRows.map((row) => row.tracker.name);
+  const rawPercentages = [];
+  const chartData = [];
+  heatmapRows.forEach((row, yIndex) => {
+    row.weekValues.forEach((weekValue, xIndex) => {
+      const hasTarget = weekValue.target > 0;
+      const pctRaw = hasTarget ? Number(weekValue.pctRaw) : null;
+      if (Number.isFinite(pctRaw)) {
+        rawPercentages.push(pctRaw);
+      }
+      chartData.push({
+        value: [xIndex, yIndex, Number.isFinite(pctRaw) ? Math.max(Math.min(pctRaw, 200), 0) : -1],
+        pctRaw,
+        progress: weekValue.progress,
+        target: weekValue.target,
+        unit: row.tracker.unit || "units",
+        goalName: row.tracker.name,
+        weekLabel: `${formatDate(weekRanges[xIndex].start)} to ${formatDate(weekRanges[xIndex].end)}`
+      });
+    });
+  });
+
+  const maxRawPercent = rawPercentages.length > 0 ? Math.max(...rawPercentages) : 100;
+  const visualMax = Math.max(120, Math.min(Math.ceil(maxRawPercent / 10) * 10, 200));
+  const longestLabelLength = goalLabels.reduce((max, label) => Math.max(max, String(label || "").length), 0);
+  const leftPadding = Math.min(Math.max((longestLabelLength * 7) + 26, 140), 280);
+  const chartHeight = Math.max(220, (goalLabels.length * 34) + 100);
+  const chartConfigId = registerEChartConfig({
+    option: buildHomeHeatmapOption({
+      weekLabels,
+      goalLabels,
+      chartData,
+      visualMax,
+      leftPadding,
+      showCellLabel: goalLabels.length <= 10
+    })
+  });
+  homeGoalHeatmap.innerHTML = `
+    <div class="home-heatmap-echart js-echart" data-echart-config-id="${chartConfigId}" style="height:${chartHeight}px" aria-label="Last five weeks goal heatmap"></div>
+  `;
+  homeGoalHeatmapEmpty.style.display = "none";
+  homeGoalHeatmap.style.display = "block";
+  initializeEChartsInScope(homeGoalHeatmap);
+}
+
 function renderHomeTab() {
   if (!homeSummary || !homeMissedList || !homeMissedEmpty || !homeRemindersList || !homeRemindersEmpty) {
     return;
@@ -4836,6 +5043,14 @@ function renderHomeTab() {
     homeMissedEmpty.style.display = "none";
     homeRemindersList.innerHTML = "";
     homeRemindersEmpty.style.display = "none";
+    if (homeGoalHeatmap) {
+      disposeEChartsInScope(homeGoalHeatmap);
+      homeGoalHeatmap.innerHTML = "";
+      homeGoalHeatmap.style.display = "none";
+    }
+    if (homeGoalHeatmapEmpty) {
+      homeGoalHeatmapEmpty.style.display = "none";
+    }
     return;
   }
 
@@ -4892,6 +5107,7 @@ function renderHomeTab() {
       </div>
     </article>
   `;
+  renderHomeGoalHeatmap(weekIndex, now);
 
   const missedItems = getMissedEntryItems(now).slice(0, 8);
   if (missedItems.length < 1) {
