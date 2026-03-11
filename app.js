@@ -4332,6 +4332,125 @@ function createHistoryEChartMarkup(history, options = {}) {
   `;
 }
 
+function isPeriodProgressEChartEnabled(periodName) {
+  return periodName === "week" || periodName === "month" || periodName === "year";
+}
+
+function getProgressTonePalette(toneClass) {
+  if (toneClass === "progress-hit") {
+    return { start: "#27b07d", end: "#198b60", marker: "#1f9b6c" };
+  }
+  if (toneClass === "progress-off-pace") {
+    return { start: "#dea34d", end: "#be7f24", marker: "#8b6419" };
+  }
+  if (toneClass === "progress-missed") {
+    return { start: "#d26a72", end: "#b94f59", marker: "#a5404a" };
+  }
+  return { start: "#2f9fb6", end: "#267f92", marker: "#267f92" };
+}
+
+function createPeriodProgressBarEChartMarkup(options = {}) {
+  const currentPercent = Math.max(Number(options.currentPercent) || 0, 0);
+  const projectedPercent = Math.max(Number(options.projectedPercent) || 0, 0);
+  const toneClass = String(options.toneClass || "");
+  const progressLabel = String(options.progressLabel || "");
+  const projectedLabel = String(options.projectedLabel || "");
+  const maxPercent = Math.max(100, currentPercent, projectedPercent, 1);
+  const chartConfigId = registerEChartConfig({
+    option: buildPeriodProgressBarEChartOption({
+      currentPercent,
+      projectedPercent,
+      toneClass,
+      maxPercent
+    })
+  });
+  const caption = projectedLabel
+    ? `${progressLabel} | ${projectedLabel}`
+    : progressLabel;
+  return `
+    <div class="period-progress-block">
+      <div class="period-progress-echart js-echart" data-echart-config-id="${chartConfigId}" data-chart-type="period-progress" aria-label="${escapeAttr(caption)}"></div>
+      <p class="metric-line metric-progress-caption">${escapeHtml(caption)}</p>
+    </div>
+  `;
+}
+
+function buildPeriodProgressBarEChartOption(config) {
+  const currentPercent = Math.max(Number(config.currentPercent) || 0, 0);
+  const projectedPercent = Math.max(Number(config.projectedPercent) || 0, 0);
+  const maxPercent = Math.max(Number(config.maxPercent) || 100, 1);
+  const palette = getProgressTonePalette(config.toneClass);
+  return {
+    animationDuration: 220,
+    backgroundColor: "transparent",
+    grid: {
+      left: 0,
+      right: 0,
+      top: 4,
+      bottom: 4,
+      containLabel: false
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: function () {
+        return `Current: ${formatAmount(currentPercent)}%<br>Projected: ${formatAmount(projectedPercent)}%`;
+      }
+    },
+    xAxis: {
+      type: "value",
+      min: 0,
+      max: maxPercent,
+      show: false
+    },
+    yAxis: {
+      type: "category",
+      data: ["progress"],
+      show: false
+    },
+    series: [
+      {
+        name: "Progress",
+        type: "bar",
+        data: [currentPercent],
+        barWidth: 16,
+        showBackground: true,
+        backgroundStyle: {
+          color: "#d7f5f1"
+        },
+        itemStyle: {
+          borderRadius: [999, 999, 999, 999],
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 1,
+            y2: 0,
+            colorStops: [
+              { offset: 0, color: palette.start },
+              { offset: 1, color: palette.end }
+            ]
+          }
+        },
+        markLine: {
+          symbol: "none",
+          silent: true,
+          lineStyle: {
+            type: "dashed",
+            color: palette.marker,
+            width: 2
+          },
+          label: {
+            show: false
+          },
+          data: [
+            { xAxis: projectedPercent }
+          ]
+        }
+      }
+    ]
+  };
+}
+
 function buildHistoryEChartOption(history, graphType, metricType) {
   const categories = history.map((item) => item.label);
   const values = history.map((item) => Number(item.value) || 0);
@@ -6715,6 +6834,23 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         : "";
 
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
+      const projectedPct = percent(projectedTracker, target);
+      const projectedLabel = `Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} (${projectedPct}%)`;
+      const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
+        ? createPeriodProgressBarEChartMarkup({
+          currentPercent: pct,
+          projectedPercent: projectedPct,
+          toneClass: progressToneClass,
+          progressLabel,
+          projectedLabel
+        })
+        : `
+          <div class="progress progress-with-label">
+            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
+            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
+            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
+          </div>
+        `;
 
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
@@ -6723,11 +6859,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             ${goalsPlusChipMarkup ? `<div class="metric-controls">${goalsPlusChipMarkup}</div>` : ""}
           </div>
           <p class="metric-updated-through">${escapeHtml(updatedThroughLabel)}</p>
-          <div class="progress progress-with-label">
-            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
-            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
-            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
-          </div>
+          ${progressBarMarkup}
           <div class="pace-line">
             ${paceStatusChip}
             <span class="pace-actions">
@@ -6939,6 +7071,23 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const progressToneClass = getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel);
       const ownerLabel = share.ownerUsername || "Friend";
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
+      const projectedPct = percent(projected, target);
+      const projectedLabel = `Projected ${formatAmountWithUnit(projected, tracker.unit)} (${projectedPct}%)`;
+      const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
+        ? createPeriodProgressBarEChartMarkup({
+          currentPercent: pct,
+          projectedPercent: projectedPct,
+          toneClass: progressToneClass,
+          progressLabel,
+          projectedLabel
+        })
+        : `
+          <div class="progress progress-with-label">
+            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
+            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
+            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
+          </div>
+        `;
 
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
@@ -6946,11 +7095,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
             <h3>${escapeHtml(tracker.name)}</h3>
             <span class="pace-chip">${escapeHtml(ownerLabel)}</span>
           </div>
-          <div class="progress progress-with-label">
-            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
-            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
-            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
-          </div>
+          ${progressBarMarkup}
           <form data-action="add-shared-goal-entry" data-share-id="${share.id}" data-owner-id="${share.ownerId}" data-goal-id="${tracker.id}" class="entry-edit-form">
             <div class="form-grid form-grid-3">
               <label>

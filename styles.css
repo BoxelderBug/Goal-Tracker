@@ -2093,6 +2093,25 @@ strong.pace-off,
   background: linear-gradient(90deg, var(--goal-missed-start), var(--goal-missed-end));
 }
 
+.period-progress-block {
+  display: grid;
+  gap: 6px;
+}
+
+.period-progress-echart {
+  width: 100%;
+  height: 24px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--surface-soft) 0%, #ffffff 100%);
+}
+
+.metric-progress-caption {
+  margin: 0;
+  font-weight: 700;
+}
+
 .progress.progress-with-label {
   height: 24px;
 }
