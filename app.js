@@ -681,6 +681,14 @@ function closeAllDropdownMenus() {
   });
 }
 
+function closeNotificationsPanel() {
+  if (!notificationsPanelOpen) {
+    return;
+  }
+  notificationsPanelOpen = false;
+  renderNotifications();
+}
+
 function closeAllViewFilterDisclosures() {
   document.querySelectorAll(".view-filters-disclosure[open]").forEach((item) => {
     item.open = false;
@@ -701,6 +709,34 @@ function setMobileMenuOpen(open) {
   mobileMenuToggle.textContent = shouldOpen ? "Close Menu" : "Menu";
   if (!shouldOpen) {
     closeAllDropdownMenus();
+  }
+}
+
+function navigateToTab(tabName, options = {}) {
+  if (!currentUser) {
+    return;
+  }
+  const targetTab = String(tabName || "").trim();
+  if (!targetTab) {
+    return;
+  }
+  const socialSection = String(options.socialSection || "").trim().toLowerCase();
+  const scrollTarget = String(options.scrollTarget || "").trim();
+  closeAllDropdownMenus();
+  closeNotificationsPanel();
+  setActiveTabSafe(targetTab, { renderImmediate: true });
+  if (activeTab === "social" && socialSection) {
+    activateSocialSection(socialSection, { scroll: true });
+  } else if (scrollTarget) {
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector(scrollTarget);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+  if (isMobileMenuMode()) {
+    setMobileMenuOpen(false);
   }
 }
 
@@ -766,22 +802,13 @@ document.addEventListener("keydown", (event) => {
 
 menuButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    if (!currentUser) {
-      return;
-    }
     const targetTab = String(button.dataset.tab || "").trim();
     if (!targetTab) {
       return;
     }
     const socialSection = String(button.dataset.socialSection || "").trim().toLowerCase();
-    closeAllDropdownMenus();
-    setActiveTabSafe(targetTab, { renderImmediate: true });
-    if (targetTab === "social" && socialSection) {
-      activateSocialSection(socialSection, { scroll: true });
-    }
-    if (isMobileMenuMode()) {
-      setMobileMenuOpen(false);
-    }
+    const scrollTarget = String(button.dataset.scrollTarget || "").trim();
+    navigateToTab(targetTab, { socialSection, scrollTarget });
   });
 });
 
@@ -794,7 +821,9 @@ document.addEventListener("click", (event) => {
   if (!tabTarget) {
     return;
   }
-  setActiveTabSafe(tabTarget, { renderImmediate: true });
+  const socialSection = String(jumpButton.dataset.socialSection || "").trim().toLowerCase();
+  const scrollTarget = String(jumpButton.dataset.scrollTarget || "").trim();
+  navigateToTab(tabTarget, { socialSection, scrollTarget });
 });
 
 authModeButtons.forEach((button) => {
@@ -1129,6 +1158,7 @@ registerForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", async () => {
+  closeNotificationsPanel();
   closeAllDropdownMenus();
   if (firebaseConfigured && firebaseAuth) {
     try {
@@ -1147,8 +1177,7 @@ if (settingsShortcutButton) {
     if (!currentUser) {
       return;
     }
-    closeAllDropdownMenus();
-    setActiveTabSafe("settings", { renderImmediate: true });
+    navigateToTab("settings", { scrollTarget: "#account-security-section" });
   });
 }
 
@@ -1157,10 +1186,7 @@ if (activeUserPointsButton) {
     if (!currentUser || !isPointStoreRewardsEnabled()) {
       return;
     }
-    closeAllDropdownMenus();
-    activeTab = "point-store";
-    renderTabs();
-    renderPointStoreTab();
+    navigateToTab("point-store");
   });
 }
 
@@ -1169,6 +1195,10 @@ if (notificationsToggleButton) {
     event.preventDefault();
     if (!currentUser) {
       return;
+    }
+    closeAllDropdownMenus();
+    if (isMobileMenuMode()) {
+      setMobileMenuOpen(false);
     }
     notificationsPanelOpen = !notificationsPanelOpen;
     renderNotifications();
@@ -4637,12 +4667,18 @@ function renderAuthState() {
   if (settingsShortcutButton) {
     settingsShortcutButton.hidden = !isAuthenticated;
     settingsShortcutButton.disabled = !isAuthenticated;
+    const settingsActive = isAuthenticated && activeTab === "settings";
+    settingsShortcutButton.classList.toggle("active", settingsActive);
+    settingsShortcutButton.setAttribute("aria-current", settingsActive ? "page" : "false");
   }
   if (activeUserPointsButton) {
     const showPointsButton = isAuthenticated && isPointStoreRewardsEnabled();
     activeUserPointsButton.hidden = !showPointsButton;
     activeUserPointsButton.textContent = `${formatAmount(getPointBankBalance())} pts`;
     activeUserPointsButton.disabled = !showPointsButton;
+    const pointsActive = showPointsButton && activeTab === "point-store";
+    activeUserPointsButton.classList.toggle("active", pointsActive);
+    activeUserPointsButton.setAttribute("aria-current", pointsActive ? "page" : "false");
   }
   renderNotifications();
   if (isAuthenticated) {

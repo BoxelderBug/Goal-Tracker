@@ -278,6 +278,14 @@ body::before {
   box-shadow: 0 6px 12px rgba(0, 70, 63, 0.1);
 }
 
+.user-actions-panel > .btn.active,
+.user-actions-panel .btn-notifications.active {
+  border-color: var(--btn-active-border);
+  background: linear-gradient(180deg, var(--btn-active-bg) 0%, var(--brand-strong) 100%);
+  color: var(--btn-active-text);
+  box-shadow: 0 10px 18px rgba(0, 76, 69, 0.2);
+}
+
 .user-actions-panel .btn-nav-compact {
   min-height: 40px;
   font-size: 0.92rem;
