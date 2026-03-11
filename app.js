@@ -4469,7 +4469,18 @@ function buildPeriodProgressBarEChartOption(config) {
         barWidth: 26,
         showBackground: true,
         backgroundStyle: {
-          color: "#caefe9"
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: "#effcf9" },
+              { offset: 0.48, color: "#d6f2ed" },
+              { offset: 1, color: "#c0e8e2" }
+            ]
+          }
         },
         itemStyle: {
           borderRadius: [999, 999, 999, 999],
@@ -4477,13 +4488,20 @@ function buildPeriodProgressBarEChartOption(config) {
             type: "linear",
             x: 0,
             y: 0,
-            x2: 1,
-            y2: 0,
+            x2: 0,
+            y2: 1,
             colorStops: [
-              { offset: 0, color: palette.start },
+              { offset: 0, color: "#f4fffd" },
+              { offset: 0.16, color: palette.start },
+              { offset: 0.7, color: palette.end },
               { offset: 1, color: palette.end }
             ]
-          }
+          },
+          borderColor: "rgba(255, 255, 255, 0.32)",
+          borderWidth: 1,
+          shadowColor: "rgba(0, 66, 59, 0.22)",
+          shadowBlur: 10,
+          shadowOffsetY: 3
         },
         markLine: {
           symbol: "none",
@@ -4511,7 +4529,19 @@ function buildPeriodProgressBarEChartOption(config) {
         silent: true,
         itemStyle: {
           borderRadius: [0, 999, 999, 0],
-          color: "rgba(47, 159, 182, 0.35)"
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(206, 245, 238, 0.88)" },
+              { offset: 1, color: "rgba(66, 173, 191, 0.42)" }
+            ]
+          },
+          borderColor: "rgba(255, 255, 255, 0.28)",
+          borderWidth: 1
         }
       }
     ]
