@@ -4429,6 +4429,9 @@ function buildPeriodProgressBarEChartOption(config) {
   const currentPercent = Math.max(Number(config.currentPercent) || 0, 0);
   const projectedPercent = Math.max(Number(config.projectedPercent) || 0, 0);
   const palette = getProgressTonePalette(config.toneClass);
+  const currentDisplay = Math.min(currentPercent, 100);
+  const projectedDisplay = Math.min(projectedPercent, 100);
+  const projectedExtension = Math.max(projectedDisplay - currentDisplay, 0);
   return {
     animationDuration: 220,
     backgroundColor: "transparent",
@@ -4460,7 +4463,8 @@ function buildPeriodProgressBarEChartOption(config) {
       {
         name: "Progress",
         type: "bar",
-        data: [currentPercent],
+        stack: "progress",
+        data: [currentDisplay],
         clip: true,
         barWidth: 26,
         showBackground: true,
@@ -4493,8 +4497,21 @@ function buildPeriodProgressBarEChartOption(config) {
             show: false
           },
           data: [
-            { xAxis: projectedPercent }
+            { xAxis: projectedDisplay }
           ]
+        }
+      },
+      {
+        name: "Projection",
+        type: "bar",
+        stack: "progress",
+        data: [projectedExtension],
+        clip: true,
+        barWidth: 26,
+        silent: true,
+        itemStyle: {
+          borderRadius: [0, 999, 999, 0],
+          color: "rgba(47, 159, 182, 0.35)"
         }
       }
     ]
