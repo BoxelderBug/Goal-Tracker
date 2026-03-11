@@ -4396,6 +4396,7 @@ function createPeriodProgressBarEChartMarkup(options = {}) {
   const toneClass = String(options.toneClass || "");
   const progressLabel = String(options.progressLabel || "");
   const projectedLabel = String(options.projectedLabel || "");
+  const projectedChipLabel = `Proj ${Math.round(projectedPercent)}%`;
   const displayCurrentPercent = Math.min(currentPercent, 100);
   const displayProjectedPercent = Math.min(projectedPercent, 100);
   const chartConfigId = registerEChartConfig({
@@ -4408,9 +4409,11 @@ function createPeriodProgressBarEChartMarkup(options = {}) {
   const caption = projectedLabel || progressLabel;
   return `
     <div class="period-progress-block">
-      <div class="period-progress-echart js-echart" data-echart-config-id="${chartConfigId}" data-chart-type="period-progress" aria-label="${escapeAttr(caption)}"></div>
-      <span class="period-progress-label">${escapeHtml(progressLabel)}</span>
-      <p class="metric-line metric-progress-caption">${escapeHtml(caption)}</p>
+      <div class="period-progress-wrap" aria-label="${escapeAttr(caption)}" title="${escapeAttr(caption)}">
+        <div class="period-progress-echart js-echart" data-echart-config-id="${chartConfigId}" data-chart-type="period-progress"></div>
+        <span class="period-progress-label">${escapeHtml(progressLabel)}</span>
+        <span class="period-progress-projected">${escapeHtml(projectedChipLabel)}</span>
+      </div>
     </div>
   `;
 }
@@ -4425,8 +4428,8 @@ function buildPeriodProgressBarEChartOption(config) {
     grid: {
       left: 0,
       right: 0,
-      top: 4,
-      bottom: 4,
+      top: 2,
+      bottom: 2,
       containLabel: false
     },
     tooltip: {
@@ -4452,10 +4455,10 @@ function buildPeriodProgressBarEChartOption(config) {
         type: "bar",
         data: [currentPercent],
         clip: true,
-        barWidth: 16,
+        barWidth: 26,
         showBackground: true,
         backgroundStyle: {
-          color: "#d7f5f1"
+          color: "#caefe9"
         },
         itemStyle: {
           borderRadius: [999, 999, 999, 999],
@@ -4477,7 +4480,7 @@ function buildPeriodProgressBarEChartOption(config) {
           lineStyle: {
             type: "dashed",
             color: palette.marker,
-            width: 2
+            width: 2.4
           },
           label: {
             show: false
