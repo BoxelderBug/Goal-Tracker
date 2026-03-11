@@ -4382,8 +4382,17 @@ function getProgressTonePalette(toneClass) {
 }
 
 function createPeriodProgressBarEChartMarkup(options = {}) {
-  const currentPercent = Math.max(Number(options.currentPercent) || 0, 0);
-  const projectedPercent = Math.max(Number(options.projectedPercent) || 0, 0);
+  const progressValue = Number(options.progressValue);
+  const targetValue = Number(options.targetValue);
+  const projectedValue = Number(options.projectedValue);
+  const derivedCurrentPercent = targetValue > 0 && Number.isFinite(progressValue)
+    ? (progressValue / targetValue) * 100
+    : Number(options.currentPercent);
+  const derivedProjectedPercent = targetValue > 0 && Number.isFinite(projectedValue)
+    ? (projectedValue / targetValue) * 100
+    : Number(options.projectedPercent);
+  const currentPercent = Math.max(Number.isFinite(derivedCurrentPercent) ? derivedCurrentPercent : 0, 0);
+  const projectedPercent = Math.max(Number.isFinite(derivedProjectedPercent) ? derivedProjectedPercent : 0, 0);
   const toneClass = String(options.toneClass || "");
   const progressLabel = String(options.progressLabel || "");
   const projectedLabel = String(options.projectedLabel || "");
@@ -7089,6 +7098,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const projectedLabel = `Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
         ? createPeriodProgressBarEChartMarkup({
+          progressValue: progress,
+          targetValue: target,
+          projectedValue: projectedTracker,
           currentPercent: pct,
           projectedPercent: projectedPct,
           toneClass: progressToneClass,
@@ -7326,6 +7338,9 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const projectedLabel = `Projected ${formatAmountWithUnit(projected, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
         ? createPeriodProgressBarEChartMarkup({
+          progressValue: progress,
+          targetValue: target,
+          projectedValue: projected,
           currentPercent: pct,
           projectedPercent: projectedPct,
           toneClass: progressToneClass,
