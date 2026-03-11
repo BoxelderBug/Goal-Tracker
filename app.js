@@ -4385,21 +4385,20 @@ function createPeriodProgressBarEChartMarkup(options = {}) {
   const toneClass = String(options.toneClass || "");
   const progressLabel = String(options.progressLabel || "");
   const projectedLabel = String(options.projectedLabel || "");
-  const maxPercent = Math.max(100, currentPercent, projectedPercent, 1);
+  const displayCurrentPercent = Math.min(currentPercent, 100);
+  const displayProjectedPercent = Math.min(projectedPercent, 100);
   const chartConfigId = registerEChartConfig({
     option: buildPeriodProgressBarEChartOption({
-      currentPercent,
-      projectedPercent,
-      toneClass,
-      maxPercent
+      currentPercent: displayCurrentPercent,
+      projectedPercent: displayProjectedPercent,
+      toneClass
     })
   });
-  const caption = projectedLabel
-    ? `${progressLabel} | ${projectedLabel}`
-    : progressLabel;
+  const caption = projectedLabel || progressLabel;
   return `
     <div class="period-progress-block">
       <div class="period-progress-echart js-echart" data-echart-config-id="${chartConfigId}" data-chart-type="period-progress" aria-label="${escapeAttr(caption)}"></div>
+      <span class="period-progress-label">${escapeHtml(progressLabel)}</span>
       <p class="metric-line metric-progress-caption">${escapeHtml(caption)}</p>
     </div>
   `;
@@ -4408,7 +4407,6 @@ function createPeriodProgressBarEChartMarkup(options = {}) {
 function buildPeriodProgressBarEChartOption(config) {
   const currentPercent = Math.max(Number(config.currentPercent) || 0, 0);
   const projectedPercent = Math.max(Number(config.projectedPercent) || 0, 0);
-  const maxPercent = Math.max(Number(config.maxPercent) || 100, 1);
   const palette = getProgressTonePalette(config.toneClass);
   return {
     animationDuration: 220,
@@ -4429,7 +4427,7 @@ function buildPeriodProgressBarEChartOption(config) {
     xAxis: {
       type: "value",
       min: 0,
-      max: maxPercent,
+      max: 100,
       show: false
     },
     yAxis: {
@@ -4442,6 +4440,7 @@ function buildPeriodProgressBarEChartOption(config) {
         name: "Progress",
         type: "bar",
         data: [currentPercent],
+        clip: true,
         barWidth: 16,
         showBackground: true,
         backgroundStyle: {
