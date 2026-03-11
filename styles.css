@@ -2181,12 +2181,30 @@ strong.pace-off,
   height: 240px;
 }
 
+.graph-echart {
+  width: 100%;
+  height: 240px;
+}
+
 .graph-wrap.graph-wrap-expanded .graph-svg {
+  height: 320px;
+}
+
+.graph-wrap.graph-wrap-expanded .graph-echart {
   height: 320px;
 }
 
 .graph-svg-large {
   height: 360px;
+}
+
+.graph-echart-large {
+  height: 360px;
+}
+
+.history-echart {
+  width: 100%;
+  height: 170px;
 }
 
 .graph-legend {
@@ -3024,6 +3042,14 @@ strong.pace-off,
   }
 
   .graph-wrap.graph-wrap-expanded .graph-svg {
+    height: 260px;
+  }
+
+  .graph-echart-large {
+    height: 280px;
+  }
+
+  .graph-wrap.graph-wrap-expanded .graph-echart {
     height: 260px;
   }
 

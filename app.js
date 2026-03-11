@@ -534,6 +534,9 @@ const graphModalState = {
   historyScope: "period",
   historyGraphType: "bar"
 };
+const pendingEChartConfigs = new Map();
+const activeEChartInstances = new Map();
+let nextEChartConfigId = 0;
 const goalTargetInputTouched = { weekly: false, monthly: false, yearly: false };
 let goalCustomWeekTargetsDraft = [];
 let goalCustomMonthTargetsDraft = [];
@@ -713,6 +716,7 @@ window.addEventListener("resize", () => {
     setMobileMenuOpen(false);
   }
   applyMobileQuickActionsVisibility();
+  resizeAllECharts();
 });
 
 dropdowns.forEach((dropdown) => {
@@ -3472,8 +3476,15 @@ function handleGraphCardActions(event) {
     const range = meta ? meta.range : null;
     const filename = buildChartFilename(tracker.name, period, range);
     const scope = context === "modal" ? graphModalBody : downloadButton.closest(".graph-wrap");
+    const eChartElement = scope
+      ? scope.querySelector(`.js-echart[data-chart-type='cumulative'][data-chart-period='${period}'][data-chart-id='${id}']`)
+      : null;
+    if (eChartElement && downloadChartFromEChart(eChartElement, format, filename)) {
+      hideAllDownloadMenus();
+      return;
+    }
     const svg = scope ? scope.querySelector(".graph-svg") : null;
-    if (svg) {
+    if (svg && (format === "svg" || format === "png" || format === "webp")) {
       downloadChartFromSvg(svg, format, filename);
     }
     hideAllDownloadMenus();
@@ -3539,6 +3550,9 @@ function handleGraphCardActions(event) {
 }
 
 function closeGraphModal() {
+  if (graphModalBody) {
+    disposeEChartsInScope(graphModalBody);
+  }
   graphModalState.open = false;
   graphModalState.period = "";
   graphModalState.trackerId = "";
@@ -3556,6 +3570,7 @@ function renderGraphModal() {
   if (!graphModal || !graphModalBody || !graphModalTitle) {
     return;
   }
+  disposeEChartsInScope(graphModalBody);
   if (!currentUser || !graphModalState.open) {
     graphModal.classList.add("hidden");
     graphModal.setAttribute("aria-hidden", "true");
@@ -3614,6 +3629,8 @@ function renderGraphModal() {
     showProjectionPoints: pointsEnabled,
     large: true,
     periodName: graphModalState.period,
+    trackerId: tracker.id,
+    context: "modal",
     unit: tracker.unit,
     domainDays: getRangeDays(range),
     projection,
@@ -3634,6 +3651,8 @@ function renderGraphModal() {
 
   graphModal.classList.remove("hidden");
   graphModal.setAttribute("aria-hidden", "false");
+  initializeEChartsInScope(graphModalBody);
+  resizeAllECharts();
 }
 
 function getPeriodMeta(periodName) {
@@ -3770,21 +3789,10 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
   const lookbackCount = getHistoryLookbackCount(selectedMetric);
   const averageRange = getCurrentRangeForMode(selectedMode, focusDate);
   const history = getAverageHistoryForPeriod(tracker, selectedMode, averageRange, index, selectedMetric, selectedScope);
-  const maxMetricValue = Math.max(...history.map((item) => item.value), 1);
-  const barsMarkup = history.map((item) => {
-    const normalizedHeight = maxMetricValue > 0 ? Math.round((item.value / maxMetricValue) * 100) : 0;
-    const heightPct = item.value > 0 ? Math.max(normalizedHeight, 2) : 0;
-    const isCurrent = item.offset === 0;
-    const valueLabel = selectedMetric === "hit" ? (item.value > 0 ? "Yes" : "No") : formatAmount(item.value);
-    return `
-      <article class="avg-bar-item${isCurrent ? " is-current" : ""}" title="${escapeAttr(item.rangeLabel)}">
-        <p class="avg-bar-value">${escapeHtml(valueLabel)}</p>
-        <div class="avg-bar-track"><span style="height:${heightPct}%"></span></div>
-        <p class="avg-bar-label">${escapeHtml(item.label)}</p>
-      </article>
-    `;
-  }).join("");
-  const lineMarkup = createHistoryLineGraphMarkup(history, maxMetricValue, selectedMetric);
+  const historyChartMarkup = createHistoryEChartMarkup(history, {
+    graphType: selectedGraphType,
+    metricType: selectedMetric
+  });
 
   const bestDayText = bestDay
     ? `${formatAmountWithUnit(bestDay.amount, unit)} on ${formatDate(parseDateKey(bestDay.date))}`
@@ -3806,9 +3814,7 @@ function createDeepDiveInsightsMarkup(tracker, periodName, range, series, index,
     ? `Goal Hit vs last ${lookbackCount} ${modeLabel.toLowerCase()}`
     : `${metricLabel} (${scopeLabel}) vs last ${lookbackCount} periods`;
   const unitSuffix = selectedMetric === "hit" ? "" : ` (${escapeHtml(unit)})`;
-  const viewMarkup = selectedGraphType === "line"
-    ? `<div class="avg-line-wrap">${lineMarkup}</div>`
-    : `<div class="avg-bars">${barsMarkup}</div>`;
+  const viewMarkup = historyChartMarkup;
 
   return `
     <section class="deep-dive-insights">
@@ -4329,6 +4335,116 @@ function render() {
   queueGoalHitNotificationCheck();
   queueMilestoneNotificationCheck();
   queueSmartReminderCheck();
+}
+
+function createHistoryEChartMarkup(history, options = {}) {
+  const selectedGraphType = normalizeHistoryGraphType(options.graphType);
+  const selectedMetric = normalizeHistoryMetric(options.metricType);
+  const chartConfigId = registerEChartConfig({
+    option: buildHistoryEChartOption(history, selectedGraphType, selectedMetric)
+  });
+  return `
+    <div class="avg-line-wrap">
+      <div class="history-echart js-echart" data-echart-config-id="${chartConfigId}" data-chart-type="history" aria-label="History comparison chart"></div>
+    </div>
+  `;
+}
+
+function buildHistoryEChartOption(history, graphType, metricType) {
+  const categories = history.map((item) => item.label);
+  const values = history.map((item) => Number(item.value) || 0);
+  const maxValue = Math.max(...values, metricType === "hit" ? 1 : 0);
+  const yAxisMax = metricType === "hit" ? 1 : addAmount(maxValue, Math.max(maxValue * 0.12, 0.25));
+  const isLine = graphType === "line";
+
+  const series = isLine
+    ? {
+        type: "line",
+        smooth: true,
+        showSymbol: true,
+        symbolSize: 7,
+        lineStyle: { width: 2.8, color: "#3f7f7a" },
+        itemStyle: { color: "#2f9189", borderColor: "#ffffff", borderWidth: 1.2 },
+        areaStyle: { color: "rgba(103, 185, 175, 0.16)" },
+        data: values
+      }
+    : {
+        type: "bar",
+        barWidth: "48%",
+        data: values,
+        itemStyle: {
+          borderRadius: [6, 6, 0, 0],
+          color: function (params) {
+            return params.dataIndex === 0 ? "#2f9189" : "#9fb8b4";
+          }
+        },
+        label: {
+          show: true,
+          position: "top",
+          color: "#385f5a",
+          fontSize: 10,
+          formatter: function (params) {
+            if (metricType === "hit") {
+              return Number(params.value) > 0 ? "Yes" : "No";
+            }
+            return formatAmount(params.value);
+          }
+        }
+      };
+
+  return {
+    animationDuration: 260,
+    color: ["#2f9189"],
+    grid: {
+      left: 42,
+      right: 14,
+      top: 14,
+      bottom: 26,
+      containLabel: true
+    },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "line" },
+      formatter: function (items) {
+        const first = Array.isArray(items) && items.length > 0 ? items[0] : null;
+        if (!first) {
+          return "";
+        }
+        const label = categories[first.dataIndex] || "";
+        if (metricType === "hit") {
+          return `${label}<br>${Number(first.value) > 0 ? "Goal Hit: Yes" : "Goal Hit: No"}`;
+        }
+        return `${label}<br>${isLine ? "Average" : "Value"}: ${formatAmount(first.value)}`;
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: categories,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#c8d9d6" } },
+      axisLabel: { color: "#577c76", fontSize: 10, fontWeight: 700 }
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: yAxisMax,
+      splitNumber: metricType === "hit" ? 1 : 4,
+      axisLabel: {
+        color: "#577c76",
+        fontSize: 10,
+        fontWeight: 700,
+        formatter: function (value) {
+          if (metricType === "hit") {
+            return Number(value) >= 1 ? "Yes" : "No";
+          }
+          return formatAmount(value);
+        }
+      },
+      splitLine: { lineStyle: { color: "#d9e8e5" } },
+      axisLine: { show: false }
+    },
+    series: [series]
+  };
 }
 
 function createHistoryLineGraphMarkup(history, maxMetricValue, selectedMetric) {
@@ -6403,6 +6519,7 @@ function getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel) {
 }
 
 function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, targetFn, index) {
+  disposeEChartsInScope(listEl);
   const filteredTrackers = getTrackersForPeriod(periodName);
   const dueCheckIns = getCheckInsForPeriod(periodName);
   if (filteredTrackers.length < 1 && dueCheckIns.length < 1) {
@@ -6515,6 +6632,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           showProjectionPoints: pointsEnabled,
           large: false,
           periodName,
+          trackerId: tracker.id,
+          context: "inline",
           unit: tracker.unit,
           domainDays: getRangeDays(range),
           projection,
@@ -6703,6 +6822,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
     ${createPeriodAccordionSectionMarkup(periodName, "goals", "Goals", goalCardsMarkup, "No goals configured.")}
     ${createPeriodAccordionSectionMarkup(periodName, "checkins", "Check-ins", checkInCardsMarkup, `No ${checkInPeriodLabel} check-ins configured.`)}
   `;
+  initializeEChartsInScope(listEl);
 }
 
 function normalizeGoalShareStatus(value) {
@@ -8011,6 +8131,159 @@ function buildChartFilename(goalName, periodName, range) {
   return `${cleanGoal}-${cleanPeriod}-${rangePart}`;
 }
 
+function hasEChartsLibrary() {
+  return Boolean(window.echarts && typeof window.echarts.init === "function");
+}
+
+function registerEChartConfig(config) {
+  nextEChartConfigId += 1;
+  const id = `echart-config-${nextEChartConfigId}`;
+  pendingEChartConfigs.set(id, config);
+  return id;
+}
+
+function cleanupDisconnectedECharts() {
+  activeEChartInstances.forEach((entry, key) => {
+    if (!entry || !entry.element || !document.body.contains(entry.element)) {
+      if (entry && entry.instance) {
+        if (typeof entry.instance.isDisposed !== "function" || !entry.instance.isDisposed()) {
+          entry.instance.dispose();
+        }
+      }
+      activeEChartInstances.delete(key);
+    }
+  });
+}
+
+function disposeEChartsInScope(scope) {
+  if (!scope || !hasEChartsLibrary()) {
+    return;
+  }
+  scope.querySelectorAll(".js-echart").forEach((chartElement) => {
+    const instance = window.echarts.getInstanceByDom(chartElement);
+    if (instance) {
+      instance.dispose();
+    }
+    activeEChartInstances.forEach((entry, key) => {
+      if (entry && entry.element === chartElement) {
+        activeEChartInstances.delete(key);
+      }
+    });
+  });
+}
+
+function initializeEChartsInScope(scope) {
+  if (!scope || !hasEChartsLibrary()) {
+    return;
+  }
+  cleanupDisconnectedECharts();
+  scope.querySelectorAll(".js-echart[data-echart-config-id]").forEach((chartElement) => {
+    const configId = chartElement.dataset.echartConfigId || "";
+    const chartConfig = pendingEChartConfigs.get(configId);
+    if (!chartConfig || !chartConfig.option) {
+      return;
+    }
+    const existing = window.echarts.getInstanceByDom(chartElement);
+    if (existing) {
+      existing.dispose();
+    }
+    const instance = window.echarts.init(chartElement, null, { renderer: "svg" });
+    instance.setOption(chartConfig.option, true);
+    activeEChartInstances.set(configId, { element: chartElement, instance });
+    pendingEChartConfigs.delete(configId);
+  });
+}
+
+function resizeAllECharts() {
+  cleanupDisconnectedECharts();
+  activeEChartInstances.forEach((entry) => {
+    if (
+      !entry
+      || !entry.instance
+      || (typeof entry.instance.isDisposed === "function" && entry.instance.isDisposed())
+    ) {
+      return;
+    }
+    entry.instance.resize();
+  });
+}
+
+function downloadChartFromEChart(chartElement, format, filenameBase) {
+  if (!chartElement || !hasEChartsLibrary()) {
+    return false;
+  }
+  const chartInstance = window.echarts.getInstanceByDom(chartElement);
+  if (!chartInstance) {
+    return false;
+  }
+  const normalizedFormat = String(format || "").toLowerCase();
+  if (normalizedFormat === "svg" && typeof chartInstance.renderToSVGString === "function") {
+    const svgMarkup = chartInstance.renderToSVGString();
+    const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+    triggerBlobDownload(blob, `${filenameBase}.svg`);
+    return true;
+  }
+
+  const pngUrl = chartInstance.getDataURL({
+    type: "png",
+    pixelRatio: 2,
+    backgroundColor: "#ffffff"
+  });
+  if (!pngUrl) {
+    return false;
+  }
+
+  if (normalizedFormat === "webp") {
+    convertDataUrlToWebpAndDownload(pngUrl, filenameBase);
+    return true;
+  }
+
+  if (normalizedFormat === "svg") {
+    triggerDataUrlDownload(pngUrl, `${filenameBase}.png`);
+    return true;
+  }
+
+  triggerDataUrlDownload(pngUrl, `${filenameBase}.png`);
+  return true;
+}
+
+function triggerDataUrlDownload(dataUrl, filename) {
+  const anchor = document.createElement("a");
+  anchor.href = dataUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+function convertDataUrlToWebpAndDownload(dataUrl, filenameBase) {
+  const image = new Image();
+  image.onload = () => {
+    const width = Math.max(image.width || 1, 1);
+    const height = Math.max(image.height || 1, 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      triggerDataUrlDownload(dataUrl, `${filenameBase}.png`);
+      return;
+    }
+    context.drawImage(image, 0, 0, width, height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        triggerDataUrlDownload(dataUrl, `${filenameBase}.png`);
+        return;
+      }
+      triggerBlobDownload(blob, `${filenameBase}.webp`);
+    }, "image/webp", 0.95);
+  };
+  image.onerror = () => {
+    triggerDataUrlDownload(dataUrl, `${filenameBase}.png`);
+  };
+  image.src = dataUrl;
+}
+
 function downloadChartFromSvg(svgElement, format, filenameBase) {
   const svgMarkup = createSvgMarkup(svgElement);
   if (format === "svg") {
@@ -8089,26 +8362,11 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const large = Boolean(options.large);
   const goalHit = Boolean(options.goalHit);
   const periodName = normalizePeriodMode(options.periodName);
+  const trackerId = String(options.trackerId || "");
+  const context = String(options.context || "inline");
   const unit = normalizeGoalUnit(options.unit);
   const domainDays = Math.max(Number(options.domainDays) || 0, series.length || 1, 1);
-  const weekTicks = periodName === "week" && domainDays <= 8;
   const projection = options.projection && Array.isArray(options.projection.points) ? options.projection : null;
-  const cumulative = [];
-  let running = 0;
-  series.forEach((point) => {
-    running = addAmount(running, point.amount);
-    cumulative.push(running);
-  });
-
-  const overlayCumulative = [];
-  if (overlaySeries) {
-    let overlayRunning = 0;
-    overlaySeries.forEach((point) => {
-      overlayRunning = addAmount(overlayRunning, point.amount);
-      overlayCumulative.push(overlayRunning);
-    });
-  }
-
   const projectionPoints = projection
     ? projection.points
       .map((point) => ({
@@ -8120,143 +8378,22 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       .sort((a, b) => a.dayIndex - b.dayIndex)
     : [];
 
-  const width = large ? 1080 : 860;
-  const height = large ? 420 : 270;
-  const padLeft = large ? 74 : 58;
-  const padRight = large ? 24 : 20;
-  const padTop = 20;
-  const padBottom = large ? 64 : (weekTicks ? 70 : 54);
-  const innerWidth = width - padLeft - padRight;
-  const innerHeight = height - padTop - padBottom;
-  const axisY = height - padBottom;
-  const maxDataValue = Math.max(
-    target,
-    cumulative[cumulative.length - 1] || 0,
-    overlayCumulative[overlayCumulative.length - 1] || 0,
-    projectionPoints[projectionPoints.length - 1] ? projectionPoints[projectionPoints.length - 1].cumulative : 0,
-    1
-  );
-  const maxValue = addAmount(maxDataValue, Math.max(maxDataValue * 0.08, 0.5));
-
-  const toX = (index) => {
-    if (domainDays === 1) {
-      return padLeft + innerWidth / 2;
-    }
-    return padLeft + (index / (domainDays - 1)) * innerWidth;
-  };
-  const toY = (value) => axisY - (value / maxValue) * innerHeight;
-  const currentPointRadius = large ? 5.2 : 4.6;
-  const comparisonPointRadius = large ? 5.0 : 4.4;
-
-  const linePoints = cumulative.map((value, index) => `${toX(index).toFixed(2)},${toY(value).toFixed(2)}`).join(" ");
-  const targetY = toY(target).toFixed(2);
-
-  const overlayLinePoints = overlayCumulative
-    .map((value, index) => `${toX(index).toFixed(2)},${toY(value).toFixed(2)}`)
-    .join(" ");
-
-  const projectionLinePoints = projectionPoints
-    .map((point) => `${toX(point.dayIndex).toFixed(2)},${toY(point.cumulative).toFixed(2)}`)
-    .join(" ");
-
-  const yTickCount = 4;
-  const yTicks = Array.from({ length: yTickCount + 1 }, (_, index) => (maxValue * index) / yTickCount);
-  const yTickMarkup = yTicks.map((value) => {
-    const y = toY(value).toFixed(2);
-    return `
-      <line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" class="graph-grid-line" />
-      <text x="${padLeft - 8}" y="${y}" class="graph-tick graph-tick-y">${escapeHtml(formatAmount(value))}</text>
-    `;
-  }).join("");
-
-  const xTickIndexes = weekTicks
-    ? Array.from({ length: domainDays }, (_, index) => index)
-    : Array.from(new Set([0, Math.floor((domainDays - 1) / 2), domainDays - 1]))
-      .filter((value) => value >= 0)
-      .sort((a, b) => a - b);
-  const xTickMarkup = xTickIndexes.map((index) => {
-    const x = toX(index).toFixed(2);
-    const tickDate = addDays(range.start, index);
-    if (weekTicks) {
-      return `
-      <line x1="${x}" y1="${axisY}" x2="${x}" y2="${axisY + 6}" class="graph-axis" />
-      <text x="${x}" y="${axisY + 16}" class="graph-tick graph-tick-x graph-tick-week">
-        <tspan x="${x}" dy="0">${escapeHtml(formatWeekday(tickDate))}</tspan>
-        <tspan x="${x}" dy="12">${escapeHtml(`${tickDate.getMonth() + 1}/${tickDate.getDate()}`)}</tspan>
-      </text>
-    `;
-    }
-    return `
-      <line x1="${x}" y1="${axisY}" x2="${x}" y2="${axisY + 6}" class="graph-axis" />
-      <text x="${x}" y="${axisY + 22}" class="graph-tick graph-tick-x">${escapeHtml(formatMonthDay(tickDate))}</text>
-    `;
-  }).join("");
-
-  const pointDots = showCurrentPoints
-    ? series.map((point, index) => {
-        const cx = toX(index).toFixed(2);
-        const cy = toY(cumulative[index]).toFixed(2);
-        const dateLabel = formatDate(parseDateKey(point.date));
-        return `
-          <circle
-            data-point="1"
-            class="graph-point${goalHit ? " graph-point-hit" : ""}"
-            cx="${cx}"
-            cy="${cy}"
-            r="${currentPointRadius.toFixed(1)}"
-            data-date-label="${escapeAttr(dateLabel)}"
-            data-amount="${escapeAttr(formatAmount(point.amount))}"
-            data-cumulative="${escapeAttr(formatAmount(cumulative[index]))}"
-            data-series-label="Current"
-            data-unit="${escapeAttr(unit)}"
-          ></circle>
-        `;
-      }).join("")
-    : "";
-
-  const overlayDots = overlaySeries && showOverlayPoints
-    ? overlaySeries.map((point, index) => {
-        const cx = toX(index).toFixed(2);
-        const cy = toY(overlayCumulative[index]).toFixed(2);
-        const dateLabel = formatDate(parseDateKey(point.date));
-        return `
-          <circle
-            data-point="1"
-            class="graph-point graph-point-overlay"
-            cx="${cx}"
-            cy="${cy}"
-            r="${comparisonPointRadius.toFixed(1)}"
-            data-date-label="${escapeAttr(dateLabel)}"
-            data-amount="${escapeAttr(formatAmount(point.amount))}"
-            data-cumulative="${escapeAttr(formatAmount(overlayCumulative[index]))}"
-            data-series-label="Previous"
-            data-unit="${escapeAttr(unit)}"
-          ></circle>
-        `;
-      }).join("")
-    : "";
-
-  const projectionDots = projectionPoints.length > 1 && showProjectionPoints
-    ? projectionPoints.slice(1).map((point) => {
-        const cx = toX(point.dayIndex).toFixed(2);
-        const cy = toY(point.cumulative).toFixed(2);
-        const dateLabel = formatDate(parseDateKey(point.date));
-        return `
-          <circle
-            data-point="1"
-            class="graph-point graph-point-projection${goalHit ? " graph-point-hit" : ""}"
-            cx="${cx}"
-            cy="${cy}"
-            r="${comparisonPointRadius.toFixed(1)}"
-            data-date-label="${escapeAttr(dateLabel)}"
-            data-amount="${escapeAttr(formatAmount(point.amount))}"
-            data-cumulative="${escapeAttr(formatAmount(point.cumulative))}"
-            data-series-label="Projection"
-            data-unit="${escapeAttr(unit)}"
-          ></circle>
-        `;
-      }).join("")
-    : "";
+  const chartConfigId = registerEChartConfig({
+    option: buildCumulativeGraphEChartOption({
+      series,
+      target,
+      range,
+      overlaySeries,
+      periodName,
+      unit,
+      domainDays,
+      projectionPoints,
+      showCurrentPoints,
+      showOverlayPoints,
+      showProjectionPoints,
+      goalHit
+    })
+  });
 
   const overlayLegend = overlaySeries
     ? `<span class="legend-item"><span class="legend-swatch legend-overlay"></span>Previous Period</span>`
@@ -8264,8 +8401,8 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
   const projectionLegend = projectionPoints.length > 1
     ? `<span class="legend-item"><span class="legend-swatch legend-projection${goalHit ? " legend-projection-hit" : ""}"></span>Projection</span>`
     : "";
-
   const rangeLabel = `${formatDate(range.start)} to ${formatDate(range.end)}`;
+  const chartSizeClass = large ? "graph-echart graph-echart-large" : "graph-echart";
 
   return `
     <div class="graph-head">
@@ -8278,23 +8415,217 @@ function createCumulativeGraphSvg(series, target, range, overlaySeries = null, o
       <p class="graph-range-inline">${escapeHtml(rangeLabel)}</p>
     </div>
     <div class="graph-frame">
-      <svg class="graph-svg${large ? " graph-svg-large" : ""}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Cumulative progress line graph">
-        <rect x="${padLeft}" y="${padTop}" width="${innerWidth}" height="${innerHeight}" class="graph-grid" />
-        ${yTickMarkup}
-        <line x1="${padLeft}" y1="${targetY}" x2="${width - padRight}" y2="${targetY}" class="graph-target" />
-        <line x1="${padLeft}" y1="${axisY}" x2="${width - padRight}" y2="${axisY}" class="graph-axis" />
-        <line x1="${padLeft}" y1="${padTop}" x2="${padLeft}" y2="${axisY}" class="graph-axis" />
-        ${xTickMarkup}
-        ${overlaySeries ? `<polyline points="${overlayLinePoints}" class="graph-line-overlay"></polyline>` : ""}
-        ${projectionPoints.length > 1 ? `<polyline points="${projectionLinePoints}" class="graph-line-projection${goalHit ? " graph-line-projection-hit" : ""}"></polyline>` : ""}
-        <polyline points="${linePoints}" class="graph-line${goalHit ? " graph-line-hit" : ""}"></polyline>
-        ${overlayDots}
-        ${projectionDots}
-        ${pointDots}
-      </svg>
-      <div class="graph-tooltip hidden" data-tooltip></div>
+      <div
+        class="${chartSizeClass} js-echart"
+        data-echart-config-id="${chartConfigId}"
+        data-chart-type="cumulative"
+        data-chart-period="${escapeAttr(periodName)}"
+        data-chart-id="${escapeAttr(trackerId)}"
+        data-chart-context="${escapeAttr(context)}"
+        role="img"
+        aria-label="Cumulative progress line chart"
+      ></div>
     </div>
   `;
+}
+
+function buildCumulativeGraphEChartOption(config) {
+  const series = Array.isArray(config.series) ? config.series : [];
+  const overlaySeries = Array.isArray(config.overlaySeries) ? config.overlaySeries : null;
+  const projectionPoints = Array.isArray(config.projectionPoints) ? config.projectionPoints : [];
+  const target = Number(config.target) || 0;
+  const range = config.range;
+  const periodName = normalizePeriodMode(config.periodName);
+  const unit = normalizeGoalUnit(config.unit);
+  const domainDays = Math.max(Number(config.domainDays) || 1, 1);
+  const goalHit = Boolean(config.goalHit);
+  const showCurrentPoints = Boolean(config.showCurrentPoints);
+  const showOverlayPoints = Boolean(config.showOverlayPoints);
+  const showProjectionPoints = Boolean(config.showProjectionPoints);
+  const weekTicks = periodName === "week" && domainDays <= 8;
+
+  const dateKeys = Array.from({ length: domainDays }, (_, dayIndex) => getDateKey(addDays(range.start, dayIndex)));
+  const currentCumulative = [];
+  let currentRunning = 0;
+  for (let dayIndex = 0; dayIndex < domainDays; dayIndex += 1) {
+    const point = series[dayIndex];
+    if (point) {
+      currentRunning = addAmount(currentRunning, point.amount);
+    }
+    currentCumulative.push(currentRunning);
+  }
+
+  const previousCumulative = overlaySeries ? [] : null;
+  if (overlaySeries && previousCumulative) {
+    let previousRunning = 0;
+    for (let dayIndex = 0; dayIndex < domainDays; dayIndex += 1) {
+      const point = overlaySeries[dayIndex];
+      if (point) {
+        previousRunning = addAmount(previousRunning, point.amount);
+      }
+      previousCumulative.push(previousRunning);
+    }
+  }
+
+  const projectionValues = new Array(domainDays).fill(null);
+  projectionPoints.forEach((point) => {
+    if (point.dayIndex >= 0 && point.dayIndex < domainDays) {
+      projectionValues[point.dayIndex] = Number(point.cumulative) || 0;
+    }
+  });
+
+  const projectionMax = projectionPoints.reduce((max, point) => Math.max(max, Number(point.cumulative) || 0), 0);
+  const maxDataValue = Math.max(
+    target,
+    currentCumulative[currentCumulative.length - 1] || 0,
+    previousCumulative ? (previousCumulative[previousCumulative.length - 1] || 0) : 0,
+    projectionMax,
+    1
+  );
+  const yAxisMax = addAmount(maxDataValue, Math.max(maxDataValue * 0.08, 0.5));
+
+  const formatAxisLabel = function (dateKey) {
+    const parsed = parseDateKey(dateKey);
+    if (weekTicks) {
+      return `${formatWeekday(parsed)}\n${parsed.getMonth() + 1}/${parsed.getDate()}`;
+    }
+    return formatMonthDay(parsed);
+  };
+
+  const chartSeries = [
+    {
+      name: "Current Cumulative",
+      type: "line",
+      smooth: false,
+      symbol: "circle",
+      symbolSize: 6,
+      showSymbol: showCurrentPoints,
+      lineStyle: {
+        width: 3,
+        color: goalHit ? "#1f9b6c" : "#009f94"
+      },
+      itemStyle: {
+        color: goalHit ? "#1f9b6c" : "#009f94",
+        borderColor: "#ffffff",
+        borderWidth: 1.2
+      },
+      areaStyle: {
+        color: goalHit ? "rgba(39, 176, 125, 0.14)" : "rgba(0, 159, 148, 0.10)"
+      },
+      data: currentCumulative
+    },
+    {
+      name: "Target",
+      type: "line",
+      symbol: "none",
+      lineStyle: {
+        width: 1.8,
+        color: "#111111",
+        type: "dashed"
+      },
+      data: dateKeys.map(() => target)
+    }
+  ];
+
+  if (previousCumulative) {
+    chartSeries.push({
+      name: "Previous Period",
+      type: "line",
+      smooth: false,
+      symbol: "circle",
+      symbolSize: 5,
+      showSymbol: showOverlayPoints,
+      lineStyle: {
+        width: 2.2,
+        color: "#7ea7a3",
+        type: "dashed"
+      },
+      itemStyle: {
+        color: "#7ea7a3",
+        borderColor: "#ffffff",
+        borderWidth: 1
+      },
+      data: previousCumulative
+    });
+  }
+
+  if (projectionPoints.length > 1) {
+    chartSeries.push({
+      name: "Projection",
+      type: "line",
+      smooth: false,
+      symbol: "circle",
+      symbolSize: 5,
+      showSymbol: showProjectionPoints,
+      connectNulls: false,
+      lineStyle: {
+        width: 2,
+        type: "dashed",
+        color: goalHit ? "#1f9b6c" : "#009f94"
+      },
+      itemStyle: {
+        color: goalHit ? "#1f9b6c" : "#009f94",
+        borderColor: "#ffffff",
+        borderWidth: 1
+      },
+      data: projectionValues
+    });
+  }
+
+  return {
+    animationDuration: 280,
+    color: ["#009f94"],
+    grid: {
+      left: 56,
+      right: 20,
+      top: 16,
+      bottom: weekTicks ? 58 : 40
+    },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "line" },
+      formatter: function (items) {
+        if (!Array.isArray(items) || items.length < 1) {
+          return "";
+        }
+        const dateKey = String(items[0].axisValue || "");
+        const label = isDateKey(dateKey) ? formatDate(parseDateKey(dateKey)) : dateKey;
+        const lines = [label];
+        items.forEach((item) => {
+          lines.push(`${item.seriesName}: ${formatAmount(item.value)} ${unit}`);
+        });
+        return lines.join("<br>");
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: dateKeys,
+      boundaryGap: false,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: "#9ed9d2" } },
+      axisLabel: {
+        color: "#3b6a64",
+        fontWeight: 600,
+        formatter: formatAxisLabel
+      }
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: yAxisMax,
+      splitNumber: 4,
+      splitLine: { lineStyle: { color: "#d5ece8" } },
+      axisLine: { show: false },
+      axisLabel: {
+        color: "#3b6a64",
+        fontWeight: 600,
+        formatter: function (value) {
+          return formatAmount(value);
+        }
+      }
+    },
+    series: chartSeries
+  };
 }
 
 function getPeriodComparison(periodName, range, elapsedDays) {
