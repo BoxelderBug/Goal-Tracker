@@ -246,6 +246,8 @@ body::before {
   animation: reveal-up 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
   display: grid;
   gap: 10px;
+  position: relative;
+  z-index: 500;
 }
 
 .hero-top {
@@ -302,13 +304,14 @@ body::before {
 
 .user-account-dropdown {
   position: relative;
+  z-index: 520;
 }
 
 .user-account-menu {
   top: calc(100% + 10px);
   left: 0;
   min-width: 220px;
-  z-index: 240;
+  z-index: 900;
 }
 
 .user-account-dropdown.open .user-account-menu,
