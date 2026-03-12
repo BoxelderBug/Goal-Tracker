@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260312i" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -111,9 +111,18 @@
               <button id="logout-btn" class="btn" type="button">Logout</button>
               <div class="dropdown-menu user-account-menu">
                 <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
-                <button class="menu-btn" type="button" data-tab="manage">Manage Goals</button>
-                <button class="menu-btn" type="button" data-tab="settings" data-scroll-target="#account-security-section">Profile Settings</button>
-                <button class="menu-btn" type="button" data-tab="point-store">Point Store</button>
+                <button class="menu-btn" type="button" data-tab="settings-general">Settings Home</button>
+                <button class="menu-btn" type="button" data-tab="settings-goals">Goal Settings</button>
+                <button class="menu-btn" type="button" data-tab="settings-checkins">Check-in Settings</button>
+                <button class="menu-btn" type="button" data-tab="settings-general" data-scroll-target="#account-security-section">Profile Settings</button>
+                <button class="menu-btn menu-btn-store-icon" type="button" data-tab="settings-point-store" aria-label="Point Store Settings">
+                  <span class="store-menu-icon" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                  <span class="visually-hidden">Point Store Settings</span>
+                </button>
                 <button class="menu-btn" type="button" data-tab="social" data-social-section="friends">Friends</button>
                 <button class="menu-btn" type="button" data-tab="social" data-social-section="squads">Squads</button>
               </div>
@@ -150,9 +159,14 @@
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Views</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
-              <button class="menu-btn" type="button" data-tab="week">Week</button>
-              <button class="menu-btn" type="button" data-tab="month">Month</button>
-              <button class="menu-btn" type="button" data-tab="year">Year</button>
+              <details class="menu-subgroup">
+                <summary class="menu-subgroup-toggle">Period Views</summary>
+                <div class="menu-subgroup-menu">
+                  <button class="menu-btn" type="button" data-tab="week">Week</button>
+                  <button class="menu-btn" type="button" data-tab="month">Month</button>
+                  <button class="menu-btn" type="button" data-tab="year">Year</button>
+                </div>
+              </details>
               <button class="menu-btn" type="button" data-tab="quarter">Quarter</button>
               <button class="menu-btn" type="button" data-tab="trends">Trends</button>
               <button class="menu-btn" type="button" data-tab="goals-plus">Goals+</button>
@@ -182,24 +196,24 @@
           <ul id="home-insights-list" class="card-list compact-list"></ul>
           <p id="home-insights-empty" class="empty-state">No measurable weekly goal data yet.</p>
         </section>
-        <div class="form-grid form-grid-2 home-chart-grid">
-          <section class="snapshot-panel">
-            <div class="snapshot-panel-head">
-              <h3>30-Day Activity Trend</h3>
-              <p class="muted small">Total daily entry volume and rolling average.</p>
-            </div>
-            <div id="home-activity-chart"></div>
-            <p id="home-activity-empty" class="empty-state">No recent entry activity yet.</p>
-          </section>
-          <section class="snapshot-panel">
-            <div class="snapshot-panel-head">
-              <h3>Goal Momentum 3D</h3>
-              <p class="muted small">Completion %, priority, and weekly momentum change.</p>
-            </div>
-            <div id="home-momentum-chart"></div>
-            <p id="home-momentum-empty" class="empty-state">No measurable goals to plot yet.</p>
-          </section>
-        </div>
+        <section class="snapshot-panel home-chart-panel">
+          <div class="snapshot-panel-head">
+            <h3>Dashboard Chart</h3>
+            <p class="muted small">Switch between key chart views for activity, momentum, pacing, and risk.</p>
+          </div>
+          <label class="inline-control">
+            Chart View
+            <select id="home-dashboard-view-select">
+              <option value="activity">30-Day Activity</option>
+              <option value="momentum">Goal Momentum</option>
+              <option value="heatmap">5-Week Heatmap</option>
+              <option value="weekly-progress">Weekly Progress</option>
+              <option value="missed-risk">Missed Entry Risk</option>
+            </select>
+          </label>
+          <div id="home-dashboard-chart"></div>
+          <p id="home-dashboard-chart-empty" class="empty-state">No data available for this chart view yet.</p>
+        </section>
         <div class="form-grid form-grid-2 home-dashboard-grid">
           <section class="snapshot-panel">
             <div class="snapshot-panel-head">
@@ -218,18 +232,10 @@
             <p id="home-reminders-empty" class="empty-state">No reminders to show.</p>
           </section>
         </div>
-        <section id="home-goal-heatmap-panel" class="snapshot-panel home-heatmap-panel">
-          <div class="snapshot-panel-head">
-            <h3>5-Week Goal Heatmap</h3>
-            <p class="muted small">Weekly actual vs target percentage for each goal.</p>
-          </div>
-          <div id="home-goal-heatmap"></div>
-          <p id="home-goal-heatmap-empty" class="empty-state">No measurable weekly goals yet.</p>
-        </section>
       </section>
 
-      <section class="panel tab-panel active" data-tab-panel="manage">
-        <h2>Manage Goals</h2>
+      <section class="panel tab-panel" data-tab-panel="settings-goals" hidden>
+        <h2>Goal Settings</h2>
         <form id="goal-form" class="form-block">
           <div class="form-grid form-grid-3">
             <label>
@@ -1184,8 +1190,8 @@
       <p id="point-store-history-empty" class="empty-state">No point activity yet.</p>
     </section>
 
-      <section class="panel tab-panel" data-tab-panel="checkins" hidden>
-      <h2>Manage Check-ins</h2>
+      <section class="panel tab-panel" data-tab-panel="settings-checkins" hidden>
+      <h2>Check-in Settings</h2>
       <p class="muted">Create periodic check-ins that are tracked once per week, month, or year.</p>
       <form id="checkin-form" class="form-block">
         <div class="form-grid form-grid-2">
@@ -1225,16 +1231,17 @@
       <p id="checkin-empty" class="empty-state">No check-ins yet. Add your first check-in above.</p>
       </section>
 
-      <section class="panel tab-panel" data-tab-panel="settings" hidden>
+      <section class="panel tab-panel" data-tab-panel="settings-general" hidden>
       <h2>Settings</h2>
       <section class="snapshot-panel">
         <div class="snapshot-panel-head">
-          <h3>Setup</h3>
-          <p class="muted small">Manage your goals and check-ins.</p>
+          <h3>Settings Pages</h3>
+          <p class="muted small">Use focused settings pages for goals, check-ins, and point store.</p>
         </div>
         <div class="actions">
-          <button class="btn" type="button" data-action="jump-tab" data-tab-target="manage">Manage Goals</button>
-          <button class="btn" type="button" data-action="jump-tab" data-tab-target="checkins">Manage Check-ins</button>
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-goals">Goal Settings</button>
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-checkins">Check-in Settings</button>
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-point-store">Point Store Settings</button>
         </div>
       </section>
       <form id="settings-form" class="form-block">
@@ -1382,7 +1389,11 @@
         <p id="trash-empty" class="empty-state">No deleted items.</p>
       </section>
 
-      <section id="point-store-settings-section" class="snapshot-panel" hidden>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="settings-point-store" hidden>
+      <h2>Point Store Settings</h2>
+      <section id="point-store-settings-section" class="snapshot-panel">
         <div class="snapshot-panel-head">
           <h3>Point Store Rewards</h3>
           <p class="muted small">Define rewards and costs for spending your point bank.</p>
@@ -1517,7 +1528,7 @@
           </div>
           <div class="graph-modal-body">
             <ol class="simple-list">
-              <li>Add goals in Manage Goals.</li>
+              <li>Add goals in Settings > Goal Settings.</li>
               <li>Log updates in Add Entry.</li>
               <li>Review pace in Week/Month/Year views.</li>
               <li>Close out periods to lock snapshots and reward points.</li>
@@ -1531,6 +1542,6 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=20260312i"></script>
 </body>
 </html>

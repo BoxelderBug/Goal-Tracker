@@ -177,6 +177,9 @@ const homeActivityChart = document.querySelector("#home-activity-chart");
 const homeActivityEmpty = document.querySelector("#home-activity-empty");
 const homeMomentumChart = document.querySelector("#home-momentum-chart");
 const homeMomentumEmpty = document.querySelector("#home-momentum-empty");
+const homeDashboardViewSelect = document.querySelector("#home-dashboard-view-select");
+const homeDashboardChart = document.querySelector("#home-dashboard-chart");
+const homeDashboardChartEmpty = document.querySelector("#home-dashboard-chart-empty");
 const homeMissedList = document.querySelector("#home-missed-list");
 const homeMissedEmpty = document.querySelector("#home-missed-empty");
 const homeRemindersList = document.querySelector("#home-reminders-list");
@@ -451,7 +454,8 @@ let rewards = [];
 let rewardPurchases = [];
 let pointTransactions = [];
 let settings = getDefaultSettings();
-let activeTab = "manage";
+let activeTab = "settings-general";
+let homeDashboardChartView = "activity";
 let activeSocialSection = "friends";
 let entryMode = "solo";
 let entryListSortMode = "date_desc";
@@ -764,6 +768,18 @@ window.addEventListener("resize", () => {
   resizeAllECharts();
 });
 
+window.addEventListener("load", () => {
+  scheduleEChartResizePasses();
+});
+
+if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === "function") {
+  document.fonts.ready.then(() => {
+    scheduleEChartResizePasses();
+  }).catch(() => {
+    // Ignore font loading errors and keep chart rendering.
+  });
+}
+
 dropdowns.forEach((dropdown) => {
   const toggle = dropdown.querySelector("[data-dropdown-toggle]");
   if (!toggle) {
@@ -834,6 +850,17 @@ document.addEventListener("click", (event) => {
   const scrollTarget = String(jumpButton.dataset.scrollTarget || "").trim();
   navigateToTab(tabTarget, { socialSection, scrollTarget });
 });
+
+if (homeDashboardViewSelect) {
+  homeDashboardViewSelect.addEventListener("change", () => {
+    homeDashboardChartView = normalizeHomeDashboardChartView(homeDashboardViewSelect.value);
+    if (!currentUser) {
+      return;
+    }
+    renderHomeTab();
+    scheduleEChartResizePasses();
+  });
+}
 
 authModeButtons.forEach((button) => {
   button.addEventListener("click", () => {
@@ -994,13 +1021,23 @@ function applyPasswordVisibilityToggle() {
 }
 
 function setActiveTabSafe(tabName, options = {}) {
-  const normalizedTab = String(tabName || "").trim() || "manage";
-  activeTab = normalizedTab;
+  const normalizedTab = String(tabName || "").trim();
+  const mappedTab = normalizedTab === "settings"
+    ? "settings-general"
+    : normalizedTab === "manage"
+    ? "settings-goals"
+    : normalizedTab === "checkins"
+    ? "settings-checkins"
+    : normalizedTab;
+  activeTab = mappedTab || "settings-general";
   if (!isBucketListEnabled() && (activeTab === "bucket-entry" || activeTab === "bucket-list")) {
     activeTab = "entry";
   }
   if (!isPointStoreRewardsEnabled() && activeTab === "point-store") {
-    activeTab = "manage";
+    activeTab = "settings-general";
+  }
+  if (!isRewardPointsEnabled() && activeTab === "settings-point-store") {
+    activeTab = "settings-general";
   }
   if (!isQuartersEnabled() && activeTab === "quarter") {
     activeTab = "week";
@@ -1011,9 +1048,13 @@ function setActiveTabSafe(tabName, options = {}) {
   }
   if (options && options.renderImmediate) {
     renderTabs();
+    if (activeTab === "home") {
+      renderHomeTab();
+    }
     if (activeTab === "goal-schedule") {
       renderGoalScheduleTab();
     }
+    scheduleEChartResizePasses();
   }
 }
 
@@ -1186,7 +1227,7 @@ if (settingsShortcutButton) {
     if (!currentUser) {
       return;
     }
-    navigateToTab("settings", { scrollTarget: "#account-security-section" });
+    navigateToTab("settings-general", { scrollTarget: "#account-security-section" });
   });
 }
 
@@ -3380,6 +3421,9 @@ if (quarterCloseoutButton) {
         return;
       }
       periodAccordionState[period][section] = details.open;
+      if (details.open) {
+        scheduleEChartResizePasses();
+      }
     }, 0);
   });
 });
@@ -4388,22 +4432,49 @@ function getProgressTonePalette(toneClass) {
   return { start: "#2f9fb6", end: "#267f92", marker: "#267f92" };
 }
 
+function blendHexWithWhite(hexColor, amount = 0.5) {
+  const match = /^#?([0-9a-fA-F]{6})$/.exec(String(hexColor || "").trim());
+  if (!match) {
+    return "#d6f2ed";
+  }
+  const base = match[1];
+  const ratio = Math.min(Math.max(Number(amount) || 0, 0), 1);
+  const red = parseInt(base.slice(0, 2), 16);
+  const green = parseInt(base.slice(2, 4), 16);
+  const blue = parseInt(base.slice(4, 6), 16);
+  const nextRed = Math.round(red + ((255 - red) * ratio));
+  const nextGreen = Math.round(green + ((255 - green) * ratio));
+  const nextBlue = Math.round(blue + ((255 - blue) * ratio));
+  return `rgb(${nextRed}, ${nextGreen}, ${nextBlue})`;
+}
+
 function createPeriodProgressBarEChartMarkup(options = {}) {
   const progressValue = Number(options.progressValue);
   const targetValue = Number(options.targetValue);
   const projectedValue = Number(options.projectedValue);
+  const providedCurrentPercent = Number(options.currentPercent);
+  const providedProjectedPercent = Number(options.projectedPercent);
   const derivedCurrentPercent = targetValue > 0 && Number.isFinite(progressValue)
     ? (progressValue / targetValue) * 100
-    : Number(options.currentPercent);
+    : providedCurrentPercent;
   const derivedProjectedPercent = targetValue > 0 && Number.isFinite(projectedValue)
     ? (projectedValue / targetValue) * 100
-    : Number(options.projectedPercent);
-  const currentPercent = Math.max(Number.isFinite(derivedCurrentPercent) ? derivedCurrentPercent : 0, 0);
-  const projectedPercent = Math.max(Number.isFinite(derivedProjectedPercent) ? derivedProjectedPercent : 0, 0);
+    : providedProjectedPercent;
+  const currentPercent = Math.max(
+    Number.isFinite(providedCurrentPercent)
+      ? providedCurrentPercent
+      : (Number.isFinite(derivedCurrentPercent) ? derivedCurrentPercent : 0),
+    0
+  );
+  const projectedPercent = Math.max(
+    Number.isFinite(providedProjectedPercent)
+      ? providedProjectedPercent
+      : (Number.isFinite(derivedProjectedPercent) ? derivedProjectedPercent : 0),
+    0
+  );
   const toneClass = String(options.toneClass || "");
   const progressLabel = String(options.progressLabel || "");
   const projectedLabel = String(options.projectedLabel || "");
-  const projectedChipLabel = `Proj ${Math.round(projectedPercent)}%`;
   const displayCurrentPercent = Math.min(currentPercent, 100);
   const displayProjectedPercent = Math.min(projectedPercent, 100);
   const chartConfigId = registerEChartConfig({
@@ -4419,7 +4490,6 @@ function createPeriodProgressBarEChartMarkup(options = {}) {
       <div class="period-progress-wrap" aria-label="${escapeAttr(caption)}" title="${escapeAttr(caption)}">
         <div class="period-progress-echart js-echart" data-echart-config-id="${chartConfigId}" data-chart-type="period-progress"></div>
         <span class="period-progress-label">${escapeHtml(progressLabel)}</span>
-        <span class="period-progress-projected">${escapeHtml(projectedChipLabel)}</span>
       </div>
     </div>
   `;
@@ -4432,6 +4502,12 @@ function buildPeriodProgressBarEChartOption(config) {
   const currentDisplay = Math.min(currentPercent, 100);
   const projectedDisplay = Math.min(projectedPercent, 100);
   const projectedExtension = Math.max(projectedDisplay - currentDisplay, 0);
+  const hasProjectionExtension = projectedExtension > 0.05;
+  const currentSegmentRadius = hasProjectionExtension
+    ? [999, 0, 0, 999]
+    : [999, 999, 999, 999];
+  const projectionStartColor = blendHexWithWhite(palette.start, 0.58);
+  const projectionEndColor = blendHexWithWhite(palette.end, 0.45);
   return {
     animationDuration: 220,
     backgroundColor: "transparent",
@@ -4443,7 +4519,13 @@ function buildPeriodProgressBarEChartOption(config) {
       containLabel: false
     },
     tooltip: {
-      trigger: "item",
+      trigger: "axis",
+      axisPointer: {
+        type: "none"
+      },
+      appendToBody: true,
+      confine: false,
+      extraCssText: "z-index:999999;pointer-events:none;",
       formatter: function () {
         return `Current: ${formatAmount(currentPercent)}%<br>Projected: ${formatAmount(projectedPercent)}%`;
       }
@@ -4483,7 +4565,7 @@ function buildPeriodProgressBarEChartOption(config) {
           }
         },
         itemStyle: {
-          borderRadius: [999, 999, 999, 999],
+          borderRadius: currentSegmentRadius,
           color: {
             type: "linear",
             x: 0,
@@ -4502,21 +4584,6 @@ function buildPeriodProgressBarEChartOption(config) {
           shadowColor: "rgba(0, 66, 59, 0.22)",
           shadowBlur: 10,
           shadowOffsetY: 3
-        },
-        markLine: {
-          symbol: "none",
-          silent: true,
-          lineStyle: {
-            type: "dashed",
-            color: palette.marker,
-            width: 2.4
-          },
-          label: {
-            show: false
-          },
-          data: [
-            { xAxis: projectedDisplay }
-          ]
         }
       },
       {
@@ -4536,12 +4603,12 @@ function buildPeriodProgressBarEChartOption(config) {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: "rgba(206, 245, 238, 0.88)" },
-              { offset: 1, color: "rgba(66, 173, 191, 0.42)" }
+              { offset: 0, color: projectionStartColor },
+              { offset: 1, color: projectionEndColor }
             ]
           },
-          borderColor: "rgba(255, 255, 255, 0.28)",
-          borderWidth: 1
+          borderColor: "rgba(255, 255, 255, 0.14)",
+          borderWidth: 0
         }
       }
     ]
@@ -4734,7 +4801,7 @@ function renderAuthState() {
   if (settingsShortcutButton) {
     settingsShortcutButton.hidden = !isAuthenticated;
     settingsShortcutButton.disabled = !isAuthenticated;
-    const settingsActive = isAuthenticated && activeTab === "settings";
+    const settingsActive = isAuthenticated && activeTab.startsWith("settings-");
     settingsShortcutButton.classList.toggle("active", settingsActive);
     settingsShortcutButton.setAttribute("aria-current", settingsActive ? "page" : "false");
   }
@@ -4901,6 +4968,23 @@ function formatShortMonthDay(date) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+function normalizeHomeDashboardChartView(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "momentum") {
+    return "momentum";
+  }
+  if (normalized === "heatmap") {
+    return "heatmap";
+  }
+  if (normalized === "weekly-progress") {
+    return "weekly-progress";
+  }
+  if (normalized === "missed-risk") {
+    return "missed-risk";
+  }
+  return "activity";
+}
+
 function hasECharts3DLibrary() {
   return Boolean(window.echarts && (window.echarts.graphicGL || window.echarts.ComponentModel3D));
 }
@@ -4939,6 +5023,362 @@ function getHomeMomentumRows(weekIndex, nowDate) {
       };
     })
     .filter(Boolean);
+}
+
+function getHomeActivityTrendData(nowDate) {
+  const activeGoalIds = new Set(
+    trackers
+      .filter((tracker) => tracker && !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket")
+      .map((tracker) => tracker.id)
+  );
+  if (activeGoalIds.size < 1) {
+    return null;
+  }
+  const dailyDates = Array.from({ length: 30 }, (_, index) => addDays(nowDate, -(29 - index)));
+  const labels = dailyDates.map((date) => formatShortMonthDay(date));
+  const dateKeySet = new Set(dailyDates.map((date) => getDateKey(date)));
+  const totalsByDate = new Map(dailyDates.map((date) => [getDateKey(date), 0]));
+  entries.forEach((entry) => {
+    if (!entry || !activeGoalIds.has(entry.trackerId) || !dateKeySet.has(entry.date)) {
+      return;
+    }
+    const prior = totalsByDate.get(entry.date) || 0;
+    totalsByDate.set(entry.date, addAmount(prior, Number(entry.amount || 0)));
+  });
+  const dailyValues = dailyDates.map((date) => totalsByDate.get(getDateKey(date)) || 0);
+  if (!dailyValues.some((value) => value > 0)) {
+    return null;
+  }
+  const rollingValues = dailyValues.map((_, index) => {
+    const start = Math.max(0, index - 6);
+    const windowValues = dailyValues.slice(start, index + 1);
+    return safeDivide(windowValues.reduce((sum, value) => sum + value, 0), windowValues.length);
+  });
+  return { labels, dailyValues, rollingValues };
+}
+
+function getHomeHeatmapChartConfig(weekIndex, nowDate) {
+  const weekRanges = getHomeHeatmapWeekRanges(nowDate);
+  const weekLabels = weekRanges.map((range) => `Wk ${formatDate(range.start)}`);
+  const weeklyTrackers = trackers.filter((tracker) => (
+    tracker
+    && !tracker.archived
+    && normalizeGoalType(tracker.goalType) !== "bucket"
+    && !isFloatingGoalType(tracker.goalType)
+  ));
+  const heatmapRows = weeklyTrackers
+    .map((tracker) => {
+      const weekValues = weekRanges.map((range) => {
+        const target = getTrackerTargetForPeriod(tracker, "week", range);
+        const progress = sumTrackerRange(weekIndex, tracker.id, range);
+        const pctRaw = target > 0 ? (progress / target) * 100 : null;
+        return {
+          target,
+          progress,
+          pctRaw
+        };
+      });
+      return {
+        tracker,
+        weekValues,
+        hasMeasurableWeek: weekValues.some((item) => item.target > 0)
+      };
+    })
+    .filter((row) => row.hasMeasurableWeek);
+
+  if (heatmapRows.length < 1) {
+    return null;
+  }
+
+  const goalLabels = heatmapRows.map((row) => row.tracker.name);
+  const rawPercentages = [];
+  const chartData = [];
+  heatmapRows.forEach((row, yIndex) => {
+    row.weekValues.forEach((weekValue, xIndex) => {
+      const hasTarget = weekValue.target > 0;
+      const pctRaw = hasTarget ? Number(weekValue.pctRaw) : null;
+      if (Number.isFinite(pctRaw)) {
+        rawPercentages.push(pctRaw);
+      }
+      chartData.push({
+        value: [xIndex, yIndex, Number.isFinite(pctRaw) ? Math.max(Math.min(pctRaw, 200), 0) : -1],
+        pctRaw,
+        progress: weekValue.progress,
+        target: weekValue.target,
+        unit: row.tracker.unit || "units",
+        goalName: row.tracker.name,
+        weekLabel: `${formatDate(weekRanges[xIndex].start)} to ${formatDate(weekRanges[xIndex].end)}`
+      });
+    });
+  });
+
+  const maxRawPercent = rawPercentages.length > 0 ? Math.max(...rawPercentages) : 100;
+  const visualMax = Math.max(120, Math.min(Math.ceil(maxRawPercent / 10) * 10, 200));
+  const longestLabelLength = goalLabels.reduce((max, label) => Math.max(max, String(label || "").length), 0);
+  const leftPadding = Math.min(Math.max((longestLabelLength * 7) + 26, 140), 280);
+  const chartHeight = Math.max(320, (goalLabels.length * 34) + 120);
+  return {
+    chartHeight,
+    option: buildHomeHeatmapOption({
+      weekLabels,
+      goalLabels,
+      chartData,
+      visualMax,
+      leftPadding,
+      showCellLabel: goalLabels.length <= 10
+    })
+  };
+}
+
+function buildHomeWeeklyProgressOption(rows) {
+  const chartRows = Array.isArray(rows)
+    ? [...rows]
+      .sort((a, b) => b.currentPct - a.currentPct)
+      .slice(0, 12)
+      .reverse()
+    : [];
+  if (chartRows.length < 1) {
+    return null;
+  }
+  const labels = chartRows.map((row) => String(row.tracker && row.tracker.name ? row.tracker.name : "Goal"));
+  const values = chartRows.map((row) => Math.max(Math.min(Number(row.currentPct) || 0, 200), 0));
+  const axisMax = Math.max(100, Math.min(Math.ceil(Math.max(...values, 100) / 10) * 10, 200));
+  return {
+    animationDuration: 260,
+    backgroundColor: "transparent",
+    grid: {
+      left: 150,
+      right: 20,
+      top: 20,
+      bottom: 30,
+      containLabel: false
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: function (params) {
+        const row = params && params.data ? params.data.meta : null;
+        if (!row) {
+          return "";
+        }
+        return `${escapeHtml(row.tracker.name)}<br>${formatAmount(row.currentProgress)} / ${formatAmount(row.currentTarget)} ${escapeHtml(normalizeGoalUnit(row.tracker.unit))}<br>${formatAmount(row.currentPct)}%`;
+      }
+    },
+    xAxis: {
+      type: "value",
+      min: 0,
+      max: axisMax,
+      axisLabel: { formatter: "{value}%", color: "#466d66", fontSize: 10 },
+      splitLine: { lineStyle: { color: "#deece9" } }
+    },
+    yAxis: {
+      type: "category",
+      data: labels,
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: {
+        color: "#305a53",
+        fontSize: 10,
+        fontWeight: 700,
+        formatter: function (value) {
+          const label = String(value || "");
+          return label.length > 22 ? `${label.slice(0, 22)}...` : label;
+        }
+      }
+    },
+    series: [
+      {
+        type: "bar",
+        data: chartRows.map((row) => ({
+          value: Math.max(Math.min(Number(row.currentPct) || 0, axisMax), 0),
+          meta: row
+        })),
+        barWidth: 16,
+        itemStyle: {
+          borderRadius: [999, 999, 999, 999],
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 1,
+            y2: 0,
+            colorStops: [
+              { offset: 0, color: "#2f9fb6" },
+              { offset: 1, color: "#1f9b6c" }
+            ]
+          }
+        },
+        showBackground: true,
+        backgroundStyle: {
+          color: "#e2f1ee"
+        },
+        label: {
+          show: true,
+          position: "right",
+          formatter: function (params) {
+            return `${Math.round(Number(params.value) || 0)}%`;
+          },
+          color: "#1c4f48",
+          fontWeight: 700,
+          fontSize: 10
+        }
+      }
+    ]
+  };
+}
+
+function buildHomeMissedRiskOption(missedItems) {
+  const chartRows = Array.isArray(missedItems)
+    ? missedItems.slice(0, 12).reverse()
+    : [];
+  if (chartRows.length < 1) {
+    return null;
+  }
+  return {
+    animationDuration: 260,
+    backgroundColor: "transparent",
+    grid: {
+      left: 150,
+      right: 18,
+      top: 20,
+      bottom: 34,
+      containLabel: false
+    },
+    tooltip: {
+      trigger: "item",
+      formatter: function (params) {
+        const item = params && params.data ? params.data.meta : null;
+        if (!item || !item.tracker) {
+          return "";
+        }
+        const latestLine = item.latestDateKey ? `Last entry: ${formatDate(parseDateKey(item.latestDateKey))}` : "No entries yet";
+        return `${escapeHtml(item.tracker.name)}<br>${latestLine}<br>${item.daysWithout} day(s) without entry`;
+      }
+    },
+    xAxis: {
+      type: "value",
+      min: 0,
+      axisLabel: { color: "#4a716a", fontSize: 10 },
+      splitLine: { lineStyle: { color: "#deece9" } }
+    },
+    yAxis: {
+      type: "category",
+      data: chartRows.map((item) => item.tracker.name),
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: {
+        color: "#305a53",
+        fontSize: 10,
+        fontWeight: 700,
+        formatter: function (value) {
+          const label = String(value || "");
+          return label.length > 22 ? `${label.slice(0, 22)}...` : label;
+        }
+      }
+    },
+    series: [
+      {
+        type: "bar",
+        data: chartRows.map((item) => ({
+          value: Math.max(Number(item.daysWithout) || 0, 0),
+          meta: item
+        })),
+        barWidth: 16,
+        itemStyle: {
+          borderRadius: [999, 999, 999, 999],
+          color: {
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 1,
+            y2: 0,
+            colorStops: [
+              { offset: 0, color: "#d26a72" },
+              { offset: 1, color: "#be7f24" }
+            ]
+          }
+        },
+        label: {
+          show: true,
+          position: "right",
+          color: "#5f2a2f",
+          fontWeight: 700,
+          fontSize: 10
+        }
+      }
+    ]
+  };
+}
+
+function renderHomeDashboardChart(config = {}) {
+  if (!homeDashboardChart || !homeDashboardChartEmpty || !homeDashboardViewSelect) {
+    return;
+  }
+  disposeEChartsInScope(homeDashboardChart);
+  homeDashboardChart.innerHTML = "";
+  homeDashboardChart.style.display = "none";
+  const view = normalizeHomeDashboardChartView(homeDashboardChartView || homeDashboardViewSelect.value);
+  homeDashboardChartView = view;
+  homeDashboardViewSelect.value = view;
+
+  const nowDate = config.nowDate instanceof Date ? config.nowDate : normalizeDate(new Date());
+  const weekIndex = config.weekIndex || buildEntryIndex(entries);
+  const weekMomentumRows = Array.isArray(config.weekMomentumRows) ? config.weekMomentumRows : [];
+  const missedItems = Array.isArray(config.missedItems) ? config.missedItems : [];
+  let option = null;
+  let chartHeight = 360;
+  let emptyMessage = "No data available for this chart view yet.";
+  let ariaLabel = "Dashboard chart";
+
+  if (view === "activity") {
+    const trendData = getHomeActivityTrendData(nowDate);
+    if (trendData) {
+      option = buildHomeActivityTrendOption(trendData.labels, trendData.dailyValues, trendData.rollingValues);
+      ariaLabel = "Dashboard activity chart";
+    } else {
+      emptyMessage = "No recent entry activity yet.";
+    }
+  } else if (view === "momentum") {
+    if (weekMomentumRows.length > 0) {
+      option = hasECharts3DLibrary()
+        ? buildHomeMomentum3DOption(weekMomentumRows)
+        : buildHomeMomentum2DFallbackOption(weekMomentumRows);
+      ariaLabel = "Dashboard momentum chart";
+    } else {
+      emptyMessage = "No measurable goals to plot yet.";
+    }
+  } else if (view === "heatmap") {
+    const heatmapConfig = getHomeHeatmapChartConfig(weekIndex, nowDate);
+    if (heatmapConfig && heatmapConfig.option) {
+      option = heatmapConfig.option;
+      chartHeight = Number(heatmapConfig.chartHeight) || 360;
+      ariaLabel = "Dashboard five-week heatmap";
+    } else {
+      emptyMessage = "No measurable weekly goals yet.";
+    }
+  } else if (view === "weekly-progress") {
+    option = buildHomeWeeklyProgressOption(weekMomentumRows);
+    ariaLabel = "Dashboard weekly progress chart";
+    if (!option) {
+      emptyMessage = "No measurable weekly goal progress yet.";
+    }
+  } else if (view === "missed-risk") {
+    option = buildHomeMissedRiskOption(missedItems);
+    ariaLabel = "Dashboard missed-entry risk chart";
+    if (!option) {
+      emptyMessage = "No missed entry risk data right now.";
+    }
+  }
+
+  if (!option) {
+    homeDashboardChartEmpty.textContent = emptyMessage;
+    homeDashboardChartEmpty.style.display = "block";
+    return;
+  }
+  const chartConfigId = registerEChartConfig({ option });
+  homeDashboardChart.innerHTML = `<div class="home-dashboard-echart js-echart" data-echart-config-id="${chartConfigId}" style="height:${Math.max(chartHeight, 280)}px" aria-label="${escapeAttr(ariaLabel)}"></div>`;
+  homeDashboardChartEmpty.style.display = "none";
+  homeDashboardChart.style.display = "block";
+  initializeEChartsInScope(homeDashboardChart);
 }
 
 function buildHomeActivityTrendOption(labels, dailyValues, rollingValues) {
@@ -5503,21 +5943,13 @@ function renderHomeTab() {
     if (homeInsightsEmpty) {
       homeInsightsEmpty.style.display = "none";
     }
-    if (homeActivityChart) {
-      disposeEChartsInScope(homeActivityChart);
-      homeActivityChart.innerHTML = "";
-      homeActivityChart.style.display = "none";
+    if (homeDashboardChart) {
+      disposeEChartsInScope(homeDashboardChart);
+      homeDashboardChart.innerHTML = "";
+      homeDashboardChart.style.display = "none";
     }
-    if (homeActivityEmpty) {
-      homeActivityEmpty.style.display = "none";
-    }
-    if (homeMomentumChart) {
-      disposeEChartsInScope(homeMomentumChart);
-      homeMomentumChart.innerHTML = "";
-      homeMomentumChart.style.display = "none";
-    }
-    if (homeMomentumEmpty) {
-      homeMomentumEmpty.style.display = "none";
+    if (homeDashboardChartEmpty) {
+      homeDashboardChartEmpty.style.display = "none";
     }
     homeMissedList.innerHTML = "";
     homeMissedEmpty.style.display = "none";
@@ -5567,6 +5999,7 @@ function renderHomeTab() {
   const projectedHitPct = measurableWeekGoalCount > 0 ? Math.round((onPaceGoals.length / measurableWeekGoalCount) * 100) : 0;
   const projectedDetailText = buildProjectedWeekHitDetailText(onPaceGoals, offPaceGoals, measurableWeekGoalCount);
   const weekMomentumRows = getHomeMomentumRows(weekIndex, now);
+  const missedItems = getMissedEntryItems(now).slice(0, 8);
 
   homeSummary.innerHTML = `
     <article class="summary-card">
@@ -5586,11 +6019,13 @@ function renderHomeTab() {
     </article>
   `;
   renderHomeInsights(weekMomentumRows);
-  renderHomeActivityTrendChart(now);
-  renderHomeMomentumChart(weekMomentumRows);
-  renderHomeGoalHeatmap(weekIndex, now);
+  renderHomeDashboardChart({
+    nowDate: now,
+    weekIndex,
+    weekMomentumRows,
+    missedItems
+  });
 
-  const missedItems = getMissedEntryItems(now).slice(0, 8);
   if (missedItems.length < 1) {
     homeMissedList.innerHTML = "";
     homeMissedEmpty.style.display = "block";
@@ -6747,7 +7182,7 @@ function renderBucketEntryTab() {
       submitButton.disabled = true;
     }
     recentBucketEntriesList.innerHTML = "";
-    recentBucketEntriesEmpty.textContent = "Create a Bucket List goal in Manage Goals first.";
+    recentBucketEntriesEmpty.textContent = "Create a Bucket List goal in Settings > Goal Settings first.";
     recentBucketEntriesEmpty.style.display = "block";
     return;
   }
@@ -6828,7 +7263,7 @@ function renderCheckinEntryTab() {
     checkinEntryItem.innerHTML = "<option value=''>No check-ins</option>";
     checkinEntryItem.disabled = true;
     recentCheckinEntriesList.innerHTML = "";
-    recentCheckinEntriesEmpty.textContent = "Create check-ins in Settings > Check-ins to start logging.";
+    recentCheckinEntriesEmpty.textContent = "Create check-ins in Settings > Check-in Settings to start logging.";
     recentCheckinEntriesEmpty.style.display = "block";
     return;
   }
@@ -7122,7 +7557,7 @@ function renderGoalScheduleTab() {
     scheduleGoal.innerHTML = "<option value=''>No goals</option>";
     scheduleGoal.disabled = true;
     scheduleList.innerHTML = "";
-    scheduleEmpty.textContent = "Create active goals in Manage Goals before scheduling.";
+    scheduleEmpty.textContent = "Create active goals in Settings > Goal Settings before scheduling.";
     scheduleEmpty.style.display = "block";
     return;
   }
@@ -7339,6 +7774,7 @@ function renderPeriodTabs() {
   }
   renderGraphModal();
   renderAuthState();
+  scheduleEChartResizePasses();
 }
 
 function getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel) {
@@ -7473,9 +7909,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         });
       }
 
-      const paceDetailText = isFloating
-        ? `Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} | Floating goal`
-        : `Avg/day ${formatAmountWithUnit(avg, tracker.unit)} | Needed/day ${formatAmountWithUnit(needed, tracker.unit)} | Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)}`;
+      const paceDetailText = `Avg ${formatAmount(avg)} | Needed ${formatAmount(needed)} | Proj ${formatAmount(projectedTracker)}`;
       const paceStatusChip = isFloating
         ? `
             <span class="pace-chip-wrap">
@@ -9052,6 +9486,21 @@ function initializeEChartsInScope(scope) {
     activeEChartInstances.set(configId, { element: chartElement, instance });
     pendingEChartConfigs.delete(configId);
   });
+}
+
+function scheduleEChartResizePasses() {
+  if (!hasEChartsLibrary()) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    resizeAllECharts();
+    window.requestAnimationFrame(() => {
+      resizeAllECharts();
+    });
+  });
+  setTimeout(() => {
+    resizeAllECharts();
+  }, 140);
 }
 
 function resizeAllECharts() {
@@ -11206,7 +11655,7 @@ function resetStateForSignedOutUser() {
   milestoneNotificationKeys = new Set();
   smartReminderNotificationKeys = new Set();
   settings = getDefaultSettings();
-  activeTab = "manage";
+  activeTab = "settings-general";
   entryMode = "solo";
   entryListSortMode = "date_desc";
   entryListTypeFilter = "all";
@@ -11628,7 +12077,7 @@ function importEntriesFromCsv(text) {
   }
 
   if (mappedColumns.length < 1) {
-    return { error: "No goal headers matched existing goals in Manage Goals.", changed: false, message: "" };
+    return { error: "No goal headers matched existing goals in Settings > Goal Settings.", changed: false, message: "" };
   }
 
   const replacementValues = new Map();
@@ -12011,9 +12460,15 @@ function applyRewardPointsFeatureVisibility() {
       panel.classList.remove("active");
     }
   });
-  if (pointStoreSettingsSection) {
-    pointStoreSettingsSection.hidden = !enabled;
-  }
+  document.querySelectorAll("[data-tab='settings-point-store']").forEach((button) => {
+    button.hidden = !enabled;
+  });
+  document.querySelectorAll("[data-tab-panel='settings-point-store']").forEach((panel) => {
+    if (!enabled) {
+      panel.hidden = true;
+      panel.classList.remove("active");
+    }
+  });
   if (goalRewardPointsWrap) {
     goalRewardPointsWrap.hidden = !enabled;
   }
@@ -12030,7 +12485,10 @@ function applyRewardPointsFeatureVisibility() {
     cell.hidden = !enabled;
   });
   if (!pointStoreEnabled && activeTab === "point-store") {
-    activeTab = "manage";
+    activeTab = "settings-general";
+  }
+  if (!enabled && activeTab === "settings-point-store") {
+    activeTab = "settings-general";
   }
 }
 
