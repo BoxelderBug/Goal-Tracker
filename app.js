@@ -180,11 +180,14 @@ const homeMomentumEmpty = document.querySelector("#home-momentum-empty");
 const homeDashboardViewSelect = document.querySelector("#home-dashboard-view-select");
 const homeDashboardChart = document.querySelector("#home-dashboard-chart");
 const homeDashboardChartEmpty = document.querySelector("#home-dashboard-chart-empty");
+const homeMissedPanel = document.querySelector("#home-missed-panel");
 const homeMissedOpenWeekButton = document.querySelector("#home-missed-open-week");
 const homeMissedPeriodSelect = document.querySelector("#home-missed-period-select");
 const homeMissedPeriodCopy = document.querySelector("#home-missed-period-copy");
 const homeMissedList = document.querySelector("#home-missed-list");
 const homeMissedEmpty = document.querySelector("#home-missed-empty");
+const homeUnclosedList = document.querySelector("#home-unclosed-list");
+const homeUnclosedEmpty = document.querySelector("#home-unclosed-empty");
 const homeRemindersList = document.querySelector("#home-reminders-list");
 const homeRemindersEmpty = document.querySelector("#home-reminders-empty");
 const homeGoalHeatmap = document.querySelector("#home-goal-heatmap");
@@ -460,6 +463,7 @@ let settings = getDefaultSettings();
 let activeTab = "settings-general";
 let homeDashboardChartView = "activity";
 let homeMissedPeriod = "week";
+let homeMissedTileFlipped = false;
 let activeSocialSection = "friends";
 let entryMode = "solo";
 let entryListSortMode = "date_desc";
@@ -788,6 +792,21 @@ function openSoloEntryForTracker(trackerId) {
   updateEntryFormMode();
 }
 
+function applyHomeMissedTileFlipState() {
+  if (!homeMissedPanel) {
+    return;
+  }
+  homeMissedPanel.classList.toggle("is-flipped", homeMissedTileFlipped);
+  homeMissedPanel.querySelectorAll("button[data-action='toggle-home-missed-flip']").forEach((button) => {
+    button.setAttribute("aria-pressed", homeMissedTileFlipped ? "true" : "false");
+  });
+}
+
+function setHomeMissedTileFlipped(nextFlipped) {
+  homeMissedTileFlipped = Boolean(nextFlipped);
+  applyHomeMissedTileFlipState();
+}
+
 if (mobileMenuToggle) {
   mobileMenuToggle.addEventListener("click", () => {
     const currentlyOpen = tabStripPanel ? tabStripPanel.classList.contains("mobile-menu-open") : false;
@@ -913,6 +932,17 @@ if (homeMissedOpenWeekButton) {
   });
 }
 
+if (homeMissedPanel) {
+  homeMissedPanel.addEventListener("click", (event) => {
+    const flipButton = event.target.closest("button[data-action='toggle-home-missed-flip']");
+    if (!flipButton) {
+      return;
+    }
+    setHomeMissedTileFlipped(!homeMissedTileFlipped);
+  });
+}
+applyHomeMissedTileFlipState();
+
 if (homeMissedList) {
   homeMissedList.addEventListener("click", (event) => {
     if (!currentUser) {
@@ -927,6 +957,28 @@ if (homeMissedList) {
       return;
     }
     openSoloEntryForTracker(trackerId);
+  });
+}
+
+if (homeUnclosedList) {
+  homeUnclosedList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const periodButton = event.target.closest("button[data-action='open-home-unclosed-period-entry-list']");
+    if (!periodButton) {
+      return;
+    }
+    const periodName = normalizePeriodMode(periodButton.dataset.period);
+    const startKey = String(periodButton.dataset.start || "");
+    const endKey = String(periodButton.dataset.end || "");
+    if (!isDateKey(startKey) || !isDateKey(endKey)) {
+      return;
+    }
+    openEntryListForRange(periodName, {
+      start: parseDateKey(startKey),
+      end: parseDateKey(endKey)
+    });
   });
 }
 
@@ -6077,7 +6129,15 @@ function renderHomeGoalHeatmap(weekIndex, nowDate) {
 }
 
 function renderHomeTab() {
-  if (!homeSummary || !homeMissedList || !homeMissedEmpty || !homeRemindersList || !homeRemindersEmpty) {
+  if (
+    !homeSummary
+    || !homeMissedList
+    || !homeMissedEmpty
+    || !homeUnclosedList
+    || !homeUnclosedEmpty
+    || !homeRemindersList
+    || !homeRemindersEmpty
+  ) {
     return;
   }
   if (!currentUser) {
@@ -6104,6 +6164,9 @@ function renderHomeTab() {
     if (homeMissedPeriodCopy) {
       homeMissedPeriodCopy.textContent = getHomeMissedCopy(homeMissedPeriod);
     }
+    homeUnclosedList.innerHTML = "";
+    homeUnclosedEmpty.style.display = "none";
+    setHomeMissedTileFlipped(false);
     homeRemindersList.innerHTML = "";
     homeRemindersEmpty.style.display = "none";
     if (homeGoalHeatmap) {
@@ -6151,6 +6214,7 @@ function renderHomeTab() {
   const projectedDetailText = buildProjectedWeekHitDetailText(onPaceGoals, offPaceGoals, measurableWeekGoalCount);
   const weekMomentumRows = getHomeMomentumRows(weekIndex, now);
   const missedRiskItems = getMissedEntryItems(now).slice(0, 8);
+  const unclosedPeriodItems = getUnclosedPeriodItems(now).slice(0, 8);
   const selectedMissedPeriod = normalizeHomeMissedPeriod(
     homeMissedPeriod || (homeMissedPeriodSelect ? homeMissedPeriodSelect.value : "week")
   );
@@ -6163,6 +6227,7 @@ function renderHomeTab() {
   if (homeMissedPeriodCopy) {
     homeMissedPeriodCopy.textContent = getHomeMissedCopy(selectedMissedPeriod);
   }
+  applyHomeMissedTileFlipState();
 
   homeSummary.innerHTML = `
     <article class="summary-card">
@@ -6209,6 +6274,33 @@ function renderHomeTab() {
               <p class="muted small">${item.latestDateKey ? `Last entry ${formatDate(parseDateKey(item.latestDateKey))}` : "No entries yet"} | No updates this ${escapeHtml(missedPeriodLabelLower)}</p>
             </span>
             <span class="pace-chip pace-off">${item.daysWithout}d</span>
+          </button>
+        </li>
+      `)
+      .join("");
+  }
+
+  if (unclosedPeriodItems.length < 1) {
+    homeUnclosedList.innerHTML = "";
+    homeUnclosedEmpty.style.display = "block";
+  } else {
+    homeUnclosedEmpty.style.display = "none";
+    homeUnclosedList.innerHTML = unclosedPeriodItems
+      .map((item, index) => `
+        <li class="quick-item home-unclosed-item" style="--stagger:${index}">
+          <div>
+            <strong>${escapeHtml(`Unclosed ${item.periodLabel}`)}</strong>
+            <p class="muted small">${escapeHtml(item.rangeLabel)}</p>
+          </div>
+          <button
+            class="btn btn-nav-compact"
+            type="button"
+            data-action="open-home-unclosed-period-entry-list"
+            data-period="${escapeAttr(item.periodName)}"
+            data-start="${escapeAttr(item.startKey)}"
+            data-end="${escapeAttr(item.endKey)}"
+          >
+            Review Entries
           </button>
         </li>
       `)
@@ -11828,6 +11920,7 @@ function resetStateForSignedOutUser() {
   settings = getDefaultSettings();
   activeTab = "settings-general";
   homeMissedPeriod = "week";
+  homeMissedTileFlipped = false;
   entryMode = "solo";
   entryListSortMode = "date_desc";
   entryListTypeFilter = "all";
@@ -11947,6 +12040,7 @@ function initializeAuth() {
 function resetUiStateForLogin() {
   activeTab = "home";
   homeMissedPeriod = "week";
+  homeMissedTileFlipped = false;
   entryMode = "solo";
   notificationsPanelOpen = false;
   sharedGoalShares = [];

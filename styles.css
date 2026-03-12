@@ -1454,11 +1454,62 @@ textarea {
 
 .home-missed-period-control {
   min-width: 110px;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 #home-missed-period-copy {
   margin-top: 6px;
+}
+
+.home-missed-panel {
+  perspective: 1400px;
+}
+
+.home-missed-tile-inner {
+  position: relative;
+  min-height: 310px;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transition: transform 0.62s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.home-missed-panel.is-flipped .home-missed-tile-inner {
+  transform: rotateY(180deg);
+}
+
+.home-missed-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: grid;
+  align-content: start;
+  gap: 0;
+}
+
+.home-missed-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+.home-missed-panel.is-flipped .home-missed-front {
+  pointer-events: none;
+}
+
+.home-missed-panel:not(.is-flipped) .home-missed-back {
+  pointer-events: none;
+}
+
+.home-missed-head-actions {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.home-missed-flip-btn {
+  align-self: center;
 }
 
 .snapshot-list {
@@ -2085,6 +2136,10 @@ textarea {
 .home-missed-goal-button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+.home-unclosed-item {
+  align-items: flex-start;
 }
 
 .today-entry-item strong {
