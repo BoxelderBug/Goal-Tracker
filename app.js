@@ -42,6 +42,7 @@ const POINT_TRANSACTIONS_STORAGE_KEY = "goal-tracker-point-transactions-v1";
 const GOAL_HIT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-goal-hit-notification-keys-v1";
 const MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-milestone-notification-keys-v1";
 const SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-smart-reminder-notification-keys-v1";
+const PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-period-close-prompt-notification-keys-v1";
 const ONBOARDING_DISMISSED_STORAGE_KEY = "goal-tracker-onboarding-dismissed-v1";
 const GOAL_JOURNAL_SUBJECT_DEFAULT = "General Journal";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
@@ -503,11 +504,14 @@ let sharedGoalOwnerData = new Map();
 let goalHitNotificationKeys = new Set();
 let milestoneNotificationKeys = new Set();
 let smartReminderNotificationKeys = new Set();
+let periodClosePromptNotificationKeys = new Set();
 let goalHitNotificationCheckTimer = null;
 let goalHitNotificationCheckInFlight = false;
 let milestoneNotificationCheckTimer = null;
 let smartReminderCheckTimer = null;
 let smartReminderCheckInFlight = false;
+let periodClosePromptNotificationCheckTimer = null;
+let periodClosePromptNotificationCheckInFlight = false;
 let firebaseApp = null;
 let firebaseAuth = null;
 let firebaseDb = null;
@@ -1387,6 +1391,18 @@ if (notificationsMarkReadButton) {
 if (notificationsList) {
   notificationsList.addEventListener("click", async (event) => {
     if (!currentUser) {
+      return;
+    }
+    const closePeriodButton = event.target.closest("button[data-action='close-period-from-notification']");
+    if (closePeriodButton) {
+      const notificationId = String(closePeriodButton.dataset.notificationId || "");
+      const periodName = normalizePeriodMode(closePeriodButton.dataset.period);
+      const rangeStart = String(closePeriodButton.dataset.rangeStart || "");
+      const rangeEnd = String(closePeriodButton.dataset.rangeEnd || "");
+      const result = await closePeriodFromNotification(notificationId, periodName, rangeStart, rangeEnd);
+      if (!result.success && result.message) {
+        alert(result.message);
+      }
       return;
     }
     const actionButton = event.target.closest("button[data-action='approve-share-invite'], button[data-action='reject-share-invite']");
@@ -4520,6 +4536,7 @@ function render() {
   queueGoalHitNotificationCheck();
   queueMilestoneNotificationCheck();
   queueSmartReminderCheck();
+  queuePeriodClosePromptCheck();
 }
 
 function createHistoryEChartMarkup(history, options = {}) {
@@ -5030,6 +5047,30 @@ function renderNotifications() {
           </div>
         `
         : "";
+      const canClosePeriod = (
+        item.type === "period-close-ready"
+        && !item.actioned
+        && isDateKey(item.rangeStart)
+        && isDateKey(item.rangeEnd)
+      );
+      const closePeriodAction = canClosePeriod
+        ? `
+          <div class="actions">
+            <button
+              class="btn btn-primary"
+              type="button"
+              data-action="close-period-from-notification"
+              data-notification-id="${item.id}"
+              data-period="${escapeAttr(item.period)}"
+              data-range-start="${escapeAttr(item.rangeStart)}"
+              data-range-end="${escapeAttr(item.rangeEnd)}"
+            >
+              Close Period
+            </button>
+          </div>
+        `
+        : "";
+      const actionMarkup = `${inviteActions}${closePeriodAction}`;
       return `
         <li class="quick-item" style="--stagger:${index}">
           <div class="metric-top">
@@ -5037,7 +5078,7 @@ function renderNotifications() {
             <span class="pace-chip${item.read ? "" : " pace-on"}">${item.read ? "Read" : "New"}</span>
           </div>
           <p class="muted small">${escapeHtml(formatSnapshotClosedAt(item.createdAt))}</p>
-          ${inviteActions}
+          ${actionMarkup}
         </li>
       `;
     })
@@ -8556,6 +8597,68 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
     .join("");
 }
 
+function getPeriodSnapshotRefKey(periodName, rangeStartKey, rangeEndKey) {
+  return `${normalizePeriodMode(periodName)}|${String(rangeStartKey || "")}|${String(rangeEndKey || "")}`;
+}
+
+function closeOutPeriodRange(periodName, range, options = {}) {
+  if (!currentUser || !range || !range.start || !range.end) {
+    return { success: false, message: "Unable to close this period right now." };
+  }
+  const normalizedPeriod = normalizePeriodMode(periodName);
+  const normalizedRange = {
+    start: normalizeDate(range.start),
+    end: normalizeDate(range.end)
+  };
+  if (normalizedRange.end < normalizedRange.start) {
+    return { success: false, message: "Unable to close this period right now." };
+  }
+
+  const now = normalizeDate(new Date());
+  const index = buildEntryIndex(entries);
+  const snapshot = buildPeriodCloseoutSnapshot(normalizedPeriod, normalizedRange, now, index);
+  if (!snapshot) {
+    return { success: false, message: `No goals or check-ins to snapshot for this ${normalizedPeriod}.` };
+  }
+
+  const existingIndex = periodSnapshots.findIndex((item) => (
+    item
+    && item.period === snapshot.period
+    && item.rangeStart === snapshot.rangeStart
+    && item.rangeEnd === snapshot.rangeEnd
+  ));
+  const allowIfAlreadyClosed = options.allowIfAlreadyClosed === true;
+  if (existingIndex >= 0) {
+    if (allowIfAlreadyClosed) {
+      return { success: true, snapshot: periodSnapshots[existingIndex], alreadyClosed: true };
+    }
+    const shouldConfirmReplace = options.confirmReplace !== false;
+    if (shouldConfirmReplace) {
+      const shouldReplace = confirm(
+        `A ${normalizedPeriod} snapshot for ${formatDate(normalizedRange.start)} to ${formatDate(normalizedRange.end)} already exists. Replace it?`
+      );
+      if (!shouldReplace) {
+        return { success: false, cancelled: true, message: "" };
+      }
+    }
+    periodSnapshots.splice(existingIndex, 1);
+  }
+
+  periodSnapshots.unshift(snapshot);
+  periodSnapshots.sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+  savePeriodSnapshots();
+  periodClosePromptNotificationKeys.delete(getPeriodSnapshotRefKey(snapshot.period, snapshot.rangeStart, snapshot.rangeEnd));
+  saveNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY, periodClosePromptNotificationKeys);
+  if (isRewardPointsEnabled()) {
+    upsertCloseoutPointAward(snapshot);
+    savePointTransactions();
+  }
+  if (options.render !== false) {
+    renderPeriodTabs();
+  }
+  return { success: true, snapshot, replaced: existingIndex >= 0 };
+}
+
 function closeOutPeriod(periodName) {
   if (!currentUser) {
     return;
@@ -8565,39 +8668,13 @@ function closeOutPeriod(periodName) {
   if (!range) {
     return;
   }
-  const now = normalizeDate(new Date());
-  const index = buildEntryIndex(entries);
-  const snapshot = buildPeriodCloseoutSnapshot(normalizedPeriod, range, now, index);
-  if (!snapshot) {
-    alert(`No goals or check-ins to snapshot for this ${normalizedPeriod}.`);
-    return;
+  const result = closeOutPeriodRange(normalizedPeriod, range, {
+    confirmReplace: true,
+    render: true
+  });
+  if (!result.success && !result.cancelled && result.message) {
+    alert(result.message);
   }
-
-  const existingIndex = periodSnapshots.findIndex((item) => (
-    item
-    && item.period === snapshot.period
-    && item.rangeStart === snapshot.rangeStart
-    && item.rangeEnd === snapshot.rangeEnd
-  ));
-
-  if (existingIndex >= 0) {
-    const shouldReplace = confirm(
-      `A ${normalizedPeriod} snapshot for ${formatDate(range.start)} to ${formatDate(range.end)} already exists. Replace it?`
-    );
-    if (!shouldReplace) {
-      return;
-    }
-    periodSnapshots.splice(existingIndex, 1);
-  }
-
-  periodSnapshots.unshift(snapshot);
-  periodSnapshots.sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
-  savePeriodSnapshots();
-  if (isRewardPointsEnabled()) {
-    upsertCloseoutPointAward(snapshot);
-    savePointTransactions();
-  }
-  renderPeriodTabs();
 }
 
 function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
@@ -9018,6 +9095,8 @@ function deletePeriodSnapshot(snapshotId) {
   const [removed] = periodSnapshots.splice(index, 1);
   savePeriodSnapshots();
   if (removed) {
+    periodClosePromptNotificationKeys.delete(getPeriodSnapshotRefKey(removed.period, removed.rangeStart, removed.rangeEnd));
+    saveNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY, periodClosePromptNotificationKeys);
     removeCloseoutPointAward(removed);
   }
 }
@@ -9026,7 +9105,7 @@ function removeCloseoutPointAward(snapshot) {
   if (!snapshot || !snapshot.period || !snapshot.rangeStart || !snapshot.rangeEnd) {
     return;
   }
-  const refKey = `${snapshot.period}|${snapshot.rangeStart}|${snapshot.rangeEnd}`;
+  const refKey = getPeriodSnapshotRefKey(snapshot.period, snapshot.rangeStart, snapshot.rangeEnd);
   const nextTransactions = pointTransactions.filter((item) => (
     !(item && item.type === "earn-closeout" && item.refKey === refKey)
   ));
@@ -9055,7 +9134,7 @@ function upsertCloseoutPointAward(snapshot) {
   if (!snapshot || !snapshot.period || !snapshot.rangeStart || !snapshot.rangeEnd) {
     return;
   }
-  const refKey = `${snapshot.period}|${snapshot.rangeStart}|${snapshot.rangeEnd}`;
+  const refKey = getPeriodSnapshotRefKey(snapshot.period, snapshot.rangeStart, snapshot.rangeEnd);
   const amount = normalizePositiveAmount(snapshot.summary && snapshot.summary.goalPointsEarned, 0);
   const index = pointTransactions.findIndex((item) => (
     item
@@ -10663,6 +10742,13 @@ function getNotificationMessage(item) {
       : "weekly";
     return `Milestone: "${goalName}" reached ${milestonePercent}% of ${periodLabel} target.`;
   }
+  if (type === "period-close-ready") {
+    const periodLabel = getSnapshotPeriodTitle(normalizePeriodMode(item.period));
+    if (isDateKey(item.rangeStart) && isDateKey(item.rangeEnd)) {
+      return `All entries saved for ${periodLabel} ${formatDate(parseDateKey(item.rangeStart))} to ${formatDate(parseDateKey(item.rangeEnd))}. Close this period?`;
+    }
+    return `All entries saved for ${periodLabel}. Close this period?`;
+  }
   if (type === "smart-reminder") {
     const goalName = String(item.goalName || "Goal");
     const reminderDays = Math.max(Math.floor(Number(item.reminderDays) || 0), 0);
@@ -11118,6 +11204,155 @@ function queueSmartReminderCheck() {
   }, 550);
 }
 
+function isPeriodReadyForClosePrompt(periodName, range, index) {
+  const trackersForPeriod = getTrackersForPeriod(periodName);
+  const dueCheckIns = getCheckInsForPeriod(periodName);
+  if (trackersForPeriod.length < 1 && dueCheckIns.length < 1) {
+    return false;
+  }
+  const goalsComplete = trackersForPeriod.every((tracker) => hasTrackerEntriesForEveryDay(index, tracker.id, range));
+  const checkInsComplete = dueCheckIns.every((checkIn) => getCheckInStatusForRange(checkIn, range).completed);
+  return goalsComplete && checkInsComplete;
+}
+
+function getPeriodClosePromptCandidates(now = new Date()) {
+  if (!currentUser) {
+    return [];
+  }
+  const normalizedNow = normalizeDate(now);
+  const index = buildEntryIndex(entries);
+  const closedSnapshotKeys = new Set(
+    periodSnapshots
+      .filter((snapshot) => snapshot && isDateKey(snapshot.rangeStart) && isDateKey(snapshot.rangeEnd))
+      .map((snapshot) => getPeriodSnapshotRefKey(snapshot.period, snapshot.rangeStart, snapshot.rangeEnd))
+  );
+  const candidatesByKey = new Map();
+  const addCandidate = (periodName, range) => {
+    if (!range || !(range.start instanceof Date) || Number.isNaN(range.start.getTime()) || !(range.end instanceof Date) || Number.isNaN(range.end.getTime())) {
+      return;
+    }
+    if (range.end < range.start) {
+      return;
+    }
+    const normalizedPeriod = normalizePeriodMode(periodName);
+    const rangeStart = getDateKey(normalizeDate(range.start));
+    const rangeEnd = getDateKey(normalizeDate(range.end));
+    if (!isDateKey(rangeStart) || !isDateKey(rangeEnd)) {
+      return;
+    }
+    const promptKey = getPeriodSnapshotRefKey(normalizedPeriod, rangeStart, rangeEnd);
+    if (closedSnapshotKeys.has(promptKey)) {
+      return;
+    }
+    if (!isPeriodReadyForClosePrompt(normalizedPeriod, { start: parseDateKey(rangeStart), end: parseDateKey(rangeEnd) }, index)) {
+      return;
+    }
+    candidatesByKey.set(promptKey, {
+      promptKey,
+      period: normalizedPeriod,
+      rangeStart,
+      rangeEnd
+    });
+  };
+
+  addCandidate("week", getWeekRange(normalizedNow));
+  addCandidate("month", getMonthRange(normalizedNow));
+  addCandidate("year", getYearRange(normalizedNow));
+  if (isQuartersEnabled()) {
+    addCandidate("quarter", getQuarterRange(normalizedNow));
+  }
+
+  const unclosedPeriods = getUnclosedPeriodItems(normalizedNow);
+  unclosedPeriods.forEach((item) => {
+    if (!item || !isDateKey(item.startKey) || !isDateKey(item.endKey)) {
+      return;
+    }
+    addCandidate(item.periodName, {
+      start: parseDateKey(item.startKey),
+      end: parseDateKey(item.endKey)
+    });
+  });
+
+  return Array.from(candidatesByKey.values())
+    .sort((a, b) => {
+      const endCompare = String(b.rangeEnd || "").localeCompare(String(a.rangeEnd || ""));
+      if (endCompare !== 0) {
+        return endCompare;
+      }
+      return String(a.period || "").localeCompare(String(b.period || ""));
+    })
+    .slice(0, 24);
+}
+
+function primePeriodClosePromptNotificationKeys() {
+  if (!currentUser || periodClosePromptNotificationKeys.size > 0) {
+    return;
+  }
+  const candidates = getPeriodClosePromptCandidates(new Date());
+  if (candidates.length < 1) {
+    return;
+  }
+  candidates.forEach((item) => {
+    periodClosePromptNotificationKeys.add(item.promptKey);
+  });
+  saveNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY, periodClosePromptNotificationKeys);
+}
+
+async function sendPeriodClosePromptNotifications() {
+  if (!firebaseConfigured || !firebaseDb || !currentUser) {
+    return;
+  }
+  if (periodClosePromptNotificationCheckInFlight) {
+    return;
+  }
+  periodClosePromptNotificationCheckInFlight = true;
+  try {
+    const candidates = getPeriodClosePromptCandidates(new Date());
+    let changed = false;
+    for (const item of candidates) {
+      if (periodClosePromptNotificationKeys.has(item.promptKey)) {
+        continue;
+      }
+      const createdId = await createNotificationDoc({
+        type: "period-close-ready",
+        recipientId: currentUser.id,
+        actorId: currentUser.id,
+        actorUsername: getUserDisplayName(currentUser),
+        actorEmail: normalizeEmail(currentUser.email),
+        period: item.period,
+        rangeStart: item.rangeStart,
+        rangeEnd: item.rangeEnd,
+        hitKey: item.promptKey,
+        read: false,
+        actioned: false
+      });
+      if (!createdId) {
+        continue;
+      }
+      periodClosePromptNotificationKeys.add(item.promptKey);
+      changed = true;
+    }
+    if (changed) {
+      saveNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY, periodClosePromptNotificationKeys);
+    }
+  } finally {
+    periodClosePromptNotificationCheckInFlight = false;
+  }
+}
+
+function queuePeriodClosePromptCheck() {
+  if (!currentUser) {
+    return;
+  }
+  if (periodClosePromptNotificationCheckTimer) {
+    clearTimeout(periodClosePromptNotificationCheckTimer);
+  }
+  periodClosePromptNotificationCheckTimer = setTimeout(() => {
+    periodClosePromptNotificationCheckTimer = null;
+    void sendPeriodClosePromptNotifications();
+  }, 420);
+}
+
 async function sendFriendAddedNotification(friendName, friendEmail) {
   if (!firebaseConfigured || !firebaseDb || !currentUser) {
     return;
@@ -11216,6 +11451,49 @@ async function markAllNotificationsRead() {
       // Keep trying on next action/listener refresh.
     }
   }));
+}
+
+async function closePeriodFromNotification(notificationId, periodName, rangeStartKey, rangeEndKey) {
+  if (!currentUser) {
+    return { success: false, message: "Sign in before closing periods." };
+  }
+  if (!isDateKey(rangeStartKey) || !isDateKey(rangeEndKey)) {
+    return { success: false, message: "This notification is missing period details." };
+  }
+  const result = closeOutPeriodRange(periodName, {
+    start: parseDateKey(rangeStartKey),
+    end: parseDateKey(rangeEndKey)
+  }, {
+    confirmReplace: false,
+    allowIfAlreadyClosed: true,
+    render: true
+  });
+  if (!result.success) {
+    return result;
+  }
+
+  if (notificationId) {
+    const notification = notifications.find((item) => item && item.id === notificationId);
+    if (notification) {
+      notification.read = true;
+      notification.actioned = true;
+    }
+    renderNotifications();
+    if (firebaseConfigured && firebaseDb) {
+      try {
+        await updateDoc(doc(firebaseDb, CLOUD_NOTIFICATION_COLLECTION, notificationId), {
+          read: true,
+          actioned: true,
+          actionedAt: new Date().toISOString(),
+          readAt: new Date().toISOString()
+        });
+      } catch {
+        // Listener refresh will eventually reconcile notification state.
+      }
+    }
+  }
+  queuePeriodClosePromptCheck();
+  return { success: true, message: result.alreadyClosed ? "Period already closed." : "Period closed." };
 }
 
 async function respondToGoalShareInvite(notificationId, shareId, approve) {
@@ -11892,9 +12170,14 @@ function resetStateForSignedOutUser() {
     clearTimeout(smartReminderCheckTimer);
     smartReminderCheckTimer = null;
   }
+  if (periodClosePromptNotificationCheckTimer) {
+    clearTimeout(periodClosePromptNotificationCheckTimer);
+    periodClosePromptNotificationCheckTimer = null;
+  }
   cloudSyncInFlight = false;
   goalHitNotificationCheckInFlight = false;
   smartReminderCheckInFlight = false;
+  periodClosePromptNotificationCheckInFlight = false;
   suppressCloudSync = false;
   currentUser = null;
   trackers = [];
@@ -11917,6 +12200,7 @@ function resetStateForSignedOutUser() {
   goalHitNotificationKeys = new Set();
   milestoneNotificationKeys = new Set();
   smartReminderNotificationKeys = new Set();
+  periodClosePromptNotificationKeys = new Set();
   settings = getDefaultSettings();
   activeTab = "settings-general";
   homeMissedPeriod = "week";
@@ -12294,6 +12578,7 @@ function resetUiStateForLogin() {
     csvUploadStatus.textContent = "";
   }
   primeGoalHitNotificationKeys();
+  primePeriodClosePromptNotificationKeys();
   if (isOnboardingEnabled() && !isOnboardingDismissed()) {
     openOnboardingModal();
   }
@@ -12980,6 +13265,7 @@ function initializeData() {
     goalHitNotificationKeys = new Set();
     milestoneNotificationKeys = new Set();
     smartReminderNotificationKeys = new Set();
+    periodClosePromptNotificationKeys = new Set();
     settings = getDefaultSettings();
     goalMetricsDraft = [];
     renderGoalMetricsDraft();
@@ -13009,6 +13295,7 @@ function initializeData() {
   goalHitNotificationKeys = loadGoalHitNotificationKeys();
   milestoneNotificationKeys = loadNotificationKeySet(MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY);
   smartReminderNotificationKeys = loadNotificationKeySet(SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY);
+  periodClosePromptNotificationKeys = loadNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY);
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
   if (goalAdditionalTrackingEnabled) {
