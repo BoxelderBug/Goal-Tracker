@@ -1,0 +1,1494 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teal Goal Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <main id="main-content" class="page">
+    <section id="auth-panel" class="panel auth-panel">
+      <h2>Account Login</h2>
+      <p class="muted">Sign in to load your goal table, entries, schedules, and settings.</p>
+      <div class="auth-single">
+        <div class="auth-switch" role="tablist" aria-label="Authentication mode">
+          <button class="auth-switch-btn active" type="button" data-auth-mode="signin" aria-selected="true">Sign In</button>
+          <button class="auth-switch-btn" type="button" data-auth-mode="register" aria-selected="false">Create Account</button>
+        </div>
+
+        <form id="login-form" class="form-block auth-form auth-form-panel" data-auth-form="signin">
+          <label>
+            Email
+            <input id="login-username" type="email" maxlength="120" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input id="login-password" type="password" maxlength="120" autocomplete="current-password" required />
+          </label>
+          <label class="check-inline auth-show-password">
+            <input id="login-show-password" type="checkbox" />
+            Show password
+          </label>
+          <button class="btn btn-primary" type="submit">Sign In</button>
+          <p class="auth-form-note">Need an account? <button class="auth-link-btn" type="button" data-auth-mode-target="register">Create one</button></p>
+        </form>
+
+        <form id="register-form" class="form-block auth-form auth-form-panel" data-auth-form="register" hidden>
+          <div class="form-grid form-grid-2">
+            <label>
+              First Name
+              <input id="register-first-name" type="text" maxlength="80" autocomplete="given-name" required />
+            </label>
+            <label>
+              Last Name
+              <input id="register-last-name" type="text" maxlength="80" autocomplete="family-name" required />
+            </label>
+          </div>
+          <label>
+            Email
+            <input id="register-email" type="email" maxlength="120" autocomplete="email" required />
+          </label>
+          <label>
+            Username
+            <input id="register-username" type="text" maxlength="80" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input id="register-password" type="password" maxlength="120" autocomplete="new-password" required />
+          </label>
+          <label>
+            Confirm Password
+            <input id="register-password-confirm" type="password" maxlength="120" autocomplete="new-password" required />
+          </label>
+          <label class="check-inline auth-show-password">
+            <input id="register-show-password" type="checkbox" />
+            Show password
+          </label>
+          <button class="btn" type="submit">Create Account</button>
+          <p class="auth-form-note">Already have an account? <button class="auth-link-btn" type="button" data-auth-mode-target="signin">Sign in</button></p>
+        </form>
+      </div>
+      <p id="auth-message" class="muted"></p>
+    </section>
+
+    <div id="app-shell" hidden>
+      <header class="hero">
+        <div class="hero-top">
+          <button id="hero-home-btn" class="hero-title-btn menu-btn" type="button" data-tab="home">Placeholder Goal Tracker</button>
+          <div class="hero-actions">
+            <div class="user-actions-panel user-account-dropdown" data-dropdown>
+              <button id="active-user-btn" class="btn btn-nav-compact btn-user-link" type="button" data-dropdown-toggle hidden></button>
+              <button id="settings-shortcut-btn" class="btn btn-nav-compact btn-settings-shortcut" type="button" aria-label="Settings" title="Settings" hidden>
+                <span class="settings-shortcut-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                    <path d="M12 15.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Z"></path>
+                    <path d="m19.15 14.38.06-.2c.15-.54.23-1.1.23-1.68s-.08-1.14-.23-1.68l-.06-.2 1.58-1.22a.75.75 0 0 0 .19-.96l-1.5-2.6a.75.75 0 0 0-.9-.32l-1.9.76-.14-.13a7.52 7.52 0 0 0-2.9-1.68l-.2-.06-.3-2.02a.75.75 0 0 0-.74-.64h-3a.75.75 0 0 0-.74.64l-.3 2.02-.2.06a7.52 7.52 0 0 0-2.9 1.68l-.14.13-1.9-.76a.75.75 0 0 0-.9.32l-1.5 2.6a.75.75 0 0 0 .19.96l1.58 1.22-.06.2A6.2 6.2 0 0 0 4.62 12c0 .58.08 1.14.23 1.68l.06.2L3.33 15.1a.75.75 0 0 0-.19.96l1.5 2.6a.75.75 0 0 0 .9.32l1.9-.76.14.13a7.52 7.52 0 0 0 2.9 1.68l.2.06.3 2.02a.75.75 0 0 0 .74.64h3a.75.75 0 0 0 .74-.64l.3-2.02.2-.06a7.52 7.52 0 0 0 2.9-1.68l.14-.13 1.9.76a.75.75 0 0 0 .9-.32l1.5-2.6a.75.75 0 0 0-.19-.96l-1.58-1.22Z"></path>
+                  </svg>
+                </span>
+                <span class="visually-hidden">Settings</span>
+              </button>
+              <button id="active-user-points-btn" class="btn btn-nav-compact btn-points-shortcut" type="button" hidden></button>
+              <div class="notifications-wrap">
+                <button id="notifications-toggle-btn" class="btn btn-notifications" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notifications-panel" hidden>
+                  <span class="notifications-icon" aria-hidden="true">&#128276;</span>
+                  <span class="visually-hidden">Notifications</span>
+                  <span id="notifications-unread-count" class="notifications-badge" hidden>0</span>
+                </button>
+                <section id="notifications-panel" class="notifications-panel hidden" aria-hidden="true" aria-label="Notifications">
+                  <div class="notifications-head">
+                    <h3>Notifications</h3>
+                    <button id="notifications-mark-read-btn" class="btn btn-nav-compact" type="button">Mark All Read</button>
+                  </div>
+                  <ul id="notifications-list" class="card-list compact-list"></ul>
+                  <p id="notifications-empty" class="empty-state">No notifications yet.</p>
+                </section>
+              </div>
+              <button id="logout-btn" class="btn" type="button">Logout</button>
+              <div class="dropdown-menu user-account-menu">
+                <button class="menu-btn" type="button" data-tab="manage">Manage Goals</button>
+                <button class="menu-btn" type="button" data-tab="social" data-social-section="friends">Friends</button>
+                <button class="menu-btn" type="button" data-tab="social" data-social-section="squads">Squads</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel tab-strip-panel">
+        <button id="mobile-menu-toggle" class="btn mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-groups">Menu</button>
+        <div id="main-nav-groups" class="nav-groups" aria-label="Tracker sections">
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="entry">Add Entry</button>
+              <button class="menu-btn" type="button" data-tab="missed-entries">Missed Entries</button>
+              <button class="menu-btn" type="button" data-tab="bucket-entry">Bucket List Entry</button>
+              <button class="menu-btn" type="button" data-tab="checkin-entry">Add Check-in</button>
+              <button class="menu-btn" type="button" data-tab="entry-list">Entry List</button>
+              <button class="menu-btn" type="button" data-tab="entry-csv">Import/Export CSV</button>
+            </div>
+          </div>
+
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Planning</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="goal-schedule">Goal Schedule</button>
+              <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
+            </div>
+          </div>
+
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Views</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
+              <button class="menu-btn" type="button" data-tab="week">Week</button>
+              <button class="menu-btn" type="button" data-tab="month">Month</button>
+              <button class="menu-btn" type="button" data-tab="year">Year</button>
+              <button class="menu-btn" type="button" data-tab="quarter">Quarter</button>
+              <button class="menu-btn" type="button" data-tab="trends">Trends</button>
+              <button class="menu-btn" type="button" data-tab="goals-plus">Goals+</button>
+              <button class="menu-btn" type="button" data-tab="bucket-list">Bucket List</button>
+            </div>
+          </div>
+
+          <div class="dropdown" data-dropdown>
+            <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Review</button>
+            <div class="dropdown-menu">
+              <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="home" hidden>
+        <h2>Dashboard</h2>
+        <div id="home-summary" class="summary-grid"></div>
+        <div class="form-grid form-grid-2 home-dashboard-grid">
+          <section class="snapshot-panel">
+            <div class="snapshot-panel-head">
+              <h3>Missed Entries</h3>
+              <p class="muted small">Goals missing updates in the current period.</p>
+            </div>
+            <ul id="home-missed-list" class="card-list compact-list"></ul>
+            <p id="home-missed-empty" class="empty-state">No missed entries right now.</p>
+          </section>
+          <section class="snapshot-panel">
+            <div class="snapshot-panel-head">
+              <h3>Reminders</h3>
+              <p class="muted small">Upcoming nudges and due checks.</p>
+            </div>
+            <ul id="home-reminders-list" class="card-list compact-list"></ul>
+            <p id="home-reminders-empty" class="empty-state">No reminders to show.</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel tab-panel active" data-tab-panel="manage">
+        <h2>Manage Goals</h2>
+        <form id="goal-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Setup Mode
+              <select id="goal-setup-mode">
+                <option value="standard">Standard Goal</option>
+                <option value="goalsplus-running">Goals+</option>
+              </select>
+            </label>
+            <label id="goal-name-text-label">
+              Goal Name
+              <input id="goal-name" type="text" maxlength="90" placeholder="Miles walked, pages read, sales calls..." required />
+              <select id="goal-name-goals-plus" hidden disabled>
+                <option value="running">Running</option>
+                <option value="golf">Golf</option>
+                <option value="disc-golf">Disc Golf</option>
+              </select>
+            </label>
+            <label>
+              Goal Type
+              <select id="goal-type">
+                <option value="quantity">Quantity Goal</option>
+                <option value="yesno">Yes/No Goal</option>
+                <option value="bucket">Bucket List Goal</option>
+                <option value="floating">Floating Goal</option>
+              </select>
+            </label>
+          </div>
+          <section id="goal-setup-wrap" class="progress-metrics-builder" aria-label="Goal setup">
+            <div class="snapshot-panel-head">
+              <h3>Goal Setup</h3>
+              <p class="muted small">Use Goals+ for running or golf/disc golf score tracking.</p>
+            </div>
+            <div class="form-grid form-grid-3 goals-plus-config-grid">
+              <label id="goal-plus-running-workout-label" hidden>
+                Running Option
+                <select id="goal-plus-running-workout">
+                  <option value="easy">Easy Run</option>
+                  <option value="tempo">Tempo Run</option>
+                  <option value="long">Long Run</option>
+                  <option value="norwegian4x4">Norwegian 4x4</option>
+                  <option value="intervals">Intervals</option>
+                  <option value="hill-repeats">Hill Repeats</option>
+                  <option value="fartlek">Fartlek</option>
+                  <option value="recovery">Recovery Run</option>
+                  <option value="progression">Progression Run</option>
+                  <option value="threshold">Threshold Run</option>
+                </select>
+              </label>
+              <label id="goal-plus-running-work-interval-label" hidden>
+                Work Speed (mph)
+                <input id="goal-plus-running-work-interval" type="number" min="0.1" max="20" step="0.1" value="8.0" />
+              </label>
+              <label id="goal-plus-running-recovery-interval-label" hidden>
+                Recovery Speed (mph)
+                <input id="goal-plus-running-recovery-interval" type="number" min="0.1" max="20" step="0.1" value="4.0" />
+              </label>
+            </div>
+            <p id="goal-plus-running-note" class="muted small" hidden>Running Goals+ entries include workout type, distance, and time with automatic pace and estimated VO2.</p>
+          </section>
+          <section id="goal-migrate-wrap" class="progress-metrics-builder" aria-label="Goal migration">
+            <div class="snapshot-panel-head">
+              <h3>Migration</h3>
+              <p class="muted small">Move tracking history from an existing goal into this new goal.</p>
+            </div>
+            <div class="form-grid form-grid-2">
+              <label>
+                Migrate From Goal
+                <select id="goal-migrate-source">
+                  <option value="">Don't migrate</option>
+                </select>
+              </label>
+              <label class="check-inline">
+                <input id="goal-migrate-archive-source" type="checkbox" checked />
+                Archive source goal after transfer
+              </label>
+            </div>
+            <p class="muted small">Transfers entries, schedules, and goal journal links.</p>
+          </section>
+          <div class="form-grid form-grid-3">
+            <label>
+              Unit
+              <input id="goal-unit" type="text" maxlength="20" placeholder="miles, pages, calls" required />
+            </label>
+            <label>
+              Priority
+              <input id="goal-priority" type="number" min="0" max="1000" value="0" />
+            </label>
+            <label>
+              Goal Tags
+              <input id="goal-tags" type="text" maxlength="140" placeholder="fitness, finance, health" />
+            </label>
+          </div>
+          <section class="progress-metrics-builder" aria-label="Additional tracking">
+            <div class="snapshot-panel-head">
+              <h3>Additional Tracking</h3>
+              <p class="muted small">Turn on to add optional sub-metrics for this goal. Example: Max Reps (reps), Weight Lifted (lbs).</p>
+            </div>
+            <label class="check-inline">
+              <input id="goal-additional-tracking-enabled" type="checkbox" />
+              Enable additional tracking
+            </label>
+            <div id="goal-additional-tracking-fields" hidden>
+              <div class="form-grid form-grid-3 progress-metrics-controls">
+                <label>
+                  Metric Name
+                  <input id="goal-metric-name" type="text" maxlength="60" placeholder="Max Reps, Pages Read..." />
+                </label>
+                <label>
+                  Metric Unit
+                  <input id="goal-metric-unit" type="text" maxlength="20" placeholder="reps, lbs, pages" />
+                </label>
+                <div class="progress-metrics-actions">
+                  <button id="goal-metric-add-btn" class="btn" type="button">Add Metric</button>
+                </div>
+              </div>
+              <ul id="goal-metrics-draft-list" class="card-list compact-list"></ul>
+              <p id="goal-metrics-draft-empty" class="muted small">No additional tracking metrics yet.</p>
+            </div>
+          </section>
+          <p class="muted small goal-hint">Yes/No and Bucket List goals use completion entries. Floating goals track flexible, non-daily progress.</p>
+          <div class="form-grid form-grid-3">
+            <label>
+              Weekly Goal
+              <input id="goal-weekly" type="number" min="0" max="1000000" value="0" required />
+            </label>
+            <label>
+              Monthly Goal
+              <input id="goal-monthly" type="number" min="0" max="1000000" value="0" required />
+            </label>
+            <label>
+              Yearly Goal
+              <input id="goal-yearly" type="number" min="0" max="1000000" value="0" required />
+            </label>
+          </div>
+          <div class="goal-template-toggle-row">
+            <label class="check-inline">
+              <input id="goal-custom-week-enabled" type="checkbox" />
+              Define each week
+            </label>
+            <label class="check-inline">
+              <input id="goal-custom-month-enabled" type="checkbox" />
+              Define each month
+            </label>
+          </div>
+          <div id="goal-custom-week-wrap" class="goal-template-wrap" hidden>
+            <p class="muted small">Custom weekly targets (W1-W52)</p>
+            <div id="goal-custom-week-grid" class="goal-template-grid goal-template-grid-week"></div>
+          </div>
+          <div id="goal-custom-month-wrap" class="goal-template-wrap" hidden>
+            <p class="muted small">Custom monthly targets (M1-M12)</p>
+            <div id="goal-custom-month-grid" class="goal-template-grid goal-template-grid-month"></div>
+          </div>
+          <div id="goal-reward-points-wrap" class="form-grid form-grid-3" hidden>
+            <label>
+              Weekly Points
+              <input id="goal-reward-weekly-points" type="number" min="0" max="1000000" value="1" />
+            </label>
+            <label>
+              Monthly Points
+              <input id="goal-reward-monthly-points" type="number" min="0" max="1000000" value="3" />
+            </label>
+            <label>
+              Yearly Points
+              <input id="goal-reward-yearly-points" type="number" min="0" max="1000000" value="10" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Goal</button>
+        </form>
+
+        <form id="manage-goals-form" class="form-block">
+          <div class="table-wrap">
+            <table id="manage-table" class="data-table" aria-label="Goals table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Tags</th>
+                  <th>Partner</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Unit</th>
+                  <th>Metrics</th>
+                  <th>Weekly</th>
+                  <th>Monthly</th>
+                  <th>Yearly</th>
+                  <th class="goal-points-col" hidden>W Pts</th>
+                  <th class="goal-points-col" hidden>M Pts</th>
+                  <th class="goal-points-col" hidden>Y Pts</th>
+                </tr>
+              </thead>
+              <tbody id="manage-list"></tbody>
+            </table>
+          </div>
+          <div class="actions">
+            <button id="manage-save-all" class="btn" type="submit">Save All Goals</button>
+          </div>
+        </form>
+        <p id="manage-empty" class="empty-state">No goals yet. Add your first goal above.</p>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="entry" hidden>
+      <h2>Add Entry</h2>
+      <p class="muted">Choose how you want to log goal updates.</p>
+      <label class="inline-control entry-mode-control">
+        Entry Mode
+        <select id="entry-mode-select">
+          <option value="solo">Add Goal Entry</option>
+          <option value="week">Week Update</option>
+          <option value="update-all-year">Update All</option>
+          <option value="update-single-goal-year">Update Single Goal (Year)</option>
+        </select>
+      </label>
+
+      <section id="solo-entry-section">
+      <h3>Solo Entry</h3>
+      <p class="muted">Log one goal update for one day.</p>
+      <form id="entry-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Goal
+            <select id="entry-tracker"></select>
+          </label>
+          <label>
+            Date
+            <input id="entry-date" type="date" required />
+          </label>
+          <label id="entry-amount-label">
+            Quantity
+            <input id="entry-amount" type="number" min="0" step="0.01" value="1.00" required />
+          </label>
+          <label id="entry-yesno-label" hidden>
+            Complete?
+            <select id="entry-yesno">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label class="check-inline">
+            <input id="entry-not-applicable" type="checkbox" />
+            Mark as N/A
+          </label>
+        </div>
+        <section id="entry-metrics-wrap" class="entry-metrics-wrap" hidden>
+          <p class="muted small">Additional Tracking</p>
+          <div id="entry-metrics-grid" class="form-grid form-grid-3"></div>
+        </section>
+        <section id="entry-goals-plus-running-wrap" class="entry-metrics-wrap" hidden>
+          <p class="muted small">Goals+ Running Entry</p>
+          <div class="form-grid form-grid-3">
+            <label>
+              Workout
+              <select id="entry-goals-plus-running-workout">
+                <option value="easy">Easy Run</option>
+                <option value="tempo">Tempo Run</option>
+                <option value="long">Long Run</option>
+                <option value="norwegian4x4">Norwegian 4x4</option>
+                <option value="intervals">Intervals</option>
+                <option value="hill-repeats">Hill Repeats</option>
+                <option value="fartlek">Fartlek</option>
+                <option value="recovery">Recovery Run</option>
+                <option value="progression">Progression Run</option>
+                <option value="threshold">Threshold Run</option>
+                <option value="custom">Custom Workout</option>
+              </select>
+            </label>
+            <label>
+              Distance (miles)
+              <input id="entry-goals-plus-distance" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label>
+              Time (minutes)
+              <input id="entry-goals-plus-duration" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label id="entry-goals-plus-work-interval-label" hidden>
+              Work Speed (mph)
+              <input id="entry-goals-plus-work-interval" type="number" min="0.1" max="20" step="0.1" />
+            </label>
+            <label id="entry-goals-plus-recovery-interval-label" hidden>
+              Recovery Speed (mph)
+              <input id="entry-goals-plus-recovery-interval" type="number" min="0.1" max="20" step="0.1" />
+            </label>
+            <label id="entry-goals-plus-custom-exercise-label" hidden>
+              Exercise
+              <input id="entry-goals-plus-custom-exercise" type="text" maxlength="80" placeholder="Kettlebell swings, push press..." />
+            </label>
+            <label id="entry-goals-plus-custom-reps-label" hidden>
+              Reps
+              <input id="entry-goals-plus-custom-reps" type="number" min="0" step="1" placeholder="0" />
+            </label>
+            <label id="entry-goals-plus-custom-weight-label" hidden>
+              Weight
+              <input id="entry-goals-plus-custom-weight" type="number" min="0" step="0.01" placeholder="0.00" />
+            </label>
+          </div>
+          <p id="entry-goals-plus-derived" class="muted small">Enter distance and time to calculate pace and estimated VO2.</p>
+        </section>
+        <section id="entry-goals-plus-golf-wrap" class="entry-metrics-wrap" hidden>
+          <p id="entry-goals-plus-golf-note" class="muted small">Goals+ Golf Entry</p>
+          <div class="form-grid form-grid-3">
+            <label>
+              Score
+              <input id="entry-goals-plus-golf-score" type="number" min="1" step="1" placeholder="72" />
+            </label>
+          </div>
+        </section>
+        <label>
+          Notes
+          <textarea id="entry-notes" rows="2" maxlength="280" placeholder="Optional note for this entry"></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Add Entry</button>
+      </form>
+
+      <h3>Today's Entries</h3>
+      <ul id="today-entries-list" class="card-list compact-list"></ul>
+      <p id="today-entries-empty" class="empty-state">No entries added today yet.</p>
+      </section>
+
+      <section id="week-update-section" hidden>
+      <div class="panel-head week-update-head">
+        <div>
+          <h3>Week Update</h3>
+          <p class="muted">Update all goals across each day of the week in one place.</p>
+          <p class="muted small">Use "-" to clear a day. Yes/No goals use Yes/No selections automatically.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="week-entry-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="week-entry-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="week-entry-next" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="week-entry-range" class="muted"></p>
+        </div>
+      </div>
+      <form id="week-entry-form" class="form-block">
+        <div class="table-wrap">
+          <table id="week-entry-table" class="data-table" aria-label="Week update table">
+            <thead id="week-entry-head"></thead>
+            <tbody id="week-entry-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Save Week Update</button>
+        </div>
+      </form>
+      <p id="week-entry-empty" class="empty-state">Create active goals before using Week Update.</p>
+      <p id="week-entry-status" class="muted small"></p>
+      </section>
+
+      <section id="year-update-all-section" hidden>
+      <div class="panel-head week-update-head">
+        <div>
+          <h3>Update All (Year)</h3>
+          <p class="muted">Edit all existing goal entries for the selected year.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="year-update-all-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="year-update-all-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="year-update-all-next" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="year-update-all-range" class="muted"></p>
+        </div>
+      </div>
+      <form id="year-update-all-form" class="form-block">
+        <div class="table-wrap">
+          <table class="data-table" aria-label="All yearly entries">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Goal</th>
+                <th>Amount</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="year-update-all-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Save Year Updates</button>
+        </div>
+      </form>
+      <p id="year-update-all-empty" class="empty-state">No entries for this year.</p>
+      <p id="year-update-all-status" class="muted small"></p>
+      </section>
+
+      <section id="year-single-goal-section" hidden>
+      <div class="panel-head week-update-head">
+        <div>
+          <h3>Update Single Goal (Year)</h3>
+          <p class="muted">Pick one goal and edit each year-to-date day. Use Status to leave no entry, set a value, or mark N/A.</p>
+        </div>
+        <div class="panel-actions">
+          <button id="year-single-goal-prev" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="year-single-goal-this" class="btn btn-nav-compact" type="button">This</button>
+          <button id="year-single-goal-next" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="year-single-goal-range" class="muted"></p>
+        </div>
+      </div>
+      <form id="year-single-goal-form" class="form-block">
+        <label class="inline-control">
+          Goal
+          <select id="year-single-goal-select"></select>
+        </label>
+        <div class="table-wrap">
+          <table class="data-table" aria-label="Single goal year-to-date entries">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Amount</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="year-single-goal-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Save Goal Year Updates</button>
+        </div>
+      </form>
+      <p id="year-single-goal-empty" class="empty-state">No year-to-date rows for this goal.</p>
+      <p id="year-single-goal-status" class="muted small"></p>
+      </section>
+
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="missed-entries" hidden>
+      <h2>Missed Entries</h2>
+      <p class="muted">Every date missing goal entries, plus past periods that have not been closed out yet.</p>
+      <ul id="missed-entries-list" class="card-list compact-list"></ul>
+      <p id="missed-entries-empty" class="empty-state">No missed entries right now.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="goal-journal" hidden>
+      <h2>Goal Journal</h2>
+      <p class="muted">Capture progress notes, blockers, and reflections tied to goals.</p>
+      <form id="goal-journal-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Date
+            <input id="goal-journal-date" type="date" required />
+          </label>
+          <label>
+            Goal (Optional)
+            <select id="goal-journal-goal"></select>
+          </label>
+          <label>
+            Subject Options
+            <select id="goal-journal-title">
+              <option value="General Journal">General Journal</option>
+              <option value="Week Planning">Week Planning</option>
+              <option value="Week Review">Week Review</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Journal Entry
+          <textarea id="goal-journal-content" rows="4" maxlength="1200" placeholder="Write your update, lesson, or plan..." required></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Add Journal Entry</button>
+      </form>
+      <ul id="goal-journal-list" class="card-list"></ul>
+      <p id="goal-journal-empty" class="empty-state">No journal entries yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="bucket-entry" hidden>
+      <h2>Bucket List Entry</h2>
+      <p class="muted">Close out bucket list goals when completed.</p>
+      <form id="bucket-entry-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Bucket Goal
+            <select id="bucket-entry-goal"></select>
+          </label>
+          <label>
+            Close-Out Date
+            <input id="bucket-entry-date" type="date" required />
+          </label>
+          <label>
+            Status
+            <input type="text" value="Close Out" disabled />
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="bucket-entry-notes" rows="2" maxlength="280" placeholder="Optional close-out note"></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Close Out Bucket Goal</button>
+      </form>
+
+      <h3>Recent Bucket Close-Outs</h3>
+      <ul id="recent-bucket-entries-list" class="card-list compact-list"></ul>
+      <p id="recent-bucket-entries-empty" class="empty-state">No bucket goals have been closed yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="checkin-entry" hidden>
+      <h2>Add Check-in</h2>
+      <p class="muted">Log periodic check-ins such as weekly finance review or monthly grocery planning.</p>
+      <form id="checkin-entry-form" class="form-block">
+        <div class="form-grid form-grid-3">
+          <label>
+            Check-in
+            <select id="checkin-entry-item"></select>
+          </label>
+          <label>
+            Date
+            <input id="checkin-entry-date" type="date" required />
+          </label>
+          <label>
+            Status
+            <select id="checkin-entry-status">
+              <option value="yes">Completed</option>
+              <option value="no">Not completed</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          Notes
+          <textarea id="checkin-entry-notes" rows="2" maxlength="280" placeholder="Optional check-in note"></textarea>
+        </label>
+        <button class="btn btn-primary" type="submit">Add Check-in</button>
+      </form>
+      <h3>Recent Check-ins</h3>
+      <ul id="recent-checkin-entries-list" class="card-list compact-list"></ul>
+      <p id="recent-checkin-entries-empty" class="empty-state">No check-ins logged yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="entry-list" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Entry List</h2>
+          <p class="muted">Every goal entry you have logged. Edit date, goal, quantity/value, and notes or delete rows.</p>
+        </div>
+        <label class="inline-control">
+          Goal Type
+          <select id="entry-list-type-filter">
+            <option value="all">All Types</option>
+            <option value="quantity">Quantity</option>
+            <option value="yesno">Yes/No</option>
+            <option value="bucket">Bucket List</option>
+            <option value="floating">Floating</option>
+          </select>
+        </label>
+        <label class="inline-control">
+          Goal Status
+          <select id="entry-list-status-filter">
+            <option value="active">Active</option>
+            <option value="all">All</option>
+            <option value="archived">Archived</option>
+          </select>
+        </label>
+        <label class="inline-control">
+          Bucket Status
+          <select id="entry-list-bucket-filter">
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+        <label class="inline-control">
+          Sort
+          <select id="entry-list-sort">
+            <option value="date_desc">Newest Date</option>
+            <option value="goal_asc">Goal A-Z</option>
+          </select>
+        </label>
+      </div>
+      <div id="entry-list-focus-wrap" class="entry-list-focus" hidden>
+        <p id="entry-list-focus-text" class="muted small"></p>
+        <button id="entry-list-focus-clear" class="btn btn-nav-compact" type="button">Clear Focus</button>
+      </div>
+      <ul id="entry-list-all" class="card-list"></ul>
+      <p id="entry-list-empty" class="empty-state">No entries yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="entry-csv" hidden>
+      <h2>CSV Import/Export</h2>
+      <p class="muted">Import entries from CSV or export your entries in the same layout.</p>
+      <p class="muted small">Format: A1 = Date, B1/C1/D1... = goal names, A2:A = dates, B2:B/C2:C... = amounts.</p>
+      <form id="csv-upload-form" class="form-block">
+        <label>
+          CSV File
+          <input id="csv-upload-file" type="file" accept=".csv,text/csv" required />
+        </label>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Import CSV</button>
+          <button id="csv-export-button" class="btn" type="button">Export CSV</button>
+        </div>
+      </form>
+      <p id="csv-upload-status" class="muted small"></p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="goal-schedule" hidden>
+      <div class="panel-head">
+        <h2>Goal Schedule</h2>
+        <div class="panel-actions">
+          <button id="schedule-prev-week" class="btn btn-nav-compact" type="button">Prev</button>
+          <button id="schedule-this-week" class="btn btn-nav-compact" type="button">This</button>
+          <button id="schedule-next-week" class="btn btn-nav-compact" type="button">Next</button>
+          <p id="schedule-week-range" class="muted"></p>
+        </div>
+      </div>
+
+      <details class="schedule-disclosure">
+        <summary>Add Schedule Item</summary>
+        <form id="schedule-form" class="form-block">
+          <div class="form-grid form-grid-4">
+            <label>
+              Goal
+              <select id="schedule-goal"></select>
+            </label>
+            <label>
+              Date
+              <input id="schedule-date" type="date" required />
+            </label>
+            <label>
+              Start Time
+              <input id="schedule-start-time" type="time" value="09:00" required />
+            </label>
+            <label>
+              End Time
+              <input id="schedule-end-time" type="time" value="10:00" required />
+            </label>
+          </div>
+          <label>
+            Notes
+            <input id="schedule-notes" type="text" maxlength="180" placeholder="Optional schedule note" />
+          </label>
+          <button class="btn btn-primary" type="submit">Add Schedule Item</button>
+        </form>
+      </details>
+
+      <details class="schedule-disclosure">
+        <summary>Weekly Calendar</summary>
+        <div id="schedule-list" class="schedule-calendar" aria-live="polite"></div>
+        <p id="schedule-empty" class="empty-state">No schedule items in this week.</p>
+      </details>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="week" hidden>
+      <div class="panel-head">
+        <h2>Week View</h2>
+        <div class="panel-actions">
+          <div class="period-nav" aria-label="Week navigation">
+            <button id="week-prev" class="btn btn-nav-pill" type="button" aria-label="Previous week">&lt;</button>
+            <button id="week-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current week">&#9679;</button>
+            <button id="week-next" class="btn btn-nav-pill" type="button" aria-label="Next week">&gt;</button>
+          </div>
+          <button id="week-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <details class="view-filters-disclosure">
+            <summary>Filters</summary>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="week-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="week-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="week-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
+          <p id="week-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="week-summary" class="summary-grid"></div>
+      <div id="week-list" class="view-accordion"></div>
+      <p id="week-empty" class="empty-state">No goals or check-ins yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="month" hidden>
+      <div class="panel-head">
+        <h2>Month View</h2>
+        <div class="panel-actions">
+          <div class="period-nav" aria-label="Month navigation">
+            <button id="month-prev" class="btn btn-nav-pill" type="button" aria-label="Previous month">&lt;</button>
+            <button id="month-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current month">&#9679;</button>
+            <button id="month-next" class="btn btn-nav-pill" type="button" aria-label="Next month">&gt;</button>
+          </div>
+          <button id="month-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <details class="view-filters-disclosure">
+            <summary>Filters</summary>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="month-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="month-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="month-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
+          <p id="month-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="month-summary" class="summary-grid"></div>
+      <div id="month-list" class="view-accordion"></div>
+      <p id="month-empty" class="empty-state">No goals or check-ins yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="year" hidden>
+      <div class="panel-head">
+        <h2>Year View</h2>
+        <div class="panel-actions">
+          <div class="period-nav" aria-label="Year navigation">
+            <button id="year-prev" class="btn btn-nav-pill" type="button" aria-label="Previous year">&lt;</button>
+            <button id="year-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current year">&#9679;</button>
+            <button id="year-next" class="btn btn-nav-pill" type="button" aria-label="Next year">&gt;</button>
+          </div>
+          <button id="year-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <details class="view-filters-disclosure">
+            <summary>Filters</summary>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="year-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="year-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="year-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
+          <p id="year-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="year-summary" class="summary-grid"></div>
+      <div id="year-list" class="view-accordion"></div>
+      <p id="year-empty" class="empty-state">No goals or check-ins yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="quarter" hidden>
+      <div class="panel-head">
+        <h2>Quarter View</h2>
+        <div class="panel-actions">
+          <div class="period-nav" aria-label="Quarter navigation">
+            <button id="quarter-prev" class="btn btn-nav-pill" type="button" aria-label="Previous quarter">&lt;</button>
+            <button id="quarter-this" class="btn btn-nav-pill btn-nav-current" type="button" aria-label="Current quarter">&#9679;</button>
+            <button id="quarter-next" class="btn btn-nav-pill" type="button" aria-label="Next quarter">&gt;</button>
+          </div>
+          <button id="quarter-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <details class="view-filters-disclosure">
+            <summary>Filters</summary>
+            <div class="view-filters-popover">
+              <div class="view-filters-head">
+                <p class="muted small">View Filters</p>
+                <button class="btn btn-nav-compact" type="button" data-action="close-view-filters">Close</button>
+              </div>
+              <div class="view-filters-grid">
+                <label class="inline-control">
+                  Goal Type
+                  <select id="quarter-goal-type-filter">
+                    <option value="all">All Types</option>
+                    <option value="quantity">Quantity</option>
+                    <option value="yesno">Yes/No</option>
+                    <option value="bucket">Bucket List</option>
+                    <option value="floating">Floating</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Goal Status
+                  <select id="quarter-goal-status-filter">
+                    <option value="active">Active</option>
+                    <option value="all">All</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <label class="inline-control">
+                  Tag
+                  <select id="quarter-goal-tag-filter">
+                    <option value="all">All Tags</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </details>
+          <p id="quarter-range" class="muted"></p>
+        </div>
+      </div>
+      <div id="quarter-summary" class="summary-grid"></div>
+      <div id="quarter-list" class="view-accordion"></div>
+      <p id="quarter-empty" class="empty-state">No goals or check-ins yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="trends" hidden>
+      <div class="panel-head">
+        <h2>Trends</h2>
+        <div class="panel-actions">
+          <label class="inline-control">
+            Window
+            <select id="trends-window-select">
+              <option value="8">Last 8 weeks</option>
+              <option value="12">Last 12 weeks</option>
+              <option value="26">Last 26 weeks</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Metric
+            <select id="trends-metric-select">
+              <option value="consistency">Consistency</option>
+              <option value="volume">Volume</option>
+              <option value="hit-rate">Hit Rate</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Tag
+            <select id="trends-tag-filter">
+              <option value="all">All Tags</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="trends-summary" class="summary-grid"></div>
+      <ul id="trends-list" class="card-list"></ul>
+      <p id="trends-empty" class="empty-state">No trend data yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="goals-plus" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Goals+ View</h2>
+          <p class="muted">Hover Goals+ to review running and golf stats.</p>
+        </div>
+      </div>
+      <div id="goals-plus-summary" class="summary-grid"></div>
+      <ul id="goals-plus-list" class="card-list"></ul>
+      <p id="goals-plus-empty" class="empty-state">No Goals+ goals yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="bucket-list" hidden>
+      <div class="panel-head">
+        <h2>Bucket List View</h2>
+        <div class="panel-actions">
+          <label class="inline-control">
+            Goal Status
+            <select id="bucket-list-goal-status-filter">
+              <option value="active">Active</option>
+              <option value="all">All</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label class="inline-control">
+            Bucket Status
+            <select id="bucket-list-item-status-filter">
+              <option value="all">All</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="bucket-list-summary" class="summary-grid"></div>
+      <ul id="bucket-list-view-list" class="card-list"></ul>
+      <p id="bucket-list-view-empty" class="empty-state">No bucket list goals yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="point-store" hidden>
+      <h2>Point Store</h2>
+      <p class="muted">Spend your point bank on rewards you define in Settings.</p>
+      <div class="summary-grid">
+        <article class="summary-card">
+          <p>Point Bank</p>
+          <strong id="point-bank-balance">0</strong>
+        </article>
+        <article class="summary-card">
+          <p>Total Earned</p>
+          <strong id="point-bank-earned">0</strong>
+        </article>
+        <article class="summary-card">
+          <p>Total Spent</p>
+          <strong id="point-bank-spent">0</strong>
+        </article>
+      </div>
+      <h3>Rewards</h3>
+      <ul id="point-store-reward-list" class="card-list"></ul>
+      <p id="point-store-reward-empty" class="empty-state">No rewards yet. Add rewards in Settings.</p>
+      <h3>Active Rewards</h3>
+      <ul id="point-store-active-list" class="card-list"></ul>
+      <p id="point-store-active-empty" class="empty-state">No active rewards yet.</p>
+      <div class="panel-actions">
+        <h3>Closed Rewards</h3>
+        <button id="point-store-clear-closed-btn" class="btn" type="button">Clear Closed</button>
+      </div>
+      <ul id="point-store-closed-list" class="card-list compact-list"></ul>
+      <p id="point-store-closed-empty" class="empty-state">No closed rewards yet.</p>
+      <h3>Point Bank History</h3>
+      <ul id="point-store-history-list" class="card-list compact-list"></ul>
+      <p id="point-store-history-empty" class="empty-state">No point activity yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="checkins" hidden>
+      <h2>Manage Check-ins</h2>
+      <p class="muted">Create periodic check-ins that are tracked once per week, month, or year.</p>
+      <form id="checkin-form" class="form-block">
+        <div class="form-grid form-grid-2">
+          <label>
+            Check-in Name
+            <input id="checkin-name" type="text" maxlength="90" placeholder="Review finances, plan groceries..." required />
+          </label>
+          <label>
+            Frequency
+            <select id="checkin-cadence">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Add Check-in</button>
+      </form>
+
+      <form id="manage-checkins-form" class="form-block">
+        <div class="table-wrap">
+          <table id="checkin-table" class="data-table" aria-label="Check-ins table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Frequency</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="checkin-list"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button id="checkin-save-all" class="btn" type="submit">Save All Check-ins</button>
+        </div>
+      </form>
+      <p id="checkin-empty" class="empty-state">No check-ins yet. Add your first check-in above.</p>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="settings" hidden>
+      <h2>Settings</h2>
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Setup</h3>
+          <p class="muted small">Manage your goals and check-ins.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="manage">Manage Goals</button>
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="checkins">Manage Check-ins</button>
+        </div>
+      </section>
+      <form id="settings-form" class="form-block">
+        <label>
+          Week Definition
+          <select id="week-start-select">
+            <option value="monday">Mon-Sun</option>
+            <option value="sunday">Sun-Sat</option>
+          </select>
+        </label>
+        <label>
+          Compare Last Period In Views
+          <select id="compare-default-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Projection Average Source
+          <select id="projection-average-select">
+            <option value="period">Given Period</option>
+            <option value="year">Year To Date</option>
+          </select>
+        </label>
+        <label>
+          Reward Points System
+          <select id="reward-points-enabled-select">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </label>
+        <label>
+          Bucket List Feature
+          <select id="bucket-list-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Quarter Views
+          <select id="quarters-enabled-select">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+          </select>
+        </label>
+        <label>
+          Smart Reminders
+          <select id="smart-reminders-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Missed Entry Threshold (days)
+          <input id="missed-entry-days-input" type="number" min="1" max="30" value="2" />
+        </label>
+        <label>
+          Milestone Notifications
+          <select id="milestone-notifications-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Milestone Step (%)
+          <select id="milestone-step-select">
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="25">25%</option>
+          </select>
+        </label>
+        <label>
+          Mobile Quick Actions
+          <select id="mobile-quick-actions-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Onboarding Tips
+          <select id="onboarding-enabled-select">
+            <option value="on">On</option>
+            <option value="off">Off</option>
+          </select>
+        </label>
+        <label>
+          Performance Mode
+          <select id="performance-mode-select">
+            <option value="standard">Standard</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+        <label>
+          Color Theme
+          <select id="theme-select">
+            <option value="teal">Teal</option>
+            <option value="ocean">Ocean</option>
+            <option value="forest">Forest</option>
+            <option value="sunset">Sunset</option>
+            <option value="amber">Amber</option>
+            <option value="berry">Berry</option>
+            <option value="slate">Slate</option>
+            <option value="midnight">Midnight</option>
+          </select>
+        </label>
+        <button class="btn" type="submit">Save Settings</button>
+      </form>
+      <p id="settings-note" class="muted">This affects week boundaries, compare behavior in views, projection behavior, reward points, bucket list visibility, and your saved color theme.</p>
+
+      <section id="account-security-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Account Security</h3>
+          <p class="muted small">Change your password for this account.</p>
+        </div>
+        <form id="change-password-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Current Password
+              <input id="change-password-current" type="password" maxlength="120" autocomplete="current-password" required />
+            </label>
+            <label>
+              New Password
+              <input id="change-password-new" type="password" maxlength="120" autocomplete="new-password" required />
+            </label>
+            <label>
+              Confirm New Password
+              <input id="change-password-confirm" type="password" maxlength="120" autocomplete="new-password" required />
+            </label>
+          </div>
+          <label class="check-inline">
+            <input id="change-password-show" type="checkbox" />
+            Show passwords
+          </label>
+          <button class="btn" type="submit">Update Password</button>
+        </form>
+        <p id="change-password-message" class="muted small"></p>
+      </section>
+
+      <section id="restore-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Undo / Restore</h3>
+          <p class="muted small">Restore recently deleted goals, check-ins, and entries.</p>
+        </div>
+        <ul id="trash-list" class="card-list compact-list"></ul>
+        <p id="trash-empty" class="empty-state">No deleted items.</p>
+      </section>
+
+      <section id="point-store-settings-section" class="snapshot-panel" hidden>
+        <div class="snapshot-panel-head">
+          <h3>Point Store Rewards</h3>
+          <p class="muted small">Define rewards and costs for spending your point bank.</p>
+        </div>
+        <form id="point-store-toggle-form" class="form-block">
+          <label>
+            Point Store Rewards
+            <select id="point-store-enabled-select">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <button class="btn" type="submit">Save Point Store Setting</button>
+        </form>
+        <form id="point-adjust-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Action
+              <select id="point-adjust-direction">
+                <option value="add">Add Points</option>
+                <option value="remove">Remove Points</option>
+              </select>
+            </label>
+            <label>
+              Amount
+              <input id="point-adjust-amount" type="number" min="0.01" step="0.01" value="10.00" required />
+            </label>
+            <label>
+              Note
+              <input id="point-adjust-note" type="text" maxlength="120" placeholder="Optional adjustment note" />
+            </label>
+          </div>
+          <button class="btn" type="submit">Apply Point Adjustment</button>
+        </form>
+        <form id="reward-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Reward Name
+              <input id="reward-name" type="text" maxlength="90" placeholder="Movie night, new game, coffee run..." required />
+            </label>
+            <label>
+              Cost (Points)
+              <input id="reward-cost" type="number" min="1" max="1000000" value="10" required />
+            </label>
+            <label>
+              Notes
+              <input id="reward-notes" type="text" maxlength="160" placeholder="Optional reward details" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Reward</button>
+        </form>
+        <ul id="reward-settings-list" class="card-list"></ul>
+        <p id="reward-settings-empty" class="empty-state">No rewards configured yet.</p>
+      </section>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="social" hidden>
+      <h2>Social</h2>
+      <section id="friends-settings-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Friends</h3>
+          <p class="muted small">Add friends to keep a quick list of people you track with. Add their account email to send a notification.</p>
+        </div>
+        <form id="friend-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Name
+              <input id="friend-name" type="text" maxlength="90" placeholder="Friend name" required />
+            </label>
+            <label>
+              Email (optional)
+              <input id="friend-email" type="email" maxlength="140" placeholder="friend@email.com" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Friend</button>
+        </form>
+        <ul id="friend-list" class="card-list compact-list"></ul>
+        <p id="friend-empty" class="empty-state">No friends added yet.</p>
+      </section>
+      <section id="squad-settings-section" class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <h3>Squad Goals</h3>
+          <p class="muted small">Create shared squads where friends track goals together.</p>
+        </div>
+        <form id="squad-form" class="form-block">
+          <div class="form-grid form-grid-3">
+            <label>
+              Squad Name
+              <input id="squad-name" type="text" maxlength="90" placeholder="Weekend Runners" required />
+            </label>
+            <label>
+              Notes
+              <input id="squad-notes" type="text" maxlength="160" placeholder="Optional squad purpose" />
+            </label>
+            <label>
+              Weekly Goal
+              <input id="squad-weekly-goal" type="number" min="0" max="1000000" value="0" />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Create Squad</button>
+        </form>
+        <ul id="squad-list" class="card-list"></ul>
+        <p id="squad-empty" class="empty-state">No squads yet.</p>
+      </section>
+      </section>
+
+      <nav id="mobile-quick-actions" class="mobile-quick-actions" hidden aria-label="Quick actions">
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="entry">Entry</button>
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="week">Week</button>
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="home">Home</button>
+        <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="social">Social</button>
+      </nav>
+
+      <div id="graph-modal" class="graph-modal hidden" aria-hidden="true">
+        <div class="graph-modal-backdrop" data-action="close-graph-modal"></div>
+        <section class="graph-modal-card" role="dialog" aria-modal="true" aria-labelledby="graph-modal-title">
+          <div class="graph-modal-head">
+            <h3 id="graph-modal-title">Expanded Chart</h3>
+            <button id="graph-modal-close" class="btn" type="button">Close</button>
+          </div>
+          <div id="graph-modal-body" class="graph-modal-body"></div>
+        </section>
+      </div>
+
+      <div id="onboarding-modal" class="graph-modal hidden" aria-hidden="true">
+        <div class="graph-modal-backdrop" data-action="close-onboarding-modal"></div>
+        <section class="graph-modal-card onboarding-card" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+          <div class="graph-modal-head">
+            <h3 id="onboarding-title">Welcome</h3>
+            <button id="onboarding-close" class="btn" type="button">Close</button>
+          </div>
+          <div class="graph-modal-body">
+            <ol class="simple-list">
+              <li>Add goals in Manage Goals.</li>
+              <li>Log updates in Add Entry.</li>
+              <li>Review pace in Week/Month/Year views.</li>
+              <li>Close out periods to lock snapshots and reward points.</li>
+            </ol>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="firebase-config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
