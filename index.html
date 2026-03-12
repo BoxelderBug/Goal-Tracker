@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260312i" />
+  <link rel="stylesheet" href="styles.css?v=20260312j" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -215,11 +215,21 @@
           <p id="home-dashboard-chart-empty" class="empty-state">No data available for this chart view yet.</p>
         </section>
         <div class="form-grid form-grid-2 home-dashboard-grid">
-          <section class="snapshot-panel">
+          <section class="snapshot-panel" id="home-missed-panel">
             <div class="snapshot-panel-head">
-              <h3>Missed Entries</h3>
-              <p class="muted small">Goals missing updates in the current period.</p>
+              <h3>
+                <button id="home-missed-open-week" class="home-panel-link-button" type="button">Missed Entries</button>
+              </h3>
+              <label class="inline-control home-missed-period-control">
+                Period
+                <select id="home-missed-period-select">
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                  <option value="year">Year</option>
+                </select>
+              </label>
             </div>
+            <p id="home-missed-period-copy" class="muted small">Goals missing updates this week.</p>
             <ul id="home-missed-list" class="card-list compact-list"></ul>
             <p id="home-missed-empty" class="empty-state">No missed entries right now.</p>
           </section>
@@ -1542,6 +1552,6 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260312i"></script>
+  <script type="module" src="app.js?v=20260312j"></script>
 </body>
 </html>

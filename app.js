@@ -180,6 +180,9 @@ const homeMomentumEmpty = document.querySelector("#home-momentum-empty");
 const homeDashboardViewSelect = document.querySelector("#home-dashboard-view-select");
 const homeDashboardChart = document.querySelector("#home-dashboard-chart");
 const homeDashboardChartEmpty = document.querySelector("#home-dashboard-chart-empty");
+const homeMissedOpenWeekButton = document.querySelector("#home-missed-open-week");
+const homeMissedPeriodSelect = document.querySelector("#home-missed-period-select");
+const homeMissedPeriodCopy = document.querySelector("#home-missed-period-copy");
 const homeMissedList = document.querySelector("#home-missed-list");
 const homeMissedEmpty = document.querySelector("#home-missed-empty");
 const homeRemindersList = document.querySelector("#home-reminders-list");
@@ -456,6 +459,7 @@ let pointTransactions = [];
 let settings = getDefaultSettings();
 let activeTab = "settings-general";
 let homeDashboardChartView = "activity";
+let homeMissedPeriod = "week";
 let activeSocialSection = "friends";
 let entryMode = "solo";
 let entryListSortMode = "date_desc";
@@ -753,6 +757,37 @@ function navigateToTab(tabName, options = {}) {
   }
 }
 
+function openWeekEntryFromHomeMissedTile() {
+  if (!currentUser) {
+    return;
+  }
+  entryMode = "week";
+  weekEntryAnchor = normalizeDate(new Date());
+  weekEntryStatusMessage = "";
+  navigateToTab("entry");
+}
+
+function openSoloEntryForTracker(trackerId) {
+  if (!currentUser) {
+    return;
+  }
+  const targetTrackerId = String(trackerId || "");
+  if (!targetTrackerId) {
+    return;
+  }
+  entryMode = "solo";
+  navigateToTab("entry");
+  if (!entryTracker) {
+    return;
+  }
+  const hasTargetOption = Array.from(entryTracker.options).some((option) => option.value === targetTrackerId);
+  if (!hasTargetOption) {
+    return;
+  }
+  entryTracker.value = targetTrackerId;
+  updateEntryFormMode();
+}
+
 if (mobileMenuToggle) {
   mobileMenuToggle.addEventListener("click", () => {
     const currentlyOpen = tabStripPanel ? tabStripPanel.classList.contains("mobile-menu-open") : false;
@@ -859,6 +894,39 @@ if (homeDashboardViewSelect) {
     }
     renderHomeTab();
     scheduleEChartResizePasses();
+  });
+}
+
+if (homeMissedPeriodSelect) {
+  homeMissedPeriodSelect.addEventListener("change", () => {
+    homeMissedPeriod = normalizeHomeMissedPeriod(homeMissedPeriodSelect.value);
+    if (!currentUser) {
+      return;
+    }
+    renderHomeTab();
+  });
+}
+
+if (homeMissedOpenWeekButton) {
+  homeMissedOpenWeekButton.addEventListener("click", () => {
+    openWeekEntryFromHomeMissedTile();
+  });
+}
+
+if (homeMissedList) {
+  homeMissedList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const goalButton = event.target.closest("button[data-action='open-home-missed-solo-entry']");
+    if (!goalButton) {
+      return;
+    }
+    const trackerId = String(goalButton.dataset.trackerId || "");
+    if (!trackerId) {
+      return;
+    }
+    openSoloEntryForTracker(trackerId);
   });
 }
 
@@ -4968,6 +5036,86 @@ function formatShortMonthDay(date) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+function normalizeHomeMissedPeriod(value) {
+  if (value === "month") {
+    return "month";
+  }
+  if (value === "year") {
+    return "year";
+  }
+  return "week";
+}
+
+function getHomeMissedRange(periodName, now = new Date()) {
+  const normalizedPeriod = normalizeHomeMissedPeriod(periodName);
+  const today = normalizeDate(now);
+  const fullRange = normalizedPeriod === "month"
+    ? getMonthRange(today)
+    : normalizedPeriod === "year"
+    ? getYearRange(today)
+    : getWeekRange(today);
+  const cappedEnd = fullRange.end > today ? today : fullRange.end;
+  return {
+    periodName: normalizedPeriod,
+    start: fullRange.start,
+    end: cappedEnd
+  };
+}
+
+function getHomeMissedCopy(periodName) {
+  const normalizedPeriod = normalizeHomeMissedPeriod(periodName);
+  const periodLabel = getSnapshotPeriodTitle(normalizedPeriod).toLowerCase();
+  return `Goals missing updates this ${periodLabel}.`;
+}
+
+function getHomeMissedEmptyCopy(periodName) {
+  const normalizedPeriod = normalizeHomeMissedPeriod(periodName);
+  const periodLabel = getSnapshotPeriodTitle(normalizedPeriod).toLowerCase();
+  return `No missed entries this ${periodLabel}.`;
+}
+
+function getHomeMissedEntryItems(periodName, now = new Date()) {
+  const range = getHomeMissedRange(periodName, now);
+  const startKey = getDateKey(range.start);
+  const endKey = getDateKey(range.end);
+  const activeTrackers = trackers
+    .filter((tracker) => tracker && !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket");
+  if (activeTrackers.length < 1 || !isDateKey(startKey) || !isDateKey(endKey) || endKey < startKey) {
+    return [];
+  }
+
+  const activeTrackerIds = new Set(activeTrackers.map((tracker) => tracker.id));
+  const trackersWithPeriodEntries = new Set();
+  entries.forEach((entry) => {
+    if (!entry || !activeTrackerIds.has(entry.trackerId) || !isDateKey(entry.date)) {
+      return;
+    }
+    if (entry.date >= startKey && entry.date <= endKey) {
+      trackersWithPeriodEntries.add(entry.trackerId);
+    }
+  });
+
+  const latestDateByTracker = getLatestEntryDateMap();
+  const elapsedRangeDays = Math.max(getRangeDays({ start: range.start, end: range.end }), 1);
+  const today = normalizeDate(now);
+  return activeTrackers
+    .filter((tracker) => !trackersWithPeriodEntries.has(tracker.id))
+    .map((tracker) => {
+      const latestDateKey = latestDateByTracker.get(tracker.id) || "";
+      const latestDate = latestDateKey ? parseDateKey(latestDateKey) : null;
+      const daysWithout = latestDate
+        ? Math.max(Math.floor((today - normalizeDate(latestDate)) / DAY_MS), 0)
+        : elapsedRangeDays;
+      return {
+        tracker,
+        latestDateKey,
+        daysWithout,
+        periodName: range.periodName
+      };
+    })
+    .sort((a, b) => b.daysWithout - a.daysWithout);
+}
+
 function normalizeHomeDashboardChartView(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "momentum") {
@@ -5953,6 +6101,9 @@ function renderHomeTab() {
     }
     homeMissedList.innerHTML = "";
     homeMissedEmpty.style.display = "none";
+    if (homeMissedPeriodCopy) {
+      homeMissedPeriodCopy.textContent = getHomeMissedCopy(homeMissedPeriod);
+    }
     homeRemindersList.innerHTML = "";
     homeRemindersEmpty.style.display = "none";
     if (homeGoalHeatmap) {
@@ -5999,7 +6150,19 @@ function renderHomeTab() {
   const projectedHitPct = measurableWeekGoalCount > 0 ? Math.round((onPaceGoals.length / measurableWeekGoalCount) * 100) : 0;
   const projectedDetailText = buildProjectedWeekHitDetailText(onPaceGoals, offPaceGoals, measurableWeekGoalCount);
   const weekMomentumRows = getHomeMomentumRows(weekIndex, now);
-  const missedItems = getMissedEntryItems(now).slice(0, 8);
+  const missedRiskItems = getMissedEntryItems(now).slice(0, 8);
+  const selectedMissedPeriod = normalizeHomeMissedPeriod(
+    homeMissedPeriod || (homeMissedPeriodSelect ? homeMissedPeriodSelect.value : "week")
+  );
+  homeMissedPeriod = selectedMissedPeriod;
+  const homeMissedItems = getHomeMissedEntryItems(selectedMissedPeriod, now).slice(0, 8);
+  const missedPeriodLabelLower = getSnapshotPeriodTitle(selectedMissedPeriod).toLowerCase();
+  if (homeMissedPeriodSelect) {
+    homeMissedPeriodSelect.value = selectedMissedPeriod;
+  }
+  if (homeMissedPeriodCopy) {
+    homeMissedPeriodCopy.textContent = getHomeMissedCopy(selectedMissedPeriod);
+  }
 
   homeSummary.innerHTML = `
     <article class="summary-card">
@@ -6023,22 +6186,30 @@ function renderHomeTab() {
     nowDate: now,
     weekIndex,
     weekMomentumRows,
-    missedItems
+    missedItems: missedRiskItems
   });
 
-  if (missedItems.length < 1) {
+  if (homeMissedItems.length < 1) {
     homeMissedList.innerHTML = "";
+    homeMissedEmpty.textContent = getHomeMissedEmptyCopy(selectedMissedPeriod);
     homeMissedEmpty.style.display = "block";
   } else {
     homeMissedEmpty.style.display = "none";
-    homeMissedList.innerHTML = missedItems
+    homeMissedList.innerHTML = homeMissedItems
       .map((item, index) => `
-        <li class="quick-item" style="--stagger:${index}">
-          <div>
-            <strong>${escapeHtml(item.tracker.name)}</strong>
-            <p class="muted small">${item.latestDateKey ? `Last entry ${formatDate(parseDateKey(item.latestDateKey))}` : "No entries yet"}</p>
-          </div>
-          <span class="pace-chip pace-off">${item.daysWithout}d</span>
+        <li class="quick-item home-missed-item" style="--stagger:${index}">
+          <button
+            class="home-missed-goal-button"
+            type="button"
+            data-action="open-home-missed-solo-entry"
+            data-tracker-id="${escapeAttr(item.tracker.id)}"
+          >
+            <span>
+              <strong>${escapeHtml(item.tracker.name)}</strong>
+              <p class="muted small">${item.latestDateKey ? `Last entry ${formatDate(parseDateKey(item.latestDateKey))}` : "No entries yet"} | No updates this ${escapeHtml(missedPeriodLabelLower)}</p>
+            </span>
+            <span class="pace-chip pace-off">${item.daysWithout}d</span>
+          </button>
         </li>
       `)
       .join("");
@@ -11656,6 +11827,7 @@ function resetStateForSignedOutUser() {
   smartReminderNotificationKeys = new Set();
   settings = getDefaultSettings();
   activeTab = "settings-general";
+  homeMissedPeriod = "week";
   entryMode = "solo";
   entryListSortMode = "date_desc";
   entryListTypeFilter = "all";
@@ -11774,6 +11946,7 @@ function initializeAuth() {
 
 function resetUiStateForLogin() {
   activeTab = "home";
+  homeMissedPeriod = "week";
   entryMode = "solo";
   notificationsPanelOpen = false;
   sharedGoalShares = [];

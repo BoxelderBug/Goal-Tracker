@@ -1431,6 +1431,36 @@ textarea {
   margin: 0;
 }
 
+.home-panel-link-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.home-panel-link-button:hover {
+  color: var(--brand-strong);
+}
+
+.home-panel-link-button:focus-visible {
+  outline: none;
+  border-radius: 8px;
+  box-shadow: var(--focus-ring);
+}
+
+.home-missed-period-control {
+  min-width: 110px;
+  margin-left: auto;
+}
+
+#home-missed-period-copy {
+  margin-top: 6px;
+}
+
 .snapshot-list {
   margin-top: 10px;
 }
@@ -2030,6 +2060,31 @@ textarea {
 
 .today-entry-item {
   justify-content: flex-start;
+}
+
+.home-missed-item {
+  padding: 0;
+}
+
+.home-missed-goal-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: 15px;
+  padding: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.home-missed-goal-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .today-entry-item strong {
