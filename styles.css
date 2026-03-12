@@ -2159,13 +2159,11 @@ textarea {
   padding: 10px 12px;
 }
 
-@media (min-width: 761px) {
-  .metric-card > .period-progress-block,
-  .metric-card > .progress.progress-with-label {
-    width: calc(100% + 24px);
-    margin-left: -12px;
-    margin-right: -12px;
-  }
+.metric-card > .period-progress-block,
+.metric-card > .progress.progress-with-label {
+  width: calc(100% - 10px);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .metric-top {
@@ -2173,6 +2171,17 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
+}
+
+.metric-top h3 {
+  margin: 0;
+}
+
+.metric-head-meta {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  min-width: fit-content;
 }
 
 .metric-updated-through {
@@ -2473,15 +2482,16 @@ strong.pace-off,
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0.015em;
-  color: #0e655a;
+  color: #f7fffd;
+  -webkit-text-stroke: 0.4px rgba(0, 42, 37, 0.82);
   text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.66),
-    0 2px 2px rgba(255, 255, 255, 0.24),
-    0 -1px 0 rgba(0, 61, 53, 0.48),
-    0 -2px 3px rgba(0, 61, 53, 0.3);
+    0 1px 1px rgba(0, 32, 28, 0.92),
+    0 0 2px rgba(0, 32, 28, 0.85),
+    0 -1px 0 rgba(0, 32, 28, 0.55),
+    0 0 6px rgba(0, 32, 28, 0.45);
   white-space: nowrap;
   pointer-events: none;
-  z-index: 2;
+  z-index: 5;
 }
 
 .progress.progress-with-label {
@@ -3441,6 +3451,14 @@ strong.pace-off,
   .metric-top {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .metric-head-meta {
+    justify-items: start;
+  }
+
+  .metric-updated-through {
+    text-align: left;
   }
 
   .metric-controls {

@@ -4645,6 +4645,7 @@ function buildPeriodProgressBarEChartOption(config) {
     : [999, 999, 999, 999];
   const projectionStartColor = blendHexWithWhite(palette.start, 0.58);
   const projectionEndColor = blendHexWithWhite(palette.end, 0.45);
+  const projectionHighlightColor = blendHexWithWhite(palette.start, 0.86);
   return {
     animationDuration: 220,
     backgroundColor: "transparent",
@@ -4740,12 +4741,17 @@ function buildPeriodProgressBarEChartOption(config) {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: projectionStartColor },
+              { offset: 0, color: projectionHighlightColor },
+              { offset: 0.18, color: projectionStartColor },
+              { offset: 0.68, color: projectionEndColor },
               { offset: 1, color: projectionEndColor }
             ]
           },
-          borderColor: "rgba(255, 255, 255, 0.14)",
-          borderWidth: 0
+          borderColor: "rgba(255, 255, 255, 0.34)",
+          borderWidth: 1,
+          shadowColor: "rgba(0, 66, 59, 0.18)",
+          shadowBlur: 9,
+          shadowOffsetY: 2
         }
       }
     ]
@@ -8329,9 +8335,11 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}</h3>
-            ${goalsPlusChipMarkup ? `<div class="metric-controls">${goalsPlusChipMarkup}</div>` : ""}
+            <div class="metric-head-meta">
+              <p class="metric-updated-through">${escapeHtml(updatedThroughLabel)}</p>
+              ${goalsPlusChipMarkup ? `<div class="metric-controls">${goalsPlusChipMarkup}</div>` : ""}
+            </div>
           </div>
-          <p class="metric-updated-through">${escapeHtml(updatedThroughLabel)}</p>
           ${progressBarMarkup}
           <div class="pace-line">
             ${paceStatusChip}
