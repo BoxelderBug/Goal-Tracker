@@ -418,6 +418,12 @@ const quarterEmpty = document.querySelector("#quarter-empty");
 const quarterGoalTypeFilterSelect = document.querySelector("#quarter-goal-type-filter");
 const quarterGoalStatusFilterSelect = document.querySelector("#quarter-goal-status-filter");
 const quarterGoalTagFilterSelect = document.querySelector("#quarter-goal-tag-filter");
+const snapshotsWeekList = document.querySelector("#snapshot-week-list");
+const snapshotsWeekEmpty = document.querySelector("#snapshot-week-empty");
+const snapshotsMonthList = document.querySelector("#snapshot-month-list");
+const snapshotsMonthEmpty = document.querySelector("#snapshot-month-empty");
+const snapshotsYearList = document.querySelector("#snapshot-year-list");
+const snapshotsYearEmpty = document.querySelector("#snapshot-year-empty");
 
 const trendsWindowSelect = document.querySelector("#trends-window-select");
 const trendsMetricSelect = document.querySelector("#trends-metric-select");
@@ -1393,13 +1399,16 @@ if (notificationsList) {
     if (!currentUser) {
       return;
     }
-    const closePeriodButton = event.target.closest("button[data-action='close-period-from-notification']");
-    if (closePeriodButton) {
-      const notificationId = String(closePeriodButton.dataset.notificationId || "");
-      const periodName = normalizePeriodMode(closePeriodButton.dataset.period);
-      const rangeStart = String(closePeriodButton.dataset.rangeStart || "");
-      const rangeEnd = String(closePeriodButton.dataset.rangeEnd || "");
-      const result = await closePeriodFromNotification(notificationId, periodName, rangeStart, rangeEnd);
+    const periodPromptButton = event.target.closest("button[data-action='close-period-from-notification'], button[data-action='dismiss-period-close-notification']");
+    if (periodPromptButton) {
+      const notificationId = String(periodPromptButton.dataset.notificationId || "");
+      const periodName = normalizePeriodMode(periodPromptButton.dataset.period);
+      const rangeStart = String(periodPromptButton.dataset.rangeStart || "");
+      const rangeEnd = String(periodPromptButton.dataset.rangeEnd || "");
+      const shouldClose = periodPromptButton.dataset.action === "close-period-from-notification";
+      const result = shouldClose
+        ? await closePeriodFromNotification(notificationId, periodName, rangeStart, rangeEnd)
+        : await dismissPeriodClosePromptNotification(notificationId);
       if (!result.success && result.message) {
         alert(result.message);
       }
@@ -3515,25 +3524,25 @@ if (quarterNextButton) {
 
 if (weekCloseoutButton) {
   weekCloseoutButton.addEventListener("click", () => {
-    closeOutPeriod("week");
+    handlePeriodCloseoutButtonClick("week");
   });
 }
 
 if (monthCloseoutButton) {
   monthCloseoutButton.addEventListener("click", () => {
-    closeOutPeriod("month");
+    handlePeriodCloseoutButtonClick("month");
   });
 }
 
 if (yearCloseoutButton) {
   yearCloseoutButton.addEventListener("click", () => {
-    closeOutPeriod("year");
+    handlePeriodCloseoutButtonClick("year");
   });
 }
 
 if (quarterCloseoutButton) {
   quarterCloseoutButton.addEventListener("click", () => {
-    closeOutPeriod("quarter");
+    handlePeriodCloseoutButtonClick("quarter");
   });
 }
 
@@ -3562,6 +3571,10 @@ if (quarterCloseoutButton) {
       }
     }, 0);
   });
+});
+
+[snapshotsWeekList, snapshotsMonthList, snapshotsYearList].filter(Boolean).forEach((listElement) => {
+  listElement.addEventListener("click", handleSnapshotActionClick);
 });
 
 [weekList, monthList, yearList, quarterList].filter(Boolean).forEach((listElement) => {
@@ -4527,6 +4540,7 @@ function render() {
   renderEntryListTab();
   renderGoalScheduleTab();
   renderPeriodTabs();
+  renderSnapshotsTab();
   renderTrendsTab();
   renderGoalsPlusTab();
   renderBucketListViewTab();
@@ -5071,7 +5085,18 @@ function renderNotifications() {
               data-range-start="${escapeAttr(item.rangeStart)}"
               data-range-end="${escapeAttr(item.rangeEnd)}"
             >
-              Close Period
+              Yes
+            </button>
+            <button
+              class="btn btn-danger"
+              type="button"
+              data-action="dismiss-period-close-notification"
+              data-notification-id="${item.id}"
+              data-period="${escapeAttr(item.period)}"
+              data-range-start="${escapeAttr(item.rangeStart)}"
+              data-range-end="${escapeAttr(item.rangeEnd)}"
+            >
+              No
             </button>
           </div>
         `
@@ -8005,6 +8030,11 @@ function renderPeriodTabs() {
     quarterRangeLabel.textContent = `${formatDate(quarter.start)} to ${formatDate(quarter.end)}`;
   }
 
+  syncPeriodCloseoutButtonLabel("week", week, weekCloseoutButton);
+  syncPeriodCloseoutButtonLabel("month", month, monthCloseoutButton);
+  syncPeriodCloseoutButtonLabel("year", year, yearCloseoutButton);
+  syncPeriodCloseoutButtonLabel("quarter", quarter, quarterCloseoutButton);
+
   periodGoalFilterState.week.type = normalizeGoalTypeFilterValue(periodGoalFilterState.week.type);
   periodGoalFilterState.week.status = normalizeGoalStatusFilterValue(periodGoalFilterState.week.status);
   periodGoalFilterState.week.tag = normalizeGoalTagFilterValue(periodGoalFilterState.week.tag);
@@ -8085,6 +8115,28 @@ function renderPeriodTabs() {
   renderGraphModal();
   renderAuthState();
   scheduleEChartResizePasses();
+}
+
+function syncPeriodCloseoutButtonLabel(periodName, range, button) {
+  if (!button || !range) {
+    return;
+  }
+  const snapshot = getPeriodSnapshotForRange(periodName, range);
+  button.textContent = snapshot ? "Closed" : "Close Out";
+}
+
+function getPeriodSnapshotForRange(periodName, range) {
+  if (!range) {
+    return null;
+  }
+  const rangeStart = getDateKey(range.start);
+  const rangeEnd = getDateKey(range.end);
+  return periodSnapshots.find((item) => (
+    item
+    && item.period === periodName
+    && item.rangeStart === rangeStart
+    && item.rangeEnd === rangeEnd
+  )) || null;
 }
 
 function getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel) {
@@ -8685,6 +8737,28 @@ function closeOutPeriod(periodName) {
   }
 }
 
+function handlePeriodCloseoutButtonClick(periodName) {
+  if (!currentUser) {
+    return;
+  }
+  const normalizedPeriod = normalizePeriodMode(periodName);
+  const range = getPeriodRange(normalizedPeriod);
+  if (!range) {
+    return;
+  }
+  const snapshot = getPeriodSnapshotForRange(normalizedPeriod, range);
+  if (!snapshot) {
+    closeOutPeriod(normalizedPeriod);
+    return;
+  }
+  const shouldReopen = confirm(`Reopen this ${getSnapshotPeriodTitle(normalizedPeriod).toLowerCase()}?`);
+  if (!shouldReopen) {
+    return;
+  }
+  deletePeriodSnapshot(snapshot.id);
+  renderPeriodTabs();
+}
+
 function buildPeriodCloseoutSnapshot(periodName, range, now, index) {
   const trackersForPeriod = getTrackersForPeriod(periodName);
   const dueCheckIns = getCheckInsForPeriod(periodName);
@@ -9000,6 +9074,62 @@ function renderPeriodSnapshots(periodName, range, listEl, emptyEl = null) {
       `No ${periodName} snapshots saved yet.`
     )
   );
+}
+
+function renderSnapshotsTab() {
+  renderSnapshotsPeriodList("week", snapshotsWeekList, snapshotsWeekEmpty);
+  renderSnapshotsPeriodList("month", snapshotsMonthList, snapshotsMonthEmpty);
+  renderSnapshotsPeriodList("year", snapshotsYearList, snapshotsYearEmpty);
+}
+
+function renderSnapshotsPeriodList(periodName, listEl, emptyEl) {
+  if (!listEl || !emptyEl) {
+    return;
+  }
+  if (!currentUser) {
+    listEl.innerHTML = "";
+    emptyEl.style.display = "none";
+    return;
+  }
+  const items = [...periodSnapshots]
+    .filter((item) => item && item.period === periodName)
+    .sort((a, b) => String(b.closedAt || "").localeCompare(String(a.closedAt || "")));
+
+  if (items.length < 1) {
+    listEl.innerHTML = "";
+    emptyEl.style.display = "block";
+    return;
+  }
+
+  emptyEl.style.display = "none";
+  listEl.innerHTML = items.map((snapshot, index) => {
+    const summary = snapshot.summary || {};
+    const rangeLabel = `${formatDate(parseDateKey(snapshot.rangeStart))} to ${formatDate(parseDateKey(snapshot.rangeEnd))}`;
+    const filterType = normalizeGoalTypeFilterValue(snapshot.filters && snapshot.filters.type);
+    const filterStatus = normalizeGoalStatusFilterValue(snapshot.filters && snapshot.filters.status);
+    const filterTag = normalizeGoalTagFilterValue(snapshot.filters && snapshot.filters.tag);
+    const filterLine = filterType === "all" && filterStatus === "active" && filterTag === "all"
+      ? ""
+      : `<p class="muted small">Filters: ${escapeHtml(filterType)} | ${escapeHtml(filterStatus)} | ${escapeHtml(filterTag === "all" ? "all tags" : filterTag)}</p>`;
+
+    return `
+      <li class="entry-card" style="--stagger:${index}">
+        <div class="snapshot-item-top">
+          <strong>${escapeHtml(rangeLabel)}</strong>
+          <span class="pace-chip">${escapeHtml(getSnapshotPeriodTitle(snapshot.period))}</span>
+        </div>
+        <p class="muted small">Closed ${escapeHtml(formatSnapshotClosedAt(snapshot.closedAt))}</p>
+        <p class="muted small">Pace: ${escapeHtml(normalizeSnapshotOnPaceLabel(summary.onPaceLabel))}</p>
+        <p class="metric-line">Completion ${escapeHtml(String(Math.max(Math.round(Number(summary.completion) || 0), 0)))}% | Progress ${escapeHtml(formatAmount(summary.totalProgress || 0))}/${escapeHtml(formatAmount(summary.totalTarget || 0))}</p>
+        <p class="muted small">${escapeHtml(String(Math.max(Math.floor(Number(summary.goalsCount) || 0), 0)))} goals + ${escapeHtml(String(Math.max(Math.floor(Number(summary.checkInsCount) || 0), 0)))} check-ins</p>
+        ${filterLine}
+        <div class="actions">
+          <button class="btn" type="button" data-action="reopen-snapshot" data-id="${snapshot.id}">Reopen</button>
+          <button class="btn btn-danger" type="button" data-action="delete-snapshot" data-id="${snapshot.id}">Delete</button>
+        </div>
+      </li>
+    `;
+  }).join("");
 }
 
 function normalizeSnapshotOnPaceLabel(value) {
@@ -11502,6 +11632,34 @@ async function closePeriodFromNotification(notificationId, periodName, rangeStar
   }
   queuePeriodClosePromptCheck();
   return { success: true, message: result.alreadyClosed ? "Period already closed." : "Period closed." };
+}
+
+async function dismissPeriodClosePromptNotification(notificationId) {
+  if (!currentUser) {
+    return { success: false, message: "Sign in before managing period reminders." };
+  }
+  if (!notificationId) {
+    return { success: false, message: "Notification not found." };
+  }
+  const notification = notifications.find((item) => item && item.id === notificationId);
+  if (notification) {
+    notification.read = true;
+    notification.actioned = true;
+  }
+  renderNotifications();
+  if (firebaseConfigured && firebaseDb) {
+    try {
+      await updateDoc(doc(firebaseDb, CLOUD_NOTIFICATION_COLLECTION, notificationId), {
+        read: true,
+        actioned: true,
+        actionedAt: new Date().toISOString(),
+        readAt: new Date().toISOString()
+      });
+    } catch {
+      return { success: false, message: "Unable to dismiss this reminder right now." };
+    }
+  }
+  return { success: true, message: "" };
 }
 
 async function respondToGoalShareInvite(notificationId, shareId, approve) {

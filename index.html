@@ -167,6 +167,7 @@
                   <button class="menu-btn" type="button" data-tab="year">Year</button>
                 </div>
               </details>
+              <button class="menu-btn" type="button" data-tab="snapshots">Snapshots</button>
               <button class="menu-btn" type="button" data-tab="quarter">Quarter</button>
               <button class="menu-btn" type="button" data-tab="trends">Trends</button>
               <button class="menu-btn" type="button" data-tab="goals-plus">Goals+</button>
@@ -1122,6 +1123,48 @@
       <div id="quarter-summary" class="summary-grid"></div>
       <div id="quarter-list" class="view-accordion"></div>
       <p id="quarter-empty" class="empty-state">No goals or check-ins yet.</p>
+    </section>
+
+      <section class="panel tab-panel" data-tab-panel="snapshots" hidden>
+      <div class="panel-head">
+        <div>
+          <h2>Snapshots</h2>
+          <p class="muted">Review your closed period snapshots in one place.</p>
+        </div>
+      </div>
+
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <div>
+            <h3>Week Snapshots</h3>
+            <p class="muted small">Every weekly close-out saved so far.</p>
+          </div>
+        </div>
+        <ul id="snapshot-week-list" class="card-list"></ul>
+        <p id="snapshot-week-empty" class="empty-state">No week snapshots yet.</p>
+      </section>
+
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <div>
+            <h3>Month Snapshots</h3>
+            <p class="muted small">Every monthly close-out saved so far.</p>
+          </div>
+        </div>
+        <ul id="snapshot-month-list" class="card-list"></ul>
+        <p id="snapshot-month-empty" class="empty-state">No month snapshots yet.</p>
+      </section>
+
+      <section class="snapshot-panel">
+        <div class="snapshot-panel-head">
+          <div>
+            <h3>Year Snapshots</h3>
+            <p class="muted small">Every yearly close-out saved so far.</p>
+          </div>
+        </div>
+        <ul id="snapshot-year-list" class="card-list"></ul>
+        <p id="snapshot-year-empty" class="empty-state">No year snapshots yet.</p>
+      </section>
     </section>
 
       <section class="panel tab-panel" data-tab-panel="trends" hidden>
