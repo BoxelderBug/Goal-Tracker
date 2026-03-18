@@ -3376,6 +3376,16 @@ strong.pace-off,
   }
 }
 
+@media (min-width: 761px) {
+  .nav-groups {
+    display: grid !important;
+  }
+
+  .mobile-menu-toggle {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .app-layout {
     grid-template-columns: 1fr;

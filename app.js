@@ -734,7 +734,7 @@ function setMobileMenuOpen(open) {
   if (!tabStripPanel || !mobileMenuToggle) {
     return;
   }
-  const shouldOpen = Boolean(open && isMobileMenuMode());
+  const shouldOpen = Boolean(open);
   tabStripPanel.classList.toggle("mobile-menu-open", shouldOpen);
   mobileMenuToggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
   if (!shouldOpen) {
