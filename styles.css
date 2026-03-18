@@ -252,7 +252,7 @@ body::before {
 
 .hero-top {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   padding: 10px;
@@ -720,7 +720,59 @@ body::before {
 }
 
 .mobile-menu-toggle {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(247, 255, 253, 0.5) 100%);
+  color: var(--brand-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+.mobile-menu-toggle:hover,
+.mobile-menu-toggle:focus-visible {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(221, 249, 245, 0.7) 100%);
+  border-color: var(--line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 159, 148, 0.1);
+}
+
+.mobile-menu-toggle[aria-expanded="true"] {
+  background: linear-gradient(180deg, rgba(221, 249, 245, 0.8) 0%, rgba(199, 244, 239, 0.8) 100%);
+  border-color: var(--brand);
+}
+
+.menu-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 20px;
+  height: 20px;
+}
+
+.menu-icon span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background-color: currentColor;
+  border-radius: 1px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-toggle[aria-expanded="true"] .menu-icon span:nth-child(1) {
+  transform: rotate(45deg) translate(8px, 8px);
+}
+
+.mobile-menu-toggle[aria-expanded="true"] .menu-icon span:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-menu-toggle[aria-expanded="true"] .menu-icon span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -7px);
 }
 
 .tab-strip-panel .nav-groups > .btn,
@@ -3363,14 +3415,6 @@ strong.pace-off,
   .tab-strip-panel {
     padding: 8px;
     gap: 6px;
-  }
-
-  .mobile-menu-toggle {
-    display: inline-flex;
-    width: 100%;
-    justify-content: space-between;
-    margin-bottom: 6px;
-    min-height: 40px;
   }
 
   .auth-panel {

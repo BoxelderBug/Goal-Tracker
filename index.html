@@ -79,6 +79,14 @@
     <div id="app-shell" hidden>
       <header class="hero">
         <div class="hero-top">
+          <button id="mobile-menu-toggle" class="btn btn-nav-compact mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-groups" aria-label="Menu">
+            <span class="menu-icon" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+            <span class="visually-hidden">Menu</span>
+          </button>
           <button id="hero-home-btn" class="hero-title-btn menu-btn" type="button" data-tab="home">Teal Goal Tracker</button>
           <div class="hero-actions">
             <div class="user-actions-panel user-account-dropdown" data-dropdown>
@@ -115,14 +123,6 @@
                 <button class="menu-btn" type="button" data-tab="settings-goals">Goal Settings</button>
                 <button class="menu-btn" type="button" data-tab="settings-checkins">Check-in Settings</button>
                 <button class="menu-btn" type="button" data-tab="settings-general" data-scroll-target="#account-security-section">Profile Settings</button>
-                <button class="menu-btn menu-btn-store-icon" type="button" data-tab="settings-point-store" aria-label="Point Store Settings">
-                  <span class="store-menu-icon" aria-hidden="true">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                  <span class="visually-hidden">Point Store Settings</span>
-                </button>
                 <button class="menu-btn" type="button" data-tab="social" data-social-section="friends">Friends</button>
                 <button class="menu-btn" type="button" data-tab="social" data-social-section="squads">Squads</button>
               </div>
@@ -133,7 +133,6 @@
 
       <div class="app-layout">
       <section class="panel tab-strip-panel">
-        <button id="mobile-menu-toggle" class="btn mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav-groups">Menu</button>
         <div id="main-nav-groups" class="nav-groups" aria-label="Tracker sections">
           <div class="dropdown" data-dropdown>
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Entry</button>
@@ -181,6 +180,9 @@
               <button class="menu-btn" type="button" data-tab="goal-journal">Goal Journal</button>
             </div>
           </div>
+
+          <button class="btn menu-btn" type="button" data-tab="settings-general">Settings</button>
+          <button class="btn menu-btn" type="button" data-tab="settings-point-store">Point Store</button>
 
         </div>
       </section>

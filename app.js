@@ -737,7 +737,6 @@ function setMobileMenuOpen(open) {
   const shouldOpen = Boolean(open && isMobileMenuMode());
   tabStripPanel.classList.toggle("mobile-menu-open", shouldOpen);
   mobileMenuToggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
-  mobileMenuToggle.textContent = shouldOpen ? "Close Menu" : "Menu";
   if (!shouldOpen) {
     closeAllDropdownMenus();
   }
