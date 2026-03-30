@@ -7,7 +7,8 @@ import {
   signOut,
   EmailAuthProvider,
   reauthenticateWithCredential,
-  updatePassword
+  updatePassword,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 import {
   getFirestore,
@@ -59,6 +60,10 @@ const GOAL_TEMPLATE_MONTH_COUNT = 12;
 const GOALS_PLUS_SETUP_STANDARD = "standard";
 const GOALS_PLUS_SETUP_RUNNING = "goalsplus-running";
 const GOALS_PLUS_SETUP_GOLF = "goalsplus-golf";
+const GOAL_TYPE_TERM = "term";
+const GOAL_TYPE_WEEK_TERM = "week-term";
+const GOAL_TYPE_MONTH_TERM = "month-term";
+const GOAL_TYPE_INPUT_OUTPUT = "input-output";
 const GOALS_PLUS_GOLF_STANDARD = "golf";
 const GOALS_PLUS_GOLF_DISC = "disc-golf";
 const NORWEGIAN_DEFAULT_WORK_SPEED_MPH = 8;
@@ -100,6 +105,7 @@ const registerForm = document.querySelector("#register-form");
 const loginUsername = document.querySelector("#login-username");
 const loginPassword = document.querySelector("#login-password");
 const loginShowPassword = document.querySelector("#login-show-password");
+const forgotPasswordBtn = document.querySelector("#forgot-password-btn");
 const registerFirstName = document.querySelector("#register-first-name");
 const registerLastName = document.querySelector("#register-last-name");
 const registerEmail = document.querySelector("#register-email");
@@ -107,6 +113,7 @@ const registerUsername = document.querySelector("#register-username");
 const registerPassword = document.querySelector("#register-password");
 const registerPasswordConfirm = document.querySelector("#register-password-confirm");
 const registerShowPassword = document.querySelector("#register-show-password");
+const passwordStrengthHints = document.querySelector("#password-strength-hints");
 const authMessage = document.querySelector("#auth-message");
 const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authForms = document.querySelectorAll("[data-auth-form]");
@@ -166,6 +173,24 @@ const goalPlusRunningRecoveryInterval = document.querySelector("#goal-plus-runni
 const goalPlusRunningNote = document.querySelector("#goal-plus-running-note");
 const goalMigrateSource = document.querySelector("#goal-migrate-source");
 const goalMigrateArchiveSource = document.querySelector("#goal-migrate-archive-source");
+const goalTermWrap = document.querySelector("#goal-term-wrap");
+const goalTermDeadline = document.querySelector("#goal-term-deadline");
+const goalTermTarget = document.querySelector("#goal-term-target");
+const goalTermCarryover = document.querySelector("#goal-term-carryover");
+const goalTermToYear = document.querySelector("#goal-term-to-year");
+const goalTermToYearLabel = document.querySelector("#goal-term-to-year-label");
+const goalIoWrap = document.querySelector("#goal-io-wrap");
+const goalIoOutputName = document.querySelector("#goal-io-output-name");
+const goalIoOutputUnit = document.querySelector("#goal-io-output-unit");
+const goalIoOutputTarget = document.querySelector("#goal-io-output-target");
+const goalIoInputName = document.querySelector("#goal-io-input-name");
+const goalIoInputUnit = document.querySelector("#goal-io-input-unit");
+const goalIoInputTarget = document.querySelector("#goal-io-input-target");
+const goalIoAddInputBtn = document.querySelector("#goal-io-add-input-btn");
+const goalIoInputsList = document.querySelector("#goal-io-inputs-list");
+const goalIoInputsEmpty = document.querySelector("#goal-io-inputs-empty");
+const legalModal = document.querySelector("#legal-modal");
+const legalModalBody = document.querySelector("#legal-modal-body");
 const manageList = document.querySelector("#manage-list");
 const manageEmpty = document.querySelector("#manage-empty");
 const manageTable = document.querySelector("#manage-table");
@@ -574,6 +599,7 @@ let goalCustomMonthTargetsDraft = [];
 let goalCustomWeekTargetsEdited = false;
 let goalCustomMonthTargetsEdited = false;
 let goalMetricsDraft = [];
+let goalIoInputsDraft = [];
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
 scheduleDate.value = getDateKey(normalizeDate(new Date()));
@@ -1241,6 +1267,20 @@ if (registerShowPassword) {
   registerShowPassword.addEventListener("change", applyPasswordVisibilityToggle);
 }
 
+if (registerPassword && passwordStrengthHints) {
+  registerPassword.addEventListener("input", () => {
+    const val = String(registerPassword.value || "");
+    const reqLength = passwordStrengthHints.querySelector("#req-length");
+    const reqUpper = passwordStrengthHints.querySelector("#req-upper");
+    const reqLower = passwordStrengthHints.querySelector("#req-lower");
+    const reqNumber = passwordStrengthHints.querySelector("#req-number");
+    if (reqLength) reqLength.classList.toggle("met", val.length >= 8);
+    if (reqUpper) reqUpper.classList.toggle("met", /[A-Z]/.test(val));
+    if (reqLower) reqLower.classList.toggle("met", /[a-z]/.test(val));
+    if (reqNumber) reqNumber.classList.toggle("met", /[0-9]/.test(val));
+  });
+}
+
 if (changePasswordShow) {
   changePasswordShow.addEventListener("change", applyChangePasswordVisibility);
 }
@@ -1276,6 +1316,31 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
+if (forgotPasswordBtn) {
+  forgotPasswordBtn.addEventListener("click", async () => {
+    if (!firebaseConfigured || !firebaseAuth) {
+      showAuthMessage("Firebase is not configured yet.", true);
+      return;
+    }
+    const email = normalizeEmail(loginUsername ? loginUsername.value : "");
+    if (!isValidEmail(email)) {
+      showAuthMessage("Enter your email address above, then click Forgot password.", true);
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(firebaseAuth, email);
+      showAuthMessage(`Password reset email sent to ${email}. Check your inbox.`, false);
+    } catch (error) {
+      const code = getFirebaseErrorCode(error);
+      if (code === "auth/user-not-found") {
+        showAuthMessage("No account found with that email address.", true);
+        return;
+      }
+      showAuthMessage(getFirebaseAuthErrorMessage(error, "Unable to send reset email."), true);
+    }
+  });
+}
+
 registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!firebaseConfigured || !firebaseAuth || !firebaseDb) {
@@ -1301,8 +1366,20 @@ registerForm.addEventListener("submit", async (event) => {
     showAuthMessage("Username must be at least 3 characters.", true);
     return;
   }
-  if (password.length < 6) {
-    showAuthMessage("Password must be at least 6 characters.", true);
+  if (password.length < 8) {
+    showAuthMessage("Password must be at least 8 characters.", true);
+    return;
+  }
+  if (!/[A-Z]/.test(password)) {
+    showAuthMessage("Password must include at least one uppercase letter.", true);
+    return;
+  }
+  if (!/[a-z]/.test(password)) {
+    showAuthMessage("Password must include at least one lowercase letter.", true);
+    return;
+  }
+  if (!/[0-9]/.test(password)) {
+    showAuthMessage("Password must include at least one number.", true);
     return;
   }
   if (password !== passwordConfirm) {
@@ -1596,6 +1673,33 @@ if (goalMetricsDraftList) {
   });
 }
 
+if (goalIoAddInputBtn) {
+  goalIoAddInputBtn.addEventListener("click", () => {
+    const name = String(goalIoInputName ? goalIoInputName.value.trim() : "");
+    const unit = String(goalIoInputUnit ? goalIoInputUnit.value.trim() : "");
+    const weeklyTarget = normalizeGoalTargetInt(goalIoInputTarget ? goalIoInputTarget.value : 0, 0);
+    if (!name || !unit) {
+      return;
+    }
+    goalIoInputsDraft.push({ id: createId(), name, unit, weeklyTarget });
+    if (goalIoInputName) goalIoInputName.value = "";
+    if (goalIoInputUnit) goalIoInputUnit.value = "";
+    if (goalIoInputTarget) goalIoInputTarget.value = "0";
+    renderGoalIoInputsDraft();
+  });
+}
+
+if (goalIoInputsList) {
+  goalIoInputsList.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-action='remove-io-input']");
+    if (!removeBtn) return;
+    const id = String(removeBtn.dataset.id || "");
+    if (!id) return;
+    goalIoInputsDraft = goalIoInputsDraft.filter((item) => item.id !== id);
+    renderGoalIoInputsDraft();
+  });
+}
+
 goalForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!currentUser) {
@@ -1627,11 +1731,16 @@ goalForm.addEventListener("submit", (event) => {
     ? normalizeCustomTargetList(goalCustomMonthTargetsDraft, GOAL_TEMPLATE_MONTH_COUNT, monthlyGoal)
     : [];
   const additionalTrackingEnabled = Boolean(goalAdditionalTrackingEnabled && goalAdditionalTrackingEnabled.checked);
-  const progressMetrics = additionalTrackingEnabled
-    ? normalizeProgressMetricList(goalMetricsDraft, {
-      fallbackUnit: unit
-    })
+  const isIoGoalType = normalizedGoalType === GOAL_TYPE_INPUT_OUTPUT;
+  // For input/output goals, auto-create progress metrics from IO inputs
+  const ioMetricsDraft = isIoGoalType && goalIoInputsDraft.length > 0
+    ? goalIoInputsDraft.map((inp) => ({ id: inp.id, name: inp.name, unit: inp.unit, enabled: true }))
     : [];
+  const progressMetrics = isIoGoalType
+    ? normalizeProgressMetricList(ioMetricsDraft, { fallbackUnit: unit })
+    : (additionalTrackingEnabled
+      ? normalizeProgressMetricList(goalMetricsDraft, { fallbackUnit: unit })
+      : []);
   const rewardWeeklyPoints = normalizeGoalPoints(goalRewardWeeklyPoints ? goalRewardWeeklyPoints.value : 1, 1);
   const rewardMonthlyPoints = normalizeGoalPoints(goalRewardMonthlyPoints ? goalRewardMonthlyPoints.value : 3, 3);
   const rewardYearlyPoints = normalizeGoalPoints(goalRewardYearlyPoints ? goalRewardYearlyPoints.value : 10, 10);
@@ -1644,6 +1753,19 @@ goalForm.addEventListener("submit", (event) => {
     return;
   }
 
+  // Term goal config
+  const isTermType = isTimedTermGoalType(normalizedGoalType);
+  const termDeadline = isTermType && goalTermDeadline && goalTermDeadline.value ? String(goalTermDeadline.value) : "";
+  const termTarget = isTermType && goalTermTarget ? normalizeGoalTargetInt(goalTermTarget.value, 0) : 0;
+  const termCarryover = isTermType && goalTermCarryover ? Boolean(goalTermCarryover.checked) : false;
+  const termToYear = isTermType && goalTermToYear ? Boolean(goalTermToYear.checked) : false;
+  // Input/Output goal config
+  const ioConfig = isInputOutputGoalType(normalizedGoalType) ? {
+    outputName: String(goalIoOutputName ? goalIoOutputName.value.trim() : ""),
+    outputUnit: String(goalIoOutputUnit ? goalIoOutputUnit.value.trim() : ""),
+    outputTarget: normalizeGoalTargetInt(goalIoOutputTarget ? goalIoOutputTarget.value : 0, 0),
+    inputs: goalIoInputsDraft.map((item) => ({ ...item }))
+  } : null;
   const nextTracker = {
     id: createId(),
     name,
@@ -1664,6 +1786,11 @@ goalForm.addEventListener("submit", (event) => {
     goalPointsWeekly: rewardWeeklyPoints,
     goalPointsMonthly: rewardMonthlyPoints,
     goalPointsYearly: rewardYearlyPoints,
+    termDeadline,
+    termTarget,
+    termCarryover,
+    termToYear,
+    ioConfig,
     accountabilityPartnerEmail: "",
     accountabilityPartnerName: "",
     accountabilityPartnerId: "",
@@ -1730,6 +1857,18 @@ goalForm.addEventListener("submit", (event) => {
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
   syncGoalAdditionalTrackingVisibility();
+  goalIoInputsDraft = [];
+  renderGoalIoInputsDraft();
+  if (goalTermDeadline) goalTermDeadline.value = "";
+  if (goalTermTarget) goalTermTarget.value = "0";
+  if (goalTermCarryover) goalTermCarryover.checked = false;
+  if (goalTermToYear) goalTermToYear.checked = false;
+  if (goalIoOutputName) goalIoOutputName.value = "";
+  if (goalIoOutputUnit) goalIoOutputUnit.value = "";
+  if (goalIoOutputTarget) goalIoOutputTarget.value = "0";
+  if (goalIoInputName) goalIoInputName.value = "";
+  if (goalIoInputUnit) goalIoInputUnit.value = "";
+  if (goalIoInputTarget) goalIoInputTarget.value = "0";
   resetGoalTargetsToDefaults();
   if (goalRewardWeeklyPoints) {
     goalRewardWeeklyPoints.value = "1";
@@ -3375,8 +3514,20 @@ if (changePasswordForm) {
       showChangePasswordMessage("Enter current password, new password, and confirmation.", true);
       return;
     }
-    if (newPassword.length < 6) {
-      showChangePasswordMessage("New password must be at least 6 characters.", true);
+    if (newPassword.length < 8) {
+      showChangePasswordMessage("New password must be at least 8 characters.", true);
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      showChangePasswordMessage("New password must include at least one uppercase letter.", true);
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      showChangePasswordMessage("New password must include at least one lowercase letter.", true);
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      showChangePasswordMessage("New password must include at least one number.", true);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -3640,6 +3791,24 @@ if (onboardingClose) {
     closeOnboardingModal();
   });
 }
+
+if (legalModal) {
+  legalModal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action='close-legal-modal']")) {
+      legalModal.classList.add("hidden");
+      legalModal.setAttribute("aria-hidden", "true");
+    }
+  });
+}
+
+document.addEventListener("click", (event) => {
+  const legalAction = event.target.closest("[data-action='show-legal-terms'], [data-action='show-legal-privacy']");
+  if (legalAction && legalModal) {
+    event.preventDefault();
+    legalModal.classList.remove("hidden");
+    legalModal.setAttribute("aria-hidden", "false");
+  }
+});
 
 if (onboardingModal) {
   onboardingModal.addEventListener("click", (event) => {
@@ -6906,8 +7075,48 @@ function renderGoalsPlusTab() {
 
 function renderSocialTab() {
   renderFriendsSettings();
+  renderSharedGoals();
   renderSquadList();
   renderTrashSection();
+}
+
+function renderSharedGoals() {
+  const listEl = document.querySelector("#shared-goals-list");
+  const emptyEl = document.querySelector("#shared-goals-empty");
+  if (!listEl || !emptyEl) {
+    return;
+  }
+  if (!currentUser) {
+    listEl.innerHTML = "";
+    emptyEl.style.display = "none";
+    return;
+  }
+  const sharedTrackers = trackers.filter((t) => t.accountabilityStatus && t.accountabilityStatus !== "none" && t.accountabilityPartnerName);
+  if (sharedTrackers.length < 1) {
+    listEl.innerHTML = "";
+    emptyEl.style.display = "block";
+    return;
+  }
+  emptyEl.style.display = "none";
+  listEl.innerHTML = sharedTrackers
+    .map((tracker, index) => {
+      const statusLabel = tracker.accountabilityStatus === "pending"
+        ? "Invite Pending"
+        : tracker.accountabilityStatus === "accepted"
+        ? "Active"
+        : tracker.accountabilityStatus;
+      const statusClass = tracker.accountabilityStatus === "accepted" ? "pace-on" : "pace-off";
+      return `
+        <li class="quick-item" style="--stagger:${index}">
+          <div class="metric-top">
+            <strong>${escapeHtml(tracker.name)}</strong>
+            <span class="pace-chip ${statusClass}">${escapeHtml(statusLabel)}</span>
+          </div>
+          <p class="muted small">Partner: ${escapeHtml(tracker.accountabilityPartnerName)}${tracker.accountabilityPartnerEmail ? ` (${escapeHtml(tracker.accountabilityPartnerEmail)})` : ""}</p>
+        </li>
+      `;
+    })
+    .join("");
 }
 
 function renderSquadList() {
@@ -7101,6 +7310,10 @@ function renderManageGoals() {
               ? `<option value="bucket" ${normalizeGoalType(tracker.goalType) === "bucket" ? "selected" : ""}>Bucket List</option>`
               : ""}
             <option value="floating" ${normalizeGoalType(tracker.goalType) === "floating" ? "selected" : ""}>Floating</option>
+            <option value="${GOAL_TYPE_TERM}" ${normalizeGoalType(tracker.goalType) === GOAL_TYPE_TERM ? "selected" : ""}>Term (Deadline)</option>
+            <option value="${GOAL_TYPE_WEEK_TERM}" ${normalizeGoalType(tracker.goalType) === GOAL_TYPE_WEEK_TERM ? "selected" : ""}>Week Goal</option>
+            <option value="${GOAL_TYPE_MONTH_TERM}" ${normalizeGoalType(tracker.goalType) === GOAL_TYPE_MONTH_TERM ? "selected" : ""}>Month Goal</option>
+            <option value="${GOAL_TYPE_INPUT_OUTPUT}" ${normalizeGoalType(tracker.goalType) === GOAL_TYPE_INPUT_OUTPUT ? "selected" : ""}>Input/Output</option>
           </select>
         </td>
         <td>
@@ -8148,6 +8361,47 @@ function getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel) {
   return isOnPace ? "progress-on-pace" : "progress-off-pace";
 }
 
+function getDeadlineBadgeMarkup(tracker) {
+  if (!tracker || !isTimedTermGoalType(tracker.goalType)) {
+    return "";
+  }
+  const type = normalizeGoalType(tracker.goalType);
+  if (type === GOAL_TYPE_WEEK_TERM) {
+    return `<span class="scope-pill">Week Goal</span>`;
+  }
+  if (type === GOAL_TYPE_MONTH_TERM) {
+    return `<span class="scope-pill">Month Goal</span>`;
+  }
+  if (type === GOAL_TYPE_TERM && tracker.termDeadline) {
+    const deadline = parseDateKey(tracker.termDeadline);
+    const now = normalizeDate(new Date());
+    const daysLeft = Math.ceil((deadline.getTime() - now.getTime()) / DAY_MS);
+    if (daysLeft < 0) {
+      return `<span class="deadline-badge done">Deadline Passed</span>`;
+    }
+    if (daysLeft === 0) {
+      return `<span class="deadline-badge urgent">Due Today</span>`;
+    }
+    if (daysLeft <= 7) {
+      return `<span class="deadline-badge urgent">${daysLeft}d left</span>`;
+    }
+    return `<span class="deadline-badge">${daysLeft}d left</span>`;
+  }
+  return `<span class="scope-pill">Term Goal</span>`;
+}
+
+function getInputOutputSummaryMarkup(tracker) {
+  if (!tracker || !isInputOutputGoalType(tracker.goalType) || !tracker.ioConfig) {
+    return "";
+  }
+  const cfg = tracker.ioConfig;
+  if (!cfg.outputName) {
+    return "";
+  }
+  const inputCount = Array.isArray(cfg.inputs) ? cfg.inputs.length : 0;
+  return `<p class="muted small">Output: <strong>${escapeHtml(cfg.outputName)}</strong> (${formatAmount(cfg.outputTarget)} ${escapeHtml(cfg.outputUnit || "")}/wk) — ${inputCount} input${inputCount === 1 ? "" : "s"} tracked</p>`;
+}
+
 function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, targetFn, index) {
   disposeEChartsInScope(listEl);
   const filteredTrackers = getTrackersForPeriod(periodName);
@@ -8382,15 +8636,18 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           </div>
         `;
 
+      const deadlineBadge = getDeadlineBadgeMarkup(tracker);
+      const ioSummary = getInputOutputSummaryMarkup(tracker);
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
-            <h3>${escapeHtml(tracker.name)}</h3>
+            <h3>${escapeHtml(tracker.name)}${deadlineBadge ? ` ${deadlineBadge}` : ""}</h3>
             <div class="metric-head-meta">
               <p class="metric-updated-through">${escapeHtml(updatedThroughLabel)}</p>
               ${goalsPlusChipMarkup ? `<div class="metric-controls">${goalsPlusChipMarkup}</div>` : ""}
             </div>
           </div>
+          ${ioSummary}
           ${progressBarMarkup}
           <div class="pace-line">
             ${paceStatusChip}
@@ -9343,15 +9600,21 @@ function renderFriendsSettings() {
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
     .map((item, index) => {
       const emailLine = item.email
-        ? `<p class="muted small">${escapeHtml(item.email)}</p>`
-        : `<p class="muted small">No email saved</p>`;
+        ? `<span>${escapeHtml(item.email)}</span>`
+        : `<span>No email saved</span>`;
+      const initials = String(item.name || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+      const addedDate = item.createdAt ? `Added ${formatDate(new Date(item.createdAt))}` : "";
       return `
         <li class="quick-item" style="--stagger:${index}">
-          <div class="metric-top">
-            <strong>${escapeHtml(item.name)}</strong>
-            <button class="btn btn-danger" type="button" data-action="delete-friend" data-id="${item.id}">Delete</button>
+          <div class="friend-card">
+            <div class="friend-avatar">${escapeHtml(initials)}</div>
+            <div class="friend-info">
+              <strong>${escapeHtml(item.name)}</strong>
+              ${emailLine}
+              ${addedDate ? `<span>${escapeHtml(addedDate)}</span>` : ""}
+            </div>
+            <button class="btn btn-danger" type="button" data-action="delete-friend" data-id="${item.id}">Remove</button>
           </div>
-          ${emailLine}
         </li>
       `;
     })
@@ -14619,6 +14882,18 @@ function normalizeGoalType(value) {
   if (value === "floating") {
     return "floating";
   }
+  if (value === GOAL_TYPE_TERM) {
+    return GOAL_TYPE_TERM;
+  }
+  if (value === GOAL_TYPE_WEEK_TERM) {
+    return GOAL_TYPE_WEEK_TERM;
+  }
+  if (value === GOAL_TYPE_MONTH_TERM) {
+    return GOAL_TYPE_MONTH_TERM;
+  }
+  if (value === GOAL_TYPE_INPUT_OUTPUT) {
+    return GOAL_TYPE_INPUT_OUTPUT;
+  }
   return "quantity";
 }
 
@@ -14637,6 +14912,18 @@ function normalizeGoalTypeFilterValue(value) {
   }
   if (value === "quantity") {
     return "quantity";
+  }
+  if (value === GOAL_TYPE_TERM) {
+    return GOAL_TYPE_TERM;
+  }
+  if (value === GOAL_TYPE_WEEK_TERM) {
+    return GOAL_TYPE_WEEK_TERM;
+  }
+  if (value === GOAL_TYPE_MONTH_TERM) {
+    return GOAL_TYPE_MONTH_TERM;
+  }
+  if (value === GOAL_TYPE_INPUT_OUTPUT) {
+    return GOAL_TYPE_INPUT_OUTPUT;
   }
   return "all";
 }
@@ -14817,6 +15104,28 @@ function renderGoalMetricsDraft() {
           <p class="muted small">${escapeHtml(metric.unit)}</p>
         </div>
         <button class="btn btn-danger" type="button" data-action="remove-goal-metric" data-id="${escapeAttr(metric.id)}">Remove</button>
+      </li>
+    `)
+    .join("");
+}
+
+function renderGoalIoInputsDraft() {
+  if (!goalIoInputsList || !goalIoInputsEmpty) {
+    return;
+  }
+  if (!Array.isArray(goalIoInputsDraft) || goalIoInputsDraft.length < 1) {
+    goalIoInputsDraft = [];
+    goalIoInputsList.innerHTML = "";
+    goalIoInputsEmpty.style.display = "block";
+    return;
+  }
+  goalIoInputsEmpty.style.display = "none";
+  goalIoInputsList.innerHTML = goalIoInputsDraft
+    .map((input, index) => `
+      <li class="io-input-item" style="--stagger:${index}">
+        <strong>${escapeHtml(input.name)}</strong>
+        <span class="muted">${escapeHtml(input.unit)} — weekly target: ${formatAmount(input.weeklyTarget)}</span>
+        <button class="btn btn-danger" type="button" data-action="remove-io-input" data-id="${escapeAttr(input.id)}">Remove</button>
       </li>
     `)
     .join("");
@@ -15324,6 +15633,27 @@ function isBinaryGoalType(value) {
 
 function isFloatingGoalType(value) {
   return normalizeGoalType(value) === "floating";
+}
+
+function isTermGoalType(value) {
+  return normalizeGoalType(value) === GOAL_TYPE_TERM;
+}
+
+function isWeekTermGoalType(value) {
+  return normalizeGoalType(value) === GOAL_TYPE_WEEK_TERM;
+}
+
+function isMonthTermGoalType(value) {
+  return normalizeGoalType(value) === GOAL_TYPE_MONTH_TERM;
+}
+
+function isInputOutputGoalType(value) {
+  return normalizeGoalType(value) === GOAL_TYPE_INPUT_OUTPUT;
+}
+
+function isTimedTermGoalType(value) {
+  const type = normalizeGoalType(value);
+  return type === GOAL_TYPE_TERM || type === GOAL_TYPE_WEEK_TERM || type === GOAL_TYPE_MONTH_TERM;
 }
 
 function getLockedUnitForGoalType(value) {
@@ -15840,6 +16170,20 @@ function updateGoalTypeFields() {
     goalUnit.placeholder = "miles, pages, calls";
   }
   syncGoalCustomTemplateVisibility();
+  // Show/hide term goal deadline fields
+  const isTermType = isTimedTermGoalType(normalizedType);
+  const isWeekTermType = isWeekTermGoalType(normalizedType);
+  const isMonthTermType = isMonthTermGoalType(normalizedType);
+  const isIoType = isInputOutputGoalType(normalizedType);
+  if (goalTermWrap) {
+    goalTermWrap.hidden = !isTermType;
+  }
+  if (goalTermToYearLabel) {
+    goalTermToYearLabel.hidden = !(isWeekTermType || isMonthTermType);
+  }
+  if (goalIoWrap) {
+    goalIoWrap.hidden = !isIoType;
+  }
 }
 
 function buildGoalsPlusConfigFromForm() {

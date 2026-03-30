@@ -736,9 +736,9 @@ body::before {
 
 .mobile-menu-toggle:hover,
 .mobile-menu-toggle:focus-visible {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(221, 249, 245, 0.7) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, color-mix(in srgb, var(--brand-soft) 70%, transparent) 100%);
   border-color: var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 159, 148, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 .mobile-menu-toggle[aria-expanded="true"] {
@@ -795,9 +795,9 @@ body::before {
 
 .tab-strip-panel .nav-groups .dropdown-toggle:hover,
 .tab-strip-panel .nav-groups .dropdown-toggle:focus-visible {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(221, 249, 245, 0.7) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, color-mix(in srgb, var(--brand-soft) 70%, transparent) 100%);
   border-color: var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px rgba(0, 159, 148, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 8px color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 .tab-strip-panel .nav-groups > .dropdown {
@@ -817,7 +817,7 @@ body::before {
   background: linear-gradient(135deg, var(--brand-soft) 0%, var(--surface-strong) 100%);
   border-color: var(--brand);
   color: var(--brand-strong);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0, 159, 148, 0.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 4px 12px color-mix(in srgb, var(--brand) 18%, transparent);
   font-weight: 700;
 }
 
@@ -923,7 +923,7 @@ body::before {
 }
 
 .tab-strip-panel .menu-subgroup > summary:hover {
-  background: rgba(0, 159, 148, 0.08);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
   border-radius: 8px;
 }
 
@@ -993,9 +993,9 @@ body::before {
 .menu-btn:focus-visible {
   transform: translateX(4px);
   color: var(--brand-strong);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(221, 249, 245, 0.8) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, color-mix(in srgb, var(--brand-soft) 80%, transparent) 100%);
   border-color: var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 12px rgba(0, 159, 148, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 12px color-mix(in srgb, var(--brand) 14%, transparent);
   outline: none;
 }
 
@@ -1003,7 +1003,7 @@ body::before {
   border-color: var(--brand);
   background: linear-gradient(135deg, var(--brand-soft) 0%, #ffffff 100%);
   color: var(--brand-strong);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 16px rgba(0, 159, 148, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 16px color-mix(in srgb, var(--brand) 20%, transparent);
   font-weight: 700;
   transform: translateX(4px);
 }
@@ -1100,12 +1100,12 @@ body::before {
 .btn:hover {
   transform: translateY(-2px);
   border-color: var(--brand);
-  box-shadow: 0 12px 24px rgba(0, 159, 148, 0.18);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
 .btn:active {
   transform: translateY(0);
-  box-shadow: 0 6px 12px rgba(0, 159, 148, 0.12);
+  box-shadow: 0 6px 12px color-mix(in srgb, var(--brand) 14%, transparent);
 }
 
 .btn:focus-visible {
@@ -1130,7 +1130,7 @@ body::before {
   color: var(--btn-active-text);
   border-color: var(--btn-primary-end);
   background: linear-gradient(135deg, var(--btn-primary-start) 0%, var(--btn-primary-end) 100%);
-  box-shadow: 0 6px 18px rgba(0, 159, 148, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--brand) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
   font-weight: 700;
   letter-spacing: 0.02em;
   transition: all 0.25s cubic-bezier(0.3, 0, 0.2, 1);
@@ -1658,18 +1658,18 @@ textarea {
 }
 
 .summary-card {
-  background: linear-gradient(150deg, var(--brand-soft) 0%, #ffffff 60%, var(--surface-soft) 100%);
+  background: linear-gradient(150deg, var(--brand-soft) 0%, var(--surface) 60%, var(--surface-soft) 100%);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 6px 16px rgba(0, 159, 148, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 6px 16px color-mix(in srgb, var(--brand) 12%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition: all 0.25s cubic-bezier(0.3, 0, 0.2, 1);
 }
 
 .summary-card:hover {
   transform: translateY(-3px);
   border-color: var(--brand);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 16px 28px rgba(0, 159, 148, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 16px 28px color-mix(in srgb, var(--brand) 16%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .summary-card p {
@@ -2564,7 +2564,7 @@ strong.pace-off,
   overflow: hidden;
   background: linear-gradient(180deg, var(--bg-soft) 0%, var(--progress-track) 100%);
   position: relative;
-  border: 1px solid rgba(0, 159, 148, 0.14);
+  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -2622,7 +2622,7 @@ strong.pace-off,
   width: 100%;
   border-radius: 999px;
   transform: translateZ(0);
-  filter: drop-shadow(0 3px 8px rgba(0, 159, 148, 0.2));
+  filter: drop-shadow(0 3px 8px color-mix(in srgb, var(--brand) 20%, rgba(0,0,0,0.06)));
   overflow: hidden;
 }
 
@@ -2641,7 +2641,7 @@ strong.pace-off,
   position: absolute;
   inset: 0;
   border-radius: 11px;
-  background: linear-gradient(180deg, transparent 40%, rgba(0, 61, 54, 0.08));
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.06));
   pointer-events: none;
   z-index: 2;
 }
@@ -2684,7 +2684,7 @@ strong.pace-off,
 .progress.progress-with-label {
   height: 30px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 159, 148, 0.14);
+  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -3444,10 +3444,10 @@ strong.pace-off,
 
 @keyframes glow-pulse {
   0%, 100% {
-    box-shadow: 0 14px 28px rgba(0, 159, 148, 0.24);
+    box-shadow: 0 14px 28px color-mix(in srgb, var(--brand) 26%, transparent);
   }
   50% {
-    box-shadow: 0 18px 36px rgba(0, 159, 148, 0.35);
+    box-shadow: 0 18px 36px color-mix(in srgb, var(--brand) 38%, transparent);
   }
 }
 
@@ -3782,6 +3782,177 @@ strong.pace-off,
     padding: 9px 8px;
     font-size: 0.83rem;
   }
+}
+
+/* ── Password requirements ──────────────────────────── */
+.password-requirements {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+.password-req-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.password-req-item.met {
+  color: var(--success);
+}
+.password-req-item::before {
+  content: "○";
+  font-size: 0.7rem;
+}
+.password-req-item.met::before {
+  content: "●";
+}
+
+/* ── Forgot password link ───────────────────────────── */
+.forgot-password-link {
+  background: none;
+  border: none;
+  color: var(--brand);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-family: inherit;
+}
+.forgot-password-link:hover {
+  color: var(--brand-strong);
+}
+.auth-form-forgot {
+  text-align: right;
+  margin: 0;
+}
+
+/* ── Legal disclaimer ───────────────────────────────── */
+.auth-legal {
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+.auth-legal a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Term / deadline goal badge ─────────────────────── */
+.deadline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+}
+.deadline-badge.urgent {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.deadline-badge.done {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+}
+
+/* ── Term goal deadline field ───────────────────────── */
+.goal-deadline-wrap {
+  display: contents;
+}
+
+/* ── Input/Output goal section ──────────────────────── */
+.input-output-section {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 6px;
+}
+.input-output-section h4 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--brand-strong);
+}
+.io-input-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+}
+.io-input-item strong {
+  flex: 1;
+}
+
+/* ── Social improvements ────────────────────────────── */
+.friend-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  margin-bottom: 6px;
+}
+.friend-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-soft) 0%, var(--brand) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--btn-active-text);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.friend-info {
+  flex: 1;
+  min-width: 0;
+}
+.friend-info strong {
+  display: block;
+  font-size: 0.9rem;
+}
+.friend-info span {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Week / month term goal scope pill ──────────────── */
+.scope-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand-strong);
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
