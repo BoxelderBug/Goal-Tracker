@@ -866,11 +866,11 @@ dropdowns.forEach((dropdown) => {
 
 document.addEventListener("click", (event) => {
   const target = event.target instanceof Element ? event.target : null;
-  if (isMobileMenuMode() && tabStripPanel && (!target || !target.closest(".tab-strip-panel"))) {
-    setMobileMenuOpen(false);
-  }
   if (mobileMenuToggle && target && target.closest("#mobile-menu-toggle")) {
     return;
+  }
+  if (isMobileMenuMode() && tabStripPanel && (!target || !target.closest(".tab-strip-panel"))) {
+    setMobileMenuOpen(false);
   }
   if (!target || !target.closest("[data-dropdown]")) {
     closeAllDropdownMenus();
