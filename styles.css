@@ -2629,7 +2629,8 @@ strong.pace-off,
   overflow: hidden;
 }
 
-.pbar-fill {
+.pbar-fill,
+.pbar-fill-projected {
   position: absolute;
   inset: 0 auto 0 0;
   height: 100%;
@@ -2638,10 +2639,21 @@ strong.pace-off,
   transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.pbar-fill.progress-hit     { background: var(--goal-hit-start); }
-.pbar-fill.progress-on-pace  { background: var(--brand); }
-.pbar-fill.progress-off-pace { background: var(--goal-off-pace-start); }
-.pbar-fill.progress-missed   { background: var(--goal-missed-start); }
+.pbar-fill-projected {
+  opacity: 0.28;
+}
+
+.pbar-fill.progress-hit,
+.pbar-fill-projected.progress-hit     { background: var(--goal-hit-start); }
+
+.pbar-fill.progress-on-pace,
+.pbar-fill-projected.progress-on-pace  { background: var(--brand); }
+
+.pbar-fill.progress-off-pace,
+.pbar-fill-projected.progress-off-pace { background: var(--goal-off-pace-start); }
+
+.pbar-fill.progress-missed,
+.pbar-fill-projected.progress-missed   { background: var(--goal-missed-start); }
 
 .period-progress-block {
   display: block;

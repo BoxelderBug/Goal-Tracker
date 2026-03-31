@@ -8643,6 +8643,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
               <span class="pbar-pct">${pct}%</span>
             </div>
             <div class="pbar-track">
+              ${!isPastPeriod && projectedPct > pct ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min(projectedPct, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
             </div>
           </div>
@@ -8893,6 +8894,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
               <span class="pbar-pct">${pct}%</span>
             </div>
             <div class="pbar-track">
+              ${!isPastPeriod && projectedPct > pct ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min(projectedPct, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
             </div>
           </div>
