@@ -1,0 +1,18 @@
+{
+  "name": "Teal Goal Tracker",
+  "short_name": "Goal Tracker",
+  "description": "Track your goals week by week",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#009f94",
+  "background_color": "#e8fbf8",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
