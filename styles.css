@@ -2549,6 +2549,42 @@ strong.pace-off,
   justify-content: center;
 }
 
+.btn-pace-on {
+  color: var(--goal-hit-line);
+  border-color: color-mix(in srgb, var(--goal-hit-line) 40%, transparent);
+  background: var(--success-soft);
+}
+
+.btn-pace-off {
+  color: var(--danger);
+  border-color: #e8b9bf;
+  background: var(--danger-soft);
+}
+
+.pace-chip-wrap-right .pace-detail-popover {
+  left: auto;
+  right: 0;
+}
+
+.pace-popover-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 3px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
+}
+
+.pace-popover-row:last-child {
+  border-bottom: none;
+}
+
+.pace-popover-key {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .btn-icon {
   width: 28px;
   height: 28px;

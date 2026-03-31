@@ -8532,6 +8532,23 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       }
 
       const paceDetailText = `Avg ${formatAmount(avg)} | Needed ${formatAmount(needed)} | Proj ${formatAmount(projectedTracker)}`;
+      const unit = escapeHtml(normalizeGoalUnit(tracker.unit));
+      const paceButtonMarkup = isFloating ? "" : `
+        <span class="pace-chip-wrap pace-chip-wrap-right">
+          <button
+            type="button"
+            class="btn btn-graph ${(isOnPace || goalHit) ? "btn-pace-on" : "btn-pace-off"}"
+            data-action="toggle-pace-detail"
+            aria-expanded="false"
+            title="Pace"
+          >P</button>
+          <span class="pace-detail-popover">
+            <span class="pace-popover-row"><span class="pace-popover-key">Avg</span> <strong>${escapeHtml(formatAmount(avg))} ${unit}/day</strong></span>
+            <span class="pace-popover-row"><span class="pace-popover-key">Needed</span> <strong>${escapeHtml(formatAmount(needed))} ${unit}/day</strong></span>
+            <span class="pace-popover-row"><span class="pace-popover-key">Projected</span> <strong>${escapeHtml(formatAmount(projectedTracker))} ${unit}</strong></span>
+          </span>
+        </span>
+      `;
       const paceStatusChip = isFloating
         ? `
             <span class="pace-chip-wrap">
@@ -8663,8 +8680,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           ${ioSummary}
           ${progressBarMarkup}
           <div class="pace-line">
-            ${paceStatusChip}
             <span class="pace-actions">
+              ${paceButtonMarkup}
               <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}" title="Deep Dive" aria-label="Deep Dive">D</button>
               <button
                 type="button"
