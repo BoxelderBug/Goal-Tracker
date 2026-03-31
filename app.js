@@ -7183,12 +7183,9 @@ function renderSquadList() {
           </div>
           <p class="metric-line">${escapeHtml(squad.notes || "No squad notes")} | ${goalCount} goal${goalCount === 1 ? "" : "s"} | Weekly Goal ${formatAmount(squadWeeklyGoal)}</p>
           <div class="pbar">
-            <div class="pbar-header">
-              <span class="pbar-label">Week Progress — ${escapeHtml(weeklyGoalLabel)}</span>
-              <span class="pbar-pct">${weeklyPercent}%</span>
-            </div>
             <div class="pbar-track">
               <div class="pbar-fill ${weeklyProgressFillClass}" style="width:${weeklyPercent}%"></div>
+              <span class="pbar-inner-label">${escapeHtml(weeklyGoalLabel)} · ${weeklyPercent}%</span>
             </div>
           </div>
           <div class="actions">
@@ -8485,9 +8482,8 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const target = targetFn(tracker);
       const goalHit = target > 0 && progress >= target;
       const updatedThroughKey = getLastLoggedDateKey(index, tracker.id, range);
-      const updatedThroughLabel = updatedThroughKey
-        ? `Updated through ${formatDate(parseDateKey(updatedThroughKey))}`
-        : "Updated through -";
+      const updatedThroughDate = updatedThroughKey ? formatDate(parseDateKey(updatedThroughKey)) : "-";
+      const updatedThroughLabel = updatedThroughKey ? `Updated through ${updatedThroughDate}` : "Updated through -";
       const pct = percent(progress, target);
       const avg = safeDivide(progress, elapsedDays);
       const needed = safeDivide(target, totalDays);
@@ -8639,7 +8635,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         : "";
 
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
-      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} ${normalizeGoalUnit(tracker.unit)}`;
+      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} · ${pct}%`;
       const projectedPct = percent(projectedTracker, target);
       const projectedLabel = `Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
@@ -8655,13 +8651,10 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         })
         : `
           <div class="pbar">
-            <div class="pbar-header">
-              <span class="pbar-label">${escapeHtml(progressAmountLabel)}</span>
-              <span class="pbar-pct">${pct}%</span>
-            </div>
             <div class="pbar-track">
               ${!isPastPeriod && projectedPct > pct ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min(projectedPct, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
+              <span class="pbar-inner-label">${escapeHtml(progressAmountLabel)}</span>
             </div>
           </div>
         `;
@@ -8673,7 +8666,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           <div class="metric-top">
             <h3>${escapeHtml(tracker.name)}${deadlineBadge ? ` ${deadlineBadge}` : ""}</h3>
             <div class="metric-head-meta">
-              <p class="metric-updated-through">${escapeHtml(updatedThroughLabel)}</p>
+              <p class="metric-updated-through" title="${escapeAttr(updatedThroughLabel)}">${escapeHtml(updatedThroughDate)}</p>
               ${goalsPlusChipMarkup ? `<div class="metric-controls">${goalsPlusChipMarkup}</div>` : ""}
             </div>
           </div>
@@ -8890,7 +8883,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const progressToneClass = getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel);
       const ownerLabel = share.ownerUsername || "Friend";
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
-      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} ${normalizeGoalUnit(tracker.unit)}`;
+      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} · ${pct}%`;
       const projectedPct = percent(projected, target);
       const projectedLabel = `Projected ${formatAmountWithUnit(projected, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
@@ -8906,13 +8899,10 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
         })
         : `
           <div class="pbar">
-            <div class="pbar-header">
-              <span class="pbar-label">${escapeHtml(progressAmountLabel)}</span>
-              <span class="pbar-pct">${pct}%</span>
-            </div>
             <div class="pbar-track">
               ${!isPastPeriod && projectedPct > pct ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min(projectedPct, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
+              <span class="pbar-inner-label">${escapeHtml(progressAmountLabel)}</span>
             </div>
           </div>
         `;

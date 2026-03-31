@@ -2449,7 +2449,11 @@ textarea {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  background: var(--bg-soft);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 10px;
+  padding: 3px;
 }
 
 .pace-chip {
@@ -2624,45 +2628,36 @@ strong.pace-off,
 /* ── Featured progress bar (.pbar) ───────────────── */
 .pbar {
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.pbar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
-.pbar-label {
-  font-size: 0.81rem;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.pbar-pct {
-  font-size: 0.81rem;
-  font-weight: 700;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  letter-spacing: -0.01em;
 }
 
 .pbar-track {
   width: 100%;
-  height: 7px;
+  height: 28px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--line) 45%, transparent);
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.pbar-inner-label {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.7),
+    0 0 8px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+  padding: 0 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pbar-fill,
