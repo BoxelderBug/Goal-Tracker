@@ -4735,7 +4735,7 @@ function createHistoryEChartMarkup(history, options = {}) {
 }
 
 function isPeriodProgressEChartEnabled(periodName) {
-  return periodName === "week" || periodName === "month" || periodName === "year";
+  return false;
 }
 
 function getProgressTonePalette(toneClass) {
