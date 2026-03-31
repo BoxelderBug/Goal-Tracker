@@ -8665,7 +8665,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           <div class="pace-line">
             ${paceStatusChip}
             <span class="pace-actions">
-              <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}">Deep Dive</button>
+              <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}" title="Deep Dive" aria-label="Deep Dive">D</button>
               <button
                 type="button"
                 class="btn btn-icon"
