@@ -2448,12 +2448,14 @@ textarea {
 .pace-actions {
   margin-left: auto;
   display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--bg-soft);
+  align-items: stretch;
+  height: 28px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 10px;
-  padding: 3px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  padding: 0;
+  gap: 0;
 }
 
 .pace-chip {
@@ -2479,8 +2481,12 @@ textarea {
 .pace-chip-wrap {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
   z-index: 2;
+  border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+.pace-chip-wrap:last-child {
+  border-right: none;
 }
 
 .pace-detail-popover {
@@ -2553,16 +2559,43 @@ strong.pace-off,
   justify-content: center;
 }
 
+/* Segmented control: strip individual button chrome inside .pace-actions */
+.pace-actions .btn,
+.pace-actions .pace-chip-wrap .btn {
+  border: none;
+  border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  height: 100%;
+  padding: 0 11px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pace-actions .btn:last-child,
+.pace-actions .pace-chip-wrap .btn:last-child {
+  border-right: none;
+}
+/* Remove the wrapper's border when the btn already has it */
+.pace-actions .pace-chip-wrap {
+  border-right: none;
+}
+.pace-actions .btn-icon {
+  width: auto;
+  height: 100%;
+  border-radius: 0;
+  padding: 0 11px;
+}
+
 .btn-pace-on {
-  color: var(--goal-hit-line);
-  border-color: color-mix(in srgb, var(--goal-hit-line) 40%, transparent);
-  background: var(--success-soft);
+  color: var(--goal-hit-line) !important;
 }
 
 .btn-pace-off {
-  color: var(--danger);
-  border-color: #e8b9bf;
-  background: var(--danger-soft);
+  color: var(--danger) !important;
 }
 
 .pace-chip-wrap-right .pace-detail-popover {

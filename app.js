@@ -8635,7 +8635,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         : "";
 
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
-      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} · ${pct}%`;
+      const progressAmountLabel = `${formatAmount(progress)} / ${formatAmount(target)} · ${pct}%`;
       const projectedPct = percent(projectedTracker, target);
       const projectedLabel = `Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
@@ -8883,7 +8883,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const progressToneClass = getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel);
       const ownerLabel = share.ownerUsername || "Friend";
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
-      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} · ${pct}%`;
+      const progressAmountLabel = `${formatAmount(progress)} / ${formatAmount(target)} · ${pct}%`;
       const projectedPct = percent(projected, target);
       const projectedLabel = `Projected ${formatAmountWithUnit(projected, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
