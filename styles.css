@@ -2561,53 +2561,87 @@ strong.pace-off,
   justify-content: center;
 }
 
+/* ── Bare progress bar (check-ins, mini bars) ─────── */
 .progress {
   width: 100%;
-  height: 8px;
+  height: 5px;
   border-radius: 999px;
-  overflow: hidden;
-  background: var(--progress-track);
+  background: color-mix(in srgb, var(--line) 45%, transparent);
   position: relative;
-  border: none;
-  box-shadow: none;
+  overflow: hidden;
 }
 
 .progress > .progress-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 0;
   height: 100%;
-  background: linear-gradient(90deg, var(--progress-fill-start), var(--progress-fill-end));
-  background-size: 200% 100%;
-  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-  z-index: 1;
   border-radius: 999px;
-  box-shadow: none;
+  background: var(--brand);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.progress > .progress-fill::after {
-  display: none;
+.progress > .progress-fill.progress-hit    { background: var(--goal-hit-start); }
+.progress > .progress-fill.progress-on-pace { background: var(--brand); }
+.progress > .progress-fill.progress-off-pace { background: var(--goal-off-pace-start); }
+.progress > .progress-fill.progress-missed  { background: var(--goal-missed-start); }
+
+/* ── Featured progress bar (.pbar) ───────────────── */
+.pbar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
-.progress > .progress-fill.progress-hit {
-  background: linear-gradient(90deg, var(--goal-hit-start), var(--goal-hit-end));
-  box-shadow: none;
+.pbar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
 }
 
-.progress > .progress-fill.progress-on-pace {
-  background: linear-gradient(90deg, var(--goal-on-pace-start), var(--goal-on-pace-end));
-  box-shadow: none;
+.pbar-label {
+  font-size: 0.81rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.progress > .progress-fill.progress-off-pace {
-  background: linear-gradient(90deg, var(--goal-off-pace-start), var(--goal-off-pace-end));
-  box-shadow: none;
+.pbar-pct {
+  font-size: 0.81rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
 }
 
-.progress > .progress-fill.progress-missed {
-  background: linear-gradient(90deg, var(--goal-missed-start), var(--goal-missed-end));
-  box-shadow: none;
+.pbar-track {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+  position: relative;
+  overflow: hidden;
 }
+
+.pbar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand);
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pbar-fill.progress-hit     { background: var(--goal-hit-start); }
+.pbar-fill.progress-on-pace  { background: var(--brand); }
+.pbar-fill.progress-off-pace { background: var(--goal-off-pace-start); }
+.pbar-fill.progress-missed   { background: var(--goal-missed-start); }
 
 .period-progress-block {
   display: block;
@@ -2666,45 +2700,6 @@ strong.pace-off,
   z-index: 5;
 }
 
-.progress.progress-with-label {
-  height: 28px;
-  border-radius: 999px;
-  border: none;
-  box-shadow: none;
-}
-
-.progress.progress-with-label > .progress-fill {
-  border-radius: 999px;
-}
-
-.progress.progress-with-label > .progress-label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 14px;
-  font-family: "Sora", "Manrope", sans-serif;
-  font-size: 0.84rem;
-  line-height: 1;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  color: #ffffff;
-  text-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.85),
-    0 0 6px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
-  pointer-events: none;
-  border-radius: 999px;
-}
-
-.progress.progress-with-label > .progress-label-track {
-  z-index: 3;
-}
-
-.progress.progress-with-label > .progress-label-fill {
-  display: none;
-}
 
 .graph-wrap {
   margin-top: 10px;

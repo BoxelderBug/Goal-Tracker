@@ -7182,9 +7182,14 @@ function renderSquadList() {
             <button class="btn btn-danger" type="button" data-action="delete-squad" data-id="${squad.id}">Delete</button>
           </div>
           <p class="metric-line">${escapeHtml(squad.notes || "No squad notes")} | ${goalCount} goal${goalCount === 1 ? "" : "s"} | Weekly Goal ${formatAmount(squadWeeklyGoal)}</p>
-          <div class="progress progress-with-label">
-            <span class="progress-fill ${weeklyProgressFillClass}" style="width:${weeklyPercent}%"></span>
-            <span class="progress-label progress-label-track">Week Progress ${escapeHtml(weeklyGoalLabel)}</span>
+          <div class="pbar">
+            <div class="pbar-header">
+              <span class="pbar-label">Week Progress — ${escapeHtml(weeklyGoalLabel)}</span>
+              <span class="pbar-pct">${weeklyPercent}%</span>
+            </div>
+            <div class="pbar-track">
+              <div class="pbar-fill ${weeklyProgressFillClass}" style="width:${weeklyPercent}%"></div>
+            </div>
           </div>
           <div class="actions">
             <label class="inline-control">
@@ -8617,6 +8622,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         : "";
 
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
+      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} ${normalizeGoalUnit(tracker.unit)}`;
       const projectedPct = percent(projectedTracker, target);
       const projectedLabel = `Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
@@ -8631,10 +8637,14 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           projectedLabel
         })
         : `
-          <div class="progress progress-with-label">
-            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
-            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
-            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
+          <div class="pbar">
+            <div class="pbar-header">
+              <span class="pbar-label">${escapeHtml(progressAmountLabel)}</span>
+              <span class="pbar-pct">${pct}%</span>
+            </div>
+            <div class="pbar-track">
+              <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
+            </div>
           </div>
         `;
 
@@ -8862,6 +8872,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
       const progressToneClass = getProgressToneClass(goalHit, isOnPace, useFinalPaceLabel);
       const ownerLabel = share.ownerUsername || "Friend";
       const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
+      const progressAmountLabel = `${formatAmount(progress)} out of ${formatAmount(target)} ${normalizeGoalUnit(tracker.unit)}`;
       const projectedPct = percent(projected, target);
       const projectedLabel = `Projected ${formatAmountWithUnit(projected, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
@@ -8876,10 +8887,14 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
           projectedLabel
         })
         : `
-          <div class="progress progress-with-label">
-            <span class="progress-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></span>
-            <span class="progress-label progress-label-track">${escapeHtml(progressLabel)}</span>
-            <span class="progress-label progress-label-fill" style="width:${Math.min(pct, 100)}%">${escapeHtml(progressLabel)}</span>
+          <div class="pbar">
+            <div class="pbar-header">
+              <span class="pbar-label">${escapeHtml(progressAmountLabel)}</span>
+              <span class="pbar-pct">${pct}%</span>
+            </div>
+            <div class="pbar-track">
+              <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
+            </div>
           </div>
         `;
 
