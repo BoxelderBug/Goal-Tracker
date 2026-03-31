@@ -255,11 +255,13 @@ body::before {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  padding: 10px;
-  border: 1px solid var(--line);
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   border-radius: 22px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.99) 0%, var(--surface-soft) 50%, var(--brand-soft) 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 1);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 18px rgba(0, 94, 86, 0.07);
   transition: box-shadow 0.3s ease;
 }
 
@@ -285,20 +287,20 @@ body::before {
 
 .user-actions-panel > .btn,
 .user-actions-panel .btn-notifications {
-  min-height: 44px;
-  border-radius: 12px;
-  border-color: var(--line);
-  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  min-height: 36px;
+  border-radius: 10px;
+  border-color: color-mix(in srgb, var(--line) 60%, transparent);
+  background: rgba(255, 255, 255, 0.7);
   color: var(--text);
-  box-shadow: 0 6px 12px rgba(0, 70, 63, 0.1);
+  box-shadow: none;
 }
 
 .user-actions-panel > .btn.active,
 .user-actions-panel .btn-notifications.active {
-  border-color: var(--btn-active-border);
-  background: linear-gradient(180deg, var(--btn-active-bg) 0%, var(--brand-strong) 100%);
-  color: var(--btn-active-text);
-  box-shadow: 0 10px 18px rgba(0, 76, 69, 0.2);
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  box-shadow: none;
 }
 
 .user-actions-panel .btn-nav-compact {
@@ -539,41 +541,43 @@ body::before {
 }
 
 .hero-top .hero-title-btn {
-  border: 1px solid var(--brand-strong);
-  background: linear-gradient(180deg, var(--btn-active-bg) 0%, var(--brand-strong) 100%);
-  box-shadow: 0 10px 18px rgba(0, 76, 69, 0.24);
-  padding: 0 16px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 8px;
   margin: 0;
   font-family: "Sora", sans-serif;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1;
-  font-size: clamp(1.9rem, 4.4vw, 3rem);
+  font-size: clamp(1.35rem, 3vw, 2rem);
   font-weight: 700;
-  color: #ffffff;
+  color: var(--brand-strong);
   text-align: left;
   text-wrap: balance;
   flex: 1 1 auto;
-  min-width: 260px;
-  min-height: 56px;
-  border-radius: 14px;
+  min-width: 160px;
+  min-height: 40px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
+  transition: opacity 0.15s ease;
 }
 
 .hero-top .hero-title-btn:hover,
 .hero-top .hero-title-btn:focus-visible {
-  color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow: 0 14px 22px rgba(0, 76, 69, 0.28);
-  background: linear-gradient(180deg, #0a9489 0%, var(--brand-strong) 100%);
-  border-color: var(--brand-strong);
+  color: var(--brand);
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+  border-color: transparent;
+  opacity: 0.75;
 }
 
 .hero-top .hero-title-btn.active {
-  color: #ffffff;
-  background: linear-gradient(180deg, #0a9489 0%, var(--brand-strong) 100%);
-  box-shadow: 0 14px 22px rgba(0, 76, 69, 0.28);
-  border-color: var(--brand-strong);
+  color: var(--brand-strong);
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
 }
 
 .subtitle {
@@ -2559,13 +2563,13 @@ strong.pace-off,
 
 .progress {
   width: 100%;
-  height: 14px;
+  height: 8px;
   border-radius: 999px;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--bg-soft) 0%, var(--progress-track) 100%);
+  background: var(--progress-track);
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border: none;
+  box-shadow: none;
 }
 
 .progress > .progress-fill {
@@ -2578,36 +2582,31 @@ strong.pace-off,
   transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 1;
   border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 159, 148, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
 .progress > .progress-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 55%);
-  pointer-events: none;
+  display: none;
 }
 
 .progress > .progress-fill.progress-hit {
   background: linear-gradient(90deg, var(--goal-hit-start), var(--goal-hit-end));
-  box-shadow: 0 2px 10px rgba(39, 176, 125, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
 .progress > .progress-fill.progress-on-pace {
   background: linear-gradient(90deg, var(--goal-on-pace-start), var(--goal-on-pace-end));
-  box-shadow: 0 2px 10px rgba(47, 159, 182, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
 .progress > .progress-fill.progress-off-pace {
   background: linear-gradient(90deg, var(--goal-off-pace-start), var(--goal-off-pace-end));
-  box-shadow: 0 2px 10px rgba(222, 163, 77, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
 .progress > .progress-fill.progress-missed {
   background: linear-gradient(90deg, var(--goal-missed-start), var(--goal-missed-end));
-  box-shadow: 0 2px 10px rgba(210, 106, 114, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: none;
 }
 
 .period-progress-block {
@@ -2621,39 +2620,25 @@ strong.pace-off,
   position: relative;
   width: 100%;
   border-radius: 999px;
-  transform: translateZ(0);
-  filter: drop-shadow(0 3px 8px color-mix(in srgb, var(--brand) 20%, rgba(0,0,0,0.06)));
   overflow: hidden;
 }
 
 .period-progress-wrap::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 11px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 60%);
-  pointer-events: none;
-  z-index: 4;
+  display: none;
 }
 
 .period-progress-wrap::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 11px;
-  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.06));
-  pointer-events: none;
-  z-index: 2;
+  display: none;
 }
 
 .period-progress-echart {
   width: 100%;
-  height: 44px;
+  height: 40px;
   border-radius: 999px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--bg-spot-a) 0%, var(--bg-soft) 100%);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  background: var(--bg-soft);
+  box-shadow: none;
   position: relative;
 }
 
@@ -2682,10 +2667,10 @@ strong.pace-off,
 }
 
 .progress.progress-with-label {
-  height: 30px;
+  height: 28px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border: none;
+  box-shadow: none;
 }
 
 .progress.progress-with-label > .progress-fill {
@@ -3953,6 +3938,48 @@ strong.pace-off,
   background: color-mix(in srgb, var(--brand) 12%, transparent);
   color: var(--brand-strong);
   border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+/* ── Period term goal history rows ──────────────────── */
+.term-history-rows {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.term-history-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 130px) 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.term-history-period {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.term-history-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--progress-track);
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.term-history-amount {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.term-history-row .pace-chip {
+  padding: 2px 8px;
+  font-size: 0.68rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -575,8 +575,8 @@ const inlineGraphState = {
   quarter: {}
 };
 const periodAccordionState = {
-  week: { goals: true, checkins: false, shared: false, snapshots: false },
-  month: { goals: true, checkins: false, shared: false, snapshots: false },
+  week: { goals: true, checkins: false, shared: false, snapshots: false, "term-history": false },
+  month: { goals: true, checkins: false, shared: false, snapshots: false, "term-history": false },
   year: { goals: true, checkins: false, shared: false, snapshots: false },
   quarter: { goals: true, checkins: false, shared: false, snapshots: false }
 };
@@ -8324,6 +8324,8 @@ function renderPeriodTabs() {
   if (isQuartersEnabled() && quarterList && quarterEmpty) {
     renderPeriodSnapshots("quarter", quarter, quarterList, quarterEmpty);
   }
+  renderPeriodTermHistory("week", week, index);
+  renderPeriodTermHistory("month", month, index);
   renderGraphModal();
   renderAuthState();
   scheduleEChartResizePasses();
@@ -9332,6 +9334,83 @@ function renderPeriodSnapshots(periodName, range, listEl, emptyEl = null) {
   );
 }
 
+function renderPeriodTermHistory(periodName, currentRange, index) {
+  if (!currentUser) return;
+  const listEl = periodName === "week" ? weekList : monthList;
+  if (!listEl) return;
+
+  const termType = periodName === "week" ? GOAL_TYPE_WEEK_TERM : GOAL_TYPE_MONTH_TERM;
+  const termTrackers = trackers.filter(
+    (t) => !t.archived && normalizeGoalType(t.goalType) === termType
+  );
+  if (termTrackers.length < 1) return;
+
+  const now = normalizeDate(new Date());
+  const pastPeriodCount = periodName === "week" ? 8 : 6;
+
+  const pastRanges = [];
+  for (let offset = 1; offset <= pastPeriodCount; offset++) {
+    const r = shiftPeriodRange(periodName, currentRange, offset);
+    if (r.end < now) {
+      pastRanges.push(r);
+    }
+  }
+  if (pastRanges.length < 1) return;
+
+  const cardsMarkup = termTrackers.map((tracker, trackerIndex) => {
+    const rowsMarkup = pastRanges.map((r) => {
+      const progress = sumTrackerRange(index, tracker.id, r);
+      const target = getTrackerTargetForPeriod(tracker, periodName, r);
+      const pct = percent(progress, target);
+      const goalHit = target > 0 && progress >= target;
+
+      let periodLabel;
+      if (periodName === "week") {
+        periodLabel = `${formatMonthDay(r.start)}\u2013${formatMonthDay(r.end)}`;
+      } else {
+        periodLabel = r.start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      }
+
+      const fillClass = goalHit ? "progress-hit" : "progress-missed";
+      const chipClass = goalHit ? "pace-chip pace-on" : "pace-chip pace-off";
+      const chipLabel = goalHit ? "Hit" : "Missed";
+      const amountLabel = target > 0
+        ? `${formatAmount(progress)}\u2009/\u2009${formatAmount(target)} ${escapeHtml(tracker.unit || "")}`
+        : `${formatAmount(progress)} ${escapeHtml(tracker.unit || "")}`;
+
+      return `
+        <li class="term-history-row">
+          <span class="term-history-period">${escapeHtml(periodLabel)}</span>
+          <div class="progress term-history-bar"><span class="progress-fill ${fillClass}" style="width:${pct}%"></span></div>
+          <span class="term-history-amount">${amountLabel}</span>
+          <span class="${chipClass}">${chipLabel}</span>
+        </li>
+      `;
+    }).join("");
+
+    return `
+      <li class="metric-card" style="--stagger:${trackerIndex}">
+        <div class="metric-top">
+          <h3>${escapeHtml(tracker.name)}</h3>
+          <span class="scope-pill">${periodName === "week" ? "Week Goal" : "Month Goal"}</span>
+        </div>
+        <ul class="term-history-rows">${rowsMarkup}</ul>
+      </li>
+    `;
+  }).join("");
+
+  listEl.insertAdjacentHTML(
+    "beforeend",
+    createPeriodAccordionSectionMarkup(
+      periodName,
+      "term-history",
+      periodName === "week" ? "Past Week Goals" : "Past Month Goals",
+      cardsMarkup,
+      "No history yet."
+    )
+  );
+}
+
 function renderSnapshotsTab() {
   renderSnapshotsPeriodList("week", snapshotsWeekList, snapshotsWeekEmpty);
   renderSnapshotsPeriodList("month", snapshotsMonthList, snapshotsMonthEmpty);
@@ -9953,6 +10032,13 @@ function getTrackersForPeriod(periodName) {
     const trackerType = normalizeGoalType(tracker.goalType);
     const trackerStatus = tracker.archived ? "archived" : "active";
     const trackerTags = normalizeGoalTags(tracker.tags);
+    // Week goals only appear in the week view; month goals only in the month view
+    if (trackerType === GOAL_TYPE_WEEK_TERM && periodName !== "week") {
+      return false;
+    }
+    if (trackerType === GOAL_TYPE_MONTH_TERM && periodName !== "month") {
+      return false;
+    }
     if (typeFilter !== "all" && trackerType !== typeFilter) {
       return false;
     }
@@ -10797,14 +10883,10 @@ function resetInlineGraphState() {
 }
 
 function resetPeriodAccordionState() {
-  Object.keys(periodAccordionState).forEach((periodName) => {
-    periodAccordionState[periodName] = {
-      goals: true,
-      checkins: false,
-      shared: false,
-      snapshots: false
-    };
-  });
+  periodAccordionState.week = { goals: true, checkins: false, shared: false, snapshots: false, "term-history": false };
+  periodAccordionState.month = { goals: true, checkins: false, shared: false, snapshots: false, "term-history": false };
+  periodAccordionState.year = { goals: true, checkins: false, shared: false, snapshots: false };
+  periodAccordionState.quarter = { goals: true, checkins: false, shared: false, snapshots: false };
 }
 
 function buildEntryIndex(allEntries) {
