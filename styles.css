@@ -2598,6 +2598,11 @@ strong.pace-off,
   color: var(--danger) !important;
 }
 
+.btn-proj-on {
+  color: var(--line) !important;
+  font-weight: 600;
+}
+
 .pace-chip-wrap-right .pace-detail-popover {
   left: auto;
   right: 0;

@@ -4621,6 +4621,21 @@ function handleViewControlChange(event) {
     renderPeriodTabs();
     renderGraphModal();
   }
+
+  const projectionBtn = event.target.closest("button[data-action='toggle-projection-btn']");
+  if (projectionBtn) {
+    const period = projectionBtn.dataset.period;
+    const id = projectionBtn.dataset.id;
+    if (!period || !id || !projectionLineState[period]) {
+      return;
+    }
+    const next = !getProjectionLineEnabled(period, id);
+    projectionLineState[period][id] = next;
+    if (next && !getInlineGraphVisible(period, id)) {
+      inlineGraphState[period][id] = true;
+    }
+    renderPeriodTabs();
+  }
 }
 
 function handleGraphHover(event) {
@@ -8682,6 +8697,15 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           <div class="pace-line">
             <span class="pace-actions">
               ${paceButtonMarkup}
+              ${projectionAllowed ? `<button
+                type="button"
+                class="btn btn-graph${projectionEnabled ? " btn-proj-on" : ""}"
+                data-action="toggle-projection-btn"
+                data-period="${periodName}"
+                data-id="${tracker.id}"
+                title="${projectionEnabled ? "Hide projection" : "Show projection"}"
+                aria-pressed="${projectionEnabled ? "true" : "false"}"
+              >Proj</button>` : ""}
               <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}" title="Deep Dive" aria-label="Deep Dive">D</button>
               <button
                 type="button"
