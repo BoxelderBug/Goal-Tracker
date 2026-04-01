@@ -1714,9 +1714,9 @@ goalForm.addEventListener("submit", (event) => {
   const goalsPlusNameOption = getGoalsPlusNameOption(goalNameGoalsPlus ? goalNameGoalsPlus.value : GOALS_PLUS_NAME_OPTIONS[0].value);
   const name = goalsPlus.mode !== GOALS_PLUS_SETUP_STANDARD
     ? goalsPlusNameOption.label
-    : goalName.value.trim();
+    : (goalName ? goalName.value.trim() : "");
   const lockedUnit = getLockedUnitForGoalType(normalizedGoalType);
-  const unit = lockedUnit || normalizeGoalUnit(goalUnit.value);
+  const unit = lockedUnit || (goalUnit ? normalizeGoalUnit(goalUnit.value) : "units");
   const priority = normalizeGoalPriority(goalPriority ? goalPriority.value : 0, 0);
   const tags = normalizeGoalTags(goalTags ? goalTags.value : "");
   const weeklyGoal = normalizeGoalTargetInt(goalWeekly ? goalWeekly.value : 0, 0);
@@ -1751,6 +1751,13 @@ goalForm.addEventListener("submit", (event) => {
   const archiveSourceAfterMigration = Boolean(goalMigrateArchiveSource && goalMigrateArchiveSource.checked);
   if (!name || !unit || weeklyGoal < 0 || monthlyGoal < 0 || yearlyGoal < 0) {
     return;
+  }
+  if (isIoGoalType) {
+    const ioOutputName = String(goalIoOutputName ? goalIoOutputName.value.trim() : "");
+    const ioOutputUnit = String(goalIoOutputUnit ? goalIoOutputUnit.value.trim() : "");
+    if (!ioOutputName || !ioOutputUnit || goalIoInputsDraft.length === 0) {
+      return;
+    }
   }
 
   // Term goal config
