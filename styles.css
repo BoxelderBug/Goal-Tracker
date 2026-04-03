@@ -1451,6 +1451,12 @@ label {
   display: none;
 }
 
+.entry-na-inline {
+  grid-column: 3;
+  align-self: end;
+  padding-bottom: 2px;
+}
+
 .entry-metric-line {
   margin: 2px 0 0;
 }

@@ -16277,8 +16277,10 @@ function updateGoalTypeFields() {
   if (!goalType || !goalUnit || !goalWeekly || !goalMonthly || !goalYearly) {
     return;
   }
-  const setupMode = normalizeGoalsPlusSetupMode(goalSetupMode ? goalSetupMode.value : GOALS_PLUS_SETUP_STANDARD);
-  if (goalSetupMode) {
+  const rawSetupMode = goalSetupMode ? goalSetupMode.value : GOALS_PLUS_SETUP_STANDARD;
+  const isYesNoMode = rawSetupMode === "yesno";
+  const setupMode = normalizeGoalsPlusSetupMode(rawSetupMode);
+  if (goalSetupMode && !isYesNoMode) {
     goalSetupMode.value = setupMode;
   }
   const useGoalsPlus = setupMode !== GOALS_PLUS_SETUP_STANDARD;
@@ -16341,8 +16343,14 @@ function updateGoalTypeFields() {
       goalPlusRunningRecoveryInterval.value = String(NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH);
     }
   }
-  if (useGoalsPlus && goalType.value !== "quantity") {
-    goalType.value = "quantity";
+  if (isYesNoMode) {
+    goalType.value = "yesno";
+    goalType.disabled = true;
+  } else {
+    goalType.disabled = false;
+    if (useGoalsPlus && goalType.value !== "quantity") {
+      goalType.value = "quantity";
+    }
   }
   if (goalRewardWeeklyPoints && (!goalRewardWeeklyPoints.value || Number(goalRewardWeeklyPoints.value) < 0)) {
     goalRewardWeeklyPoints.value = "1";
