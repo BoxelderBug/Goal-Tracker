@@ -2488,7 +2488,6 @@ textarea {
   height: 28px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 8px;
-  overflow: hidden;
   background: var(--surface);
   padding: 0;
   gap: 0;
@@ -2614,6 +2613,13 @@ strong.pace-off,
 .pace-actions .btn:last-child,
 .pace-actions .pace-chip-wrap .btn:last-child {
   border-right: none;
+}
+.pace-actions > .pace-chip-wrap:first-child .btn,
+.pace-actions > .btn:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.pace-actions > .btn:last-child {
+  border-radius: 0 7px 7px 0;
 }
 /* Remove the wrapper's border when the btn already has it */
 .pace-actions .pace-chip-wrap {
