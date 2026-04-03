@@ -7536,9 +7536,10 @@ function renderEntryTab() {
     ? standardTrackers.filter((t) => isGoalsPlusTracker(t))
     : standardTrackers;
   renderSoloEntrySection(soloTrackers);
+  const nonGoalsPlusTrackers = standardTrackers.filter((t) => !isGoalsPlusTracker(t));
   renderWeekEntrySection(standardTrackers);
   renderYearUpdateAllSection(standardTrackers);
-  renderYearSingleGoalSection(standardTrackers);
+  renderYearSingleGoalSection(nonGoalsPlusTrackers);
 }
 
 function renderSoloEntrySection(standardTrackers) {
