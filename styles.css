@@ -2645,6 +2645,26 @@ strong.pace-off,
   font-weight: 600;
 }
 
+.btn-stretch-on {
+  color: var(--brand-strong) !important;
+}
+
+.pace-actions.pace-actions-left {
+  margin-left: 0;
+}
+
+.pbar-stretch-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--brand-strong) 65%, transparent);
+  border-radius: 1px;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
 .pace-chip-wrap-right .pace-detail-popover {
   left: auto;
   right: 0;

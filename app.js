@@ -45,6 +45,7 @@ const MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-milestone-notifica
 const SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-smart-reminder-notification-keys-v1";
 const PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-period-close-prompt-notification-keys-v1";
 const ONBOARDING_DISMISSED_STORAGE_KEY = "goal-tracker-onboarding-dismissed-v1";
+const STRETCH_GOALS_STORAGE_KEY = "goal-tracker-stretch-goals-v1";
 const GOAL_JOURNAL_SUBJECT_DEFAULT = "General Journal";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
@@ -3981,6 +3982,29 @@ function handleGraphCardActions(event) {
       return;
     }
     inlineGraphState[period][id] = !getInlineGraphVisible(period, id);
+    renderPeriodTabs();
+    return;
+  }
+
+  const stretchGoalButton = event.target.closest("button[data-action='set-stretch-goal']");
+  if (stretchGoalButton) {
+    const period = stretchGoalButton.dataset.period;
+    const id = stretchGoalButton.dataset.id;
+    const tracker = trackers.find((t) => t.id === id);
+    const meta = getPeriodMeta(period);
+    if (!period || !id || !tracker || !meta) {
+      return;
+    }
+    const current = getStretchGoal(id, period, meta.range);
+    const unit = normalizeGoalUnit(tracker.unit);
+    const input = prompt(
+      `Stretch goal for "${tracker.name}" (${unit})${current > 0 ? ` — current: ${formatAmount(current)}` : ""}:\nEnter a target above your main goal, or 0 to clear.`,
+      current > 0 ? String(current) : ""
+    );
+    if (input === null) {
+      return;
+    }
+    setStretchGoal(id, period, meta.range, normalizePositiveAmount(input, 0));
     renderPeriodTabs();
     return;
   }
@@ -8618,6 +8642,11 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
 
       const paceDetailText = `Avg ${formatAmount(avg)} | Needed ${formatAmount(needed)} | Proj ${formatAmount(projectedTracker)}`;
       const unit = escapeHtml(normalizeGoalUnit(tracker.unit));
+      const stretchValue = isFloating ? 0 : getStretchGoal(tracker.id, periodName, range);
+      const stretchPct = stretchValue > 0 ? Math.min(percent(stretchValue, target), 100) : 0;
+      const stretchRow = stretchValue > 0
+        ? `<span class="pace-popover-row"><span class="pace-popover-key">Stretch</span> <strong>${escapeHtml(formatAmount(stretchValue))} ${unit}</strong></span>`
+        : "";
       const paceButtonMarkup = isFloating ? "" : `
         <span class="pace-chip-wrap pace-chip-wrap-right">
           <button
@@ -8632,6 +8661,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             <span class="pace-popover-row"><span class="pace-popover-key">Needed</span> <strong>${escapeHtml(formatAmount(needed))} ${unit}/day</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Avg</span> <strong>${escapeHtml(formatAmount(avg))} ${unit}/day</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Projected</span> <strong>${escapeHtml(formatAmount(projectedTracker))} ${unit}</strong></span>
+            ${stretchRow}
           </span>
         </span>
       `;
@@ -8751,6 +8781,20 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
 
       const deadlineBadge = getDeadlineBadgeMarkup(tracker);
       const ioSummary = getInputOutputSummaryMarkup(tracker);
+      const leftActionsMarkup = `
+        <span class="pace-actions pace-actions-left">
+          <button type="button" class="btn btn-graph" data-action="jump-tab" data-tab-target="settings-goals" title="Goal Settings" aria-label="Goal Settings">⚙</button>
+          <button
+            type="button"
+            class="btn btn-graph${stretchValue > 0 ? " btn-stretch-on" : ""}"
+            data-action="set-stretch-goal"
+            data-period="${periodName}"
+            data-id="${escapeAttr(tracker.id)}"
+            title="${stretchValue > 0 ? `Stretch: ${escapeAttr(formatAmountWithUnit(stretchValue, tracker.unit))}` : "Add stretch goal"}"
+            aria-label="${stretchValue > 0 ? `Stretch goal: ${escapeAttr(formatAmountWithUnit(stretchValue, tracker.unit))}` : "Add stretch goal"}"
+          >S</button>
+        </span>
+      `;
       return `
         <li class="metric-card" style="--stagger:${indexPosition}">
           <div class="metric-top">
@@ -8763,6 +8807,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           ${ioSummary}
           ${progressBarMarkup}
           <div class="pace-line">
+            ${leftActionsMarkup}
             <span class="pace-actions">
               ${paceButtonMarkup}
               <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}" title="Deep Dive" aria-label="Deep Dive">D</button>
@@ -16272,6 +16317,46 @@ function migrateGoalTrackingToNewGoal(sourceTracker, targetTracker, options = {}
     archivedSource: archiveSource
   };
 }
+
+// ── Stretch Goals ─────────────────────────────────────────────────────────────
+const stretchGoalMap = new Map();
+
+function getStretchGoalKey(trackerId, periodName, range) {
+  return `${trackerId}|${periodName}|${getDateKey(range.start)}`;
+}
+
+function getStretchGoal(trackerId, periodName, range) {
+  const val = stretchGoalMap.get(getStretchGoalKey(trackerId, periodName, range));
+  return typeof val === "number" && val > 0 ? val : 0;
+}
+
+function setStretchGoal(trackerId, periodName, range, value) {
+  const key = getStretchGoalKey(trackerId, periodName, range);
+  if (value > 0) {
+    stretchGoalMap.set(key, value);
+  } else {
+    stretchGoalMap.delete(key);
+  }
+  try {
+    const obj = {};
+    stretchGoalMap.forEach((v, k) => { obj[k] = v; });
+    localStorage.setItem(STRETCH_GOALS_STORAGE_KEY, JSON.stringify(obj));
+  } catch (e) {}
+}
+
+function loadStretchGoals() {
+  try {
+    const raw = localStorage.getItem(STRETCH_GOALS_STORAGE_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    if (typeof obj !== "object" || !obj) return;
+    Object.entries(obj).forEach(([k, v]) => {
+      if (typeof v === "number" && v > 0) stretchGoalMap.set(k, v);
+    });
+  } catch (e) {}
+}
+
+loadStretchGoals();
 
 function updateGoalTypeFields() {
   if (!goalType || !goalUnit || !goalWeekly || !goalMonthly || !goalYearly) {
