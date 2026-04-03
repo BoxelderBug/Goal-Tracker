@@ -543,6 +543,9 @@
           <button class="btn btn-primary" type="submit">Add Goal</button>
         </form>
 
+        <div class="table-filter-row">
+          <input id="manage-goals-search" type="search" placeholder="Filter goals by name..." />
+        </div>
         <form id="manage-goals-form" class="form-block">
           <div class="table-wrap">
             <table id="manage-table" class="data-table" aria-label="Goals table">
@@ -936,6 +939,10 @@
             <option value="goal_asc">Goal A-Z</option>
           </select>
         </label>
+        <label class="inline-control">
+          Search
+          <input id="entry-list-search" type="search" placeholder="Filter by goal name..." />
+        </label>
       </div>
       <div id="entry-list-focus-wrap" class="entry-list-focus" hidden>
         <p id="entry-list-focus-text" class="muted small"></p>
@@ -957,6 +964,7 @@
         <div class="actions">
           <button class="btn btn-primary" type="submit">Import CSV</button>
           <button id="csv-export-button" class="btn" type="button">Export CSV</button>
+          <button id="json-export-button" class="btn" type="button">Export JSON Backup</button>
         </div>
       </form>
       <p id="csv-upload-status" class="muted small"></p>
@@ -1327,6 +1335,10 @@
               <option value="open">Open</option>
               <option value="closed">Closed</option>
             </select>
+          </label>
+          <label class="inline-control">
+            Search
+            <input id="bucket-list-search" type="search" placeholder="Filter by goal name..." />
           </label>
         </div>
       </div>

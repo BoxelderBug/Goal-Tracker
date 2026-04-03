@@ -193,6 +193,7 @@ const legalModal = document.querySelector("#legal-modal");
 const legalModalBody = document.querySelector("#legal-modal-body");
 const manageList = document.querySelector("#manage-list");
 const manageEmpty = document.querySelector("#manage-empty");
+const manageGoalsSearch = document.querySelector("#manage-goals-search");
 const manageTable = document.querySelector("#manage-table");
 const manageGoalsForm = document.querySelector("#manage-goals-form");
 const homeSummary = document.querySelector("#home-summary");
@@ -320,6 +321,8 @@ const csvUploadForm = document.querySelector("#csv-upload-form");
 const csvUploadFile = document.querySelector("#csv-upload-file");
 const csvUploadStatus = document.querySelector("#csv-upload-status");
 const csvExportButton = document.querySelector("#csv-export-button");
+const jsonExportButton = document.querySelector("#json-export-button");
+const entryListSearch = document.querySelector("#entry-list-search");
 const goalJournalForm = document.querySelector("#goal-journal-form");
 const goalJournalDate = document.querySelector("#goal-journal-date");
 const goalJournalGoal = document.querySelector("#goal-journal-goal");
@@ -425,6 +428,7 @@ const bucketListViewList = document.querySelector("#bucket-list-view-list");
 const bucketListViewEmpty = document.querySelector("#bucket-list-view-empty");
 const bucketListGoalStatusFilterSelect = document.querySelector("#bucket-list-goal-status-filter");
 const bucketListItemStatusFilterSelect = document.querySelector("#bucket-list-item-status-filter");
+const bucketListSearch = document.querySelector("#bucket-list-search");
 const graphModal = document.querySelector("#graph-modal");
 const graphModalBody = document.querySelector("#graph-modal-body");
 const graphModalTitle = document.querySelector("#graph-modal-title");
@@ -502,6 +506,7 @@ let entryListSortMode = "date_desc";
 let entryListTypeFilter = "all";
 let entryListStatusFilter = "active";
 let entryListBucketFilter = "all";
+let entryListSearchQuery = "";
 let entryListFocusRange = null;
 let authMode = "signin";
 let scheduleWeekAnchor = normalizeDate(new Date());
@@ -523,6 +528,8 @@ const periodGoalFilterState = {
 };
 let bucketListGoalStatusFilter = "active";
 let bucketListItemStatusFilter = "all";
+let bucketListSearchQuery = "";
+let manageGoalsSearchQuery = "";
 let users = [];
 let currentUser = null;
 let notifications = [];
@@ -2947,6 +2954,27 @@ if (bucketListItemStatusFilterSelect) {
   });
 }
 
+if (bucketListSearch) {
+  bucketListSearch.addEventListener("input", () => {
+    bucketListSearchQuery = bucketListSearch.value.trim();
+    renderBucketListViewTab();
+  });
+}
+
+if (entryListSearch) {
+  entryListSearch.addEventListener("input", () => {
+    entryListSearchQuery = entryListSearch.value.trim();
+    renderEntryListTab();
+  });
+}
+
+if (manageGoalsSearch) {
+  manageGoalsSearch.addEventListener("input", () => {
+    manageGoalsSearchQuery = manageGoalsSearch.value.trim();
+    renderManageGoals();
+  });
+}
+
 if (csvUploadForm) {
   csvUploadForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2998,6 +3026,26 @@ if (csvExportButton) {
     triggerBlobDownload(blob, result.filename);
     if (csvUploadStatus) {
       csvUploadStatus.textContent = result.message;
+    }
+  });
+}
+
+if (jsonExportButton) {
+  jsonExportButton.addEventListener("click", () => {
+    if (!currentUser) {
+      return;
+    }
+    const result = exportAllDataToJson();
+    if (result.error) {
+      if (csvUploadStatus) {
+        csvUploadStatus.textContent = result.error;
+      }
+      return;
+    }
+    const blob = new Blob([result.jsonText], { type: "application/json;charset=utf-8" });
+    triggerBlobDownload(blob, result.filename);
+    if (csvUploadStatus) {
+      csvUploadStatus.textContent = `JSON backup complete. Exported ${trackers.length} goal(s) and ${entries.length} entr${entries.length === 1 ? "y" : "ies"}.`;
     }
   });
 }
@@ -7319,7 +7367,14 @@ function renderManageGoals() {
   document.querySelectorAll(".goal-points-col").forEach((cell) => {
     cell.hidden = !rewardPointsEnabled;
   });
-  manageList.innerHTML = [...trackers]
+  if (manageGoalsSearch) {
+    manageGoalsSearch.value = manageGoalsSearchQuery;
+  }
+  const manageSearchLower = manageGoalsSearchQuery.toLowerCase();
+  const visibleTrackers = manageSearchLower
+    ? trackers.filter((t) => (t.name || "").toLowerCase().includes(manageSearchLower))
+    : trackers;
+  manageList.innerHTML = [...visibleTrackers]
     .sort(compareTrackersByPriority)
     .map((tracker, index) => `
       <tr class="goal-row" style="--stagger:${index}" data-id="${tracker.id}">
@@ -7921,6 +7976,9 @@ function renderEntryListTab() {
   if (entryListBucketFilterSelect) {
     entryListBucketFilterSelect.value = entryListBucketFilter;
   }
+  if (entryListSearch) {
+    entryListSearch.value = entryListSearchQuery;
+  }
 
   const hasFocusRange = Boolean(
     entryListFocusRange
@@ -7958,6 +8016,7 @@ function renderEntryListTab() {
   const trackerNameById = new Map(trackers.map((tracker) => [tracker.id, tracker.name]));
   const bucketStatusMap = getBucketStatusMap(getBucketTrackers("all"));
 
+  const entryListSearchLower = entryListSearchQuery.toLowerCase();
   const filteredEntries = entries.filter((entry) => {
     const tracker = trackerById.get(entry.trackerId);
     if (!tracker) {
@@ -7985,6 +8044,9 @@ function renderEntryListTab() {
       }
     }
     if (hasFocusRange && (entry.date < entryListFocusRange.startKey || entry.date > entryListFocusRange.endKey)) {
+      return false;
+    }
+    if (entryListSearchLower && !(tracker.name || "").toLowerCase().includes(entryListSearchLower)) {
       return false;
     }
     return true;
@@ -8561,8 +8623,9 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             title="Pace"
           >P</button>
           <span class="pace-detail-popover">
-            <span class="pace-popover-row"><span class="pace-popover-key">Avg</span> <strong>${escapeHtml(formatAmount(avg))} ${unit}/day</strong></span>
+            <span class="pace-popover-row"><span class="pace-popover-key">Current</span> <strong>${escapeHtml(formatAmount(progress))} ${unit}</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Needed</span> <strong>${escapeHtml(formatAmount(needed))} ${unit}/day</strong></span>
+            <span class="pace-popover-row"><span class="pace-popover-key">Avg</span> <strong>${escapeHtml(formatAmount(avg))} ${unit}/day</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Projected</span> <strong>${escapeHtml(formatAmount(projectedTracker))} ${unit}</strong></span>
           </span>
         </span>
@@ -8697,15 +8760,6 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           <div class="pace-line">
             <span class="pace-actions">
               ${paceButtonMarkup}
-              ${projectionAllowed ? `<button
-                type="button"
-                class="btn btn-graph${projectionEnabled ? " btn-proj-on" : ""}"
-                data-action="toggle-projection-btn"
-                data-period="${periodName}"
-                data-id="${tracker.id}"
-                title="${projectionEnabled ? "Hide projection" : "Show projection"}"
-                aria-pressed="${projectionEnabled ? "true" : "false"}"
-              >Proj</button>` : ""}
               <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}" title="Deep Dive" aria-label="Deep Dive">D</button>
               <button
                 type="button"
@@ -10182,6 +10236,9 @@ function renderBucketListViewTab() {
   if (bucketListItemStatusFilterSelect) {
     bucketListItemStatusFilterSelect.value = bucketListItemStatusFilter;
   }
+  if (bucketListSearch) {
+    bucketListSearch.value = bucketListSearchQuery;
+  }
 
   const bucketTrackers = getBucketTrackers(bucketListGoalStatusFilter);
   if (bucketTrackers.length < 1) {
@@ -10211,7 +10268,11 @@ function renderBucketListViewTab() {
   `;
 
   bucketListViewEmpty.style.display = "none";
+  const bucketSearchLower = bucketListSearchQuery.toLowerCase();
   const filteredBucketTrackers = bucketTrackers.filter((tracker) => {
+    if (bucketSearchLower && !(tracker.name || "").toLowerCase().includes(bucketSearchLower)) {
+      return false;
+    }
     const status = bucketStatusMap.get(tracker.id);
     const isClosed = Boolean(status && status.isClosed);
     if (bucketListItemStatusFilter === "closed") {
@@ -13307,6 +13368,31 @@ function exportEntriesToCsv() {
     csvText,
     filename: `goal-tracker-entries-${getDateKey(normalizeDate(new Date()))}.csv`,
     message: `CSV export complete. Downloaded ${orderedDateKeys.length} date row(s) across ${goalColumns.length} goal column(s).`
+  };
+}
+
+function exportAllDataToJson() {
+  if (!currentUser) {
+    return { error: "Sign in before exporting.", jsonText: "", filename: "" };
+  }
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version: 1,
+    trackers,
+    entries,
+    checkIns,
+    checkInEntries,
+    goalJournalEntries,
+    schedules,
+    periodSnapshots,
+    rewards,
+    rewardPurchases,
+    pointTransactions,
+  };
+  return {
+    error: "",
+    jsonText: JSON.stringify(data, null, 2),
+    filename: `goal-tracker-backup-${getDateKey(normalizeDate(new Date()))}.json`,
   };
 }
 
@@ -16548,12 +16634,13 @@ function updateEntryFormMode() {
   }
   const tracker = trackers.find((item) => item.id === entryTracker.value);
   const isBinaryGoal = tracker ? isBinaryGoalType(tracker.goalType) : false;
+  const isGoalsPlus = tracker ? isGoalsPlusTracker(tracker) : false;
   const markNotApplicable = Boolean(entryNotApplicable && entryNotApplicable.checked);
-  entryAmountLabel.hidden = isBinaryGoal;
-  entryYesNoLabel.hidden = !isBinaryGoal;
-  entryAmount.disabled = isBinaryGoal || markNotApplicable;
+  entryAmountLabel.hidden = isBinaryGoal || isGoalsPlus;
+  entryYesNoLabel.hidden = !isBinaryGoal || isGoalsPlus;
+  entryAmount.disabled = isBinaryGoal || isGoalsPlus || markNotApplicable;
   if (entryYesNo) {
-    entryYesNo.disabled = !isBinaryGoal || markNotApplicable;
+    entryYesNo.disabled = !isBinaryGoal || isGoalsPlus || markNotApplicable;
   }
   if (isBinaryGoal) {
     entryAmount.value = "1.00";
@@ -16567,8 +16654,7 @@ function updateEntryFormMode() {
     return;
   }
   renderEntryMetricInputs(tracker || null);
-  const goalsPlusTracker = hasActiveGoalsPlusTracker() ? tracker : null;
-  renderEntryGoalsPlusRunningInputs(goalsPlusTracker || null);
+  renderEntryGoalsPlusRunningInputs(isGoalsPlus ? tracker : null);
 }
 
 function formatAmountWithUnit(value, unit) {
