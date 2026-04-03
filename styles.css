@@ -1447,6 +1447,10 @@ label {
   gap: 10px;
 }
 
+.entry-metrics-wrap[hidden] {
+  display: none;
+}
+
 .entry-metric-line {
   margin: 2px 0 0;
 }
