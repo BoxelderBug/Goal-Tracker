@@ -1,9 +1,9 @@
-const CACHE = "goal-tracker-v6";
+const CACHE = "goal-tracker-v7";
 const PRECACHE = [
   "/",
   "/index.html",
-  "/styles.css?v=20260403e",
-  "/app.js?v=20260403e",
+  "/styles.css?v=20260403f",
+  "/app.js?v=20260403f",
   "/icon.svg",
   "/manifest.json"
 ];
