@@ -1981,6 +1981,17 @@ textarea {
   min-width: 120px;
 }
 
+#year-update-all-form .data-table th,
+#year-update-all-form .data-table td {
+  padding: 6px 10px;
+}
+
+#year-update-all-form .goal-row input,
+#year-update-all-form .goal-row select {
+  padding: 4px 8px;
+  min-width: unset;
+}
+
 .goal-actions-cell {
   min-width: 170px;
 }

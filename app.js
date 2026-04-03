@@ -2541,7 +2541,7 @@ if (yearUpdateAllForm) {
       const trackerIdInput = row.querySelector("select[data-field='trackerId']");
       const dateInput = row.querySelector("input[data-field='date']");
       const amountInput = row.querySelector("input[data-field='amount']");
-      const notesInput = row.querySelector("textarea[data-field='notes']");
+      const notesInput = row.querySelector("[data-field='notes']");
       const trackerId = String(trackerIdInput ? trackerIdInput.value : "");
       const tracker = trackerById.get(trackerId) || null;
       const dateValue = String(dateInput ? dateInput.value : "");
@@ -7517,8 +7517,9 @@ function renderEntryTab() {
   if (entryModeSelect) {
     entryModeSelect.value = entryMode;
   }
+  const isSoloMode = entryMode === "solo" || entryMode === "goals-plus-solo";
   if (soloEntrySection) {
-    soloEntrySection.hidden = entryMode !== "solo";
+    soloEntrySection.hidden = !isSoloMode;
   }
   if (weekUpdateSection) {
     weekUpdateSection.hidden = entryMode !== "week";
@@ -7531,7 +7532,10 @@ function renderEntryTab() {
   }
 
   const standardTrackers = getStandardEntryTrackers();
-  renderSoloEntrySection(standardTrackers);
+  const soloTrackers = entryMode === "goals-plus-solo"
+    ? standardTrackers.filter((t) => isGoalsPlusTracker(t))
+    : standardTrackers;
+  renderSoloEntrySection(soloTrackers);
   renderWeekEntrySection(standardTrackers);
   renderYearUpdateAllSection(standardTrackers);
   renderYearSingleGoalSection(standardTrackers);
@@ -15475,6 +15479,7 @@ function renderYearUpdateAllSection(standardTrackers) {
   yearUpdateAllBody.innerHTML = rows
     .map((entry, index) => {
       const tracker = trackerById.get(entry.trackerId) || null;
+      const unitPlaceholder = tracker ? escapeAttr(normalizeGoalUnit(tracker.unit)) : "amount";
       return `
         <tr class="goal-row" style="--stagger:${index}" data-entry-id="${entry.id}">
           <td>
@@ -15486,11 +15491,10 @@ function renderYearUpdateAllSection(standardTrackers) {
             </select>
           </td>
           <td>
-            <input data-field="amount" type="number" min="0" step="0.01" value="${escapeAttr(formatEditableAmount(entry.amount))}" required />
+            <input data-field="amount" type="number" min="0" step="0.01" value="${escapeAttr(formatEditableAmount(entry.amount))}" placeholder="${unitPlaceholder}" required />
           </td>
           <td>
-            <textarea data-field="notes" rows="2" maxlength="280">${escapeHtml(entry.notes || "")}</textarea>
-            ${tracker ? `<p class="muted small">${escapeHtml(normalizeGoalUnit(tracker.unit))}</p>` : ""}
+            <input data-field="notes" type="text" maxlength="280" value="${escapeAttr(entry.notes || "")}" placeholder="Notes" />
           </td>
         </tr>
       `;
@@ -16111,6 +16115,9 @@ function normalizeEntryMode(value) {
   }
   if (value === "update-single-goal-year") {
     return "update-single-goal-year";
+  }
+  if (value === "goals-plus-solo") {
+    return "goals-plus-solo";
   }
   return "solo";
 }
