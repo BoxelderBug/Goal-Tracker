@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406l" />
+  <link rel="stylesheet" href="styles.css?v=20260406m" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -478,14 +478,22 @@
                   Description
                   <input id="goal-headwind-description" type="text" maxlength="200" placeholder="Briefly describe the headwind..." />
                 </label>
-                <label>
-                  How to Prevent It
-                  <input id="goal-headwind-prevention" type="text" maxlength="200" placeholder="Block time, set reminders, plan ahead..." />
-                </label>
-                <label>
-                  If It Happens
-                  <input id="goal-headwind-recovery" type="text" maxlength="200" placeholder="Make it up the next day, adjust weekly target..." />
-                </label>
+                <div class="multi-item-field" style="grid-column: 1 / -1">
+                  <span class="field-label">How to Prevent It</span>
+                  <div id="goal-headwind-preventions-list" class="multi-item-entries"></div>
+                  <div class="multi-item-add-row">
+                    <input id="goal-headwind-prevention-input" type="text" maxlength="200" placeholder="Block time, set reminders, plan ahead..." />
+                    <button id="goal-headwind-prevention-add" type="button" class="btn btn-sm">Add</button>
+                  </div>
+                </div>
+                <div class="multi-item-field" style="grid-column: 1 / -1">
+                  <span class="field-label">If It Happens</span>
+                  <div id="goal-headwind-recoveries-list" class="multi-item-entries"></div>
+                  <div class="multi-item-add-row">
+                    <input id="goal-headwind-recovery-input" type="text" maxlength="200" placeholder="Make it up the next day, adjust weekly target..." />
+                    <button id="goal-headwind-recovery-add" type="button" class="btn btn-sm">Add</button>
+                  </div>
+                </div>
               </div>
               <div class="progress-metrics-actions">
                 <button id="goal-headwind-add-btn" class="btn" type="button">Add Headwind</button>
@@ -511,14 +519,22 @@
                   Description
                   <input id="goal-tailwind-description" type="text" maxlength="200" placeholder="Briefly describe this habit or condition..." />
                 </label>
-                <label>
-                  How It Helps
-                  <input id="goal-tailwind-how-helps" type="text" maxlength="200" placeholder="Builds momentum, reduces friction..." />
-                </label>
-                <label>
-                  How to Build It
-                  <input id="goal-tailwind-how-build" type="text" maxlength="200" placeholder="Start small, tie to existing habit..." />
-                </label>
+                <div class="multi-item-field" style="grid-column: 1 / -1">
+                  <span class="field-label">How It Helps</span>
+                  <div id="goal-tailwind-how-helps-list" class="multi-item-entries"></div>
+                  <div class="multi-item-add-row">
+                    <input id="goal-tailwind-how-helps-input" type="text" maxlength="200" placeholder="Builds momentum, reduces friction..." />
+                    <button id="goal-tailwind-how-helps-add" type="button" class="btn btn-sm">Add</button>
+                  </div>
+                </div>
+                <div class="multi-item-field" style="grid-column: 1 / -1">
+                  <span class="field-label">How to Build It</span>
+                  <div id="goal-tailwind-how-build-list" class="multi-item-entries"></div>
+                  <div class="multi-item-add-row">
+                    <input id="goal-tailwind-how-build-input" type="text" maxlength="200" placeholder="Start small, tie to existing habit..." />
+                    <button id="goal-tailwind-how-build-add" type="button" class="btn btn-sm">Add</button>
+                  </div>
+                </div>
               </div>
               <div class="progress-metrics-actions">
                 <button id="goal-tailwind-add-btn" class="btn" type="button">Add Tailwind</button>
@@ -2028,7 +2044,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406l"></script>
+  <script type="module" src="app.js?v=20260406m"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {

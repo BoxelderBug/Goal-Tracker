@@ -2734,6 +2734,82 @@ strong.pace-off,
   margin-bottom: 10px;
 }
 
+/* Multi-item field widget (prevention/recovery lists, how-helps/how-build) */
+.multi-item-field {
+  margin-bottom: 10px;
+}
+
+.multi-item-field .field-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+.multi-item-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.multi-item-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+}
+
+.multi-item-entry-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.multi-item-entry-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.multi-item-entry-remove:hover {
+  background: var(--danger-bg, color-mix(in srgb, var(--danger) 12%, transparent));
+  color: var(--danger);
+}
+
+.multi-item-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.multi-item-add-row input {
+  flex: 1;
+}
+
+/* Headwind/tailwind bullet lists in modal detail view */
+.headwind-item-list {
+  margin: 4px 0 8px 0;
+  padding-left: 20px;
+  font-size: 0.87rem;
+}
+
+.headwind-item-list li {
+  margin-bottom: 2px;
+}
+
 .tailwind-draft-info {
   flex: 1;
   min-width: 0;
