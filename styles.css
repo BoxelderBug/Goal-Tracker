@@ -2650,23 +2650,27 @@ strong.pace-off,
   color: var(--brand-strong) !important;
 }
 
-.btn-obstacles-on {
+.btn-headwinds-on {
   color: var(--brand) !important;
+}
+
+.btn-tailwinds-on {
+  color: var(--brand-soft, #4db6ac) !important;
 }
 
 .pace-actions.pace-actions-left {
   margin-left: 0;
 }
 
-/* Obstacles */
-.obstacle-item {
+/* Headwinds */
+.headwind-item {
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
   margin-bottom: 6px;
 }
 
-.obstacle-item-summary {
+.headwind-item-summary {
   padding: 10px 14px;
   cursor: pointer;
   font-weight: 600;
@@ -2678,7 +2682,7 @@ strong.pace-off,
   user-select: none;
 }
 
-.obstacle-item-summary::after {
+.headwind-item-summary::after {
   content: "▸";
   margin-left: auto;
   font-size: 0.7rem;
@@ -2686,11 +2690,11 @@ strong.pace-off,
   transition: transform 0.15s ease;
 }
 
-.obstacle-item[open] .obstacle-item-summary::after {
+.headwind-item[open] .headwind-item-summary::after {
   transform: rotate(90deg);
 }
 
-.obstacle-item-body {
+.headwind-item-body {
   padding: 0 14px 12px;
   font-size: 0.87rem;
   line-height: 1.5;
@@ -2699,29 +2703,43 @@ strong.pace-off,
   gap: 5px;
 }
 
-.obstacle-item-body p {
+.headwind-item-body p {
   margin: 0;
 }
 
-.obstacles-list {
+.headwinds-list {
   margin-bottom: 16px;
 }
 
-.obstacles-add-section h4 {
+.headwinds-add-section h4 {
   font-size: 0.95rem;
   margin: 0 0 10px;
 }
 
-.goal-obstacles-fields {
+.goal-headwinds-fields {
   margin-bottom: 10px;
 }
 
-.obstacle-draft-info {
+.headwind-draft-info {
   flex: 1;
   min-width: 0;
 }
 
-.obstacle-draft-info strong {
+.headwind-draft-info strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.goal-tailwinds-fields {
+  margin-bottom: 10px;
+}
+
+.tailwind-draft-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tailwind-draft-info strong {
   display: block;
   font-size: 0.88rem;
 }

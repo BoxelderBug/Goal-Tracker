@@ -436,16 +436,26 @@ const graphModalTitle = document.querySelector("#graph-modal-title");
 const graphModalClose = document.querySelector("#graph-modal-close");
 const onboardingModal = document.querySelector("#onboarding-modal");
 const onboardingClose = document.querySelector("#onboarding-close");
-const obstaclesModal = document.querySelector("#obstacles-modal");
-const obstaclesModalBody = document.querySelector("#obstacles-modal-body");
-const obstaclesModalTitle = document.querySelector("#obstacles-modal-title");
-const goalObstacleNameInput = document.querySelector("#goal-obstacle-name");
-const goalObstacleDescInput = document.querySelector("#goal-obstacle-description");
-const goalObstaclePreventionInput = document.querySelector("#goal-obstacle-prevention");
-const goalObstacleRecoveryInput = document.querySelector("#goal-obstacle-recovery");
-const goalObstacleAddButton = document.querySelector("#goal-obstacle-add-btn");
-const goalObstaclesDraftList = document.querySelector("#goal-obstacles-draft-list");
-const goalObstaclesDraftEmpty = document.querySelector("#goal-obstacles-draft-empty");
+const headwindsModal = document.querySelector("#headwinds-modal");
+const headwindsModalBody = document.querySelector("#headwinds-modal-body");
+const headwindsModalTitle = document.querySelector("#headwinds-modal-title");
+const goalHeadwindNameInput = document.querySelector("#goal-headwind-name");
+const goalHeadwindDescInput = document.querySelector("#goal-headwind-description");
+const goalHeadwindPreventionInput = document.querySelector("#goal-headwind-prevention");
+const goalHeadwindRecoveryInput = document.querySelector("#goal-headwind-recovery");
+const goalHeadwindAddButton = document.querySelector("#goal-headwind-add-btn");
+const goalHeadwindsDraftList = document.querySelector("#goal-headwinds-draft-list");
+const goalHeadwindsDraftEmpty = document.querySelector("#goal-headwinds-draft-empty");
+const tailwindsModal = document.querySelector("#tailwinds-modal");
+const tailwindsModalBody = document.querySelector("#tailwinds-modal-body");
+const tailwindsModalTitle = document.querySelector("#tailwinds-modal-title");
+const goalTailwindNameInput = document.querySelector("#goal-tailwind-name");
+const goalTailwindDescInput = document.querySelector("#goal-tailwind-description");
+const goalTailwindHowHelpsInput = document.querySelector("#goal-tailwind-how-helps");
+const goalTailwindHowBuildInput = document.querySelector("#goal-tailwind-how-build");
+const goalTailwindAddButton = document.querySelector("#goal-tailwind-add-btn");
+const goalTailwindsDraftList = document.querySelector("#goal-tailwinds-draft-list");
+const goalTailwindsDraftEmpty = document.querySelector("#goal-tailwinds-draft-empty");
 
 const quarterRangeLabel = document.querySelector("#quarter-range");
 const quarterSummary = document.querySelector("#quarter-summary");
@@ -618,8 +628,10 @@ let goalCustomWeekTargetsEdited = false;
 let goalCustomMonthTargetsEdited = false;
 let goalMetricsDraft = [];
 let goalIoInputsDraft = [];
-let goalObstaclesDraft = [];
-const obstaclesModalState = { open: false, trackerId: "" };
+let goalHeadwindsDraft = [];
+const headwindsModalState = { open: false, trackerId: "" };
+let goalTailwindsDraft = [];
+const tailwindsModalState = { open: false, trackerId: "" };
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
 scheduleDate.value = getDateKey(normalizeDate(new Date()));
@@ -1736,30 +1748,57 @@ if (goalIoInputsList) {
   });
 }
 
-if (goalObstacleAddButton) {
-  goalObstacleAddButton.addEventListener("click", () => {
-    const name = String(goalObstacleNameInput ? goalObstacleNameInput.value.trim() : "");
+if (goalHeadwindAddButton) {
+  goalHeadwindAddButton.addEventListener("click", () => {
+    const name = String(goalHeadwindNameInput ? goalHeadwindNameInput.value.trim() : "");
     if (!name) return;
-    const description = String(goalObstacleDescInput ? goalObstacleDescInput.value.trim() : "");
-    const prevention = String(goalObstaclePreventionInput ? goalObstaclePreventionInput.value.trim() : "");
-    const recovery = String(goalObstacleRecoveryInput ? goalObstacleRecoveryInput.value.trim() : "");
-    goalObstaclesDraft.push({ id: createId(), name, description, prevention, recovery });
-    if (goalObstacleNameInput) goalObstacleNameInput.value = "";
-    if (goalObstacleDescInput) goalObstacleDescInput.value = "";
-    if (goalObstaclePreventionInput) goalObstaclePreventionInput.value = "";
-    if (goalObstacleRecoveryInput) goalObstacleRecoveryInput.value = "";
-    renderGoalObstaclesDraft();
+    const description = String(goalHeadwindDescInput ? goalHeadwindDescInput.value.trim() : "");
+    const prevention = String(goalHeadwindPreventionInput ? goalHeadwindPreventionInput.value.trim() : "");
+    const recovery = String(goalHeadwindRecoveryInput ? goalHeadwindRecoveryInput.value.trim() : "");
+    goalHeadwindsDraft.push({ id: createId(), name, description, prevention, recovery });
+    if (goalHeadwindNameInput) goalHeadwindNameInput.value = "";
+    if (goalHeadwindDescInput) goalHeadwindDescInput.value = "";
+    if (goalHeadwindPreventionInput) goalHeadwindPreventionInput.value = "";
+    if (goalHeadwindRecoveryInput) goalHeadwindRecoveryInput.value = "";
+    renderGoalHeadwindsDraft();
   });
 }
 
-if (goalObstaclesDraftList) {
-  goalObstaclesDraftList.addEventListener("click", (event) => {
-    const removeBtn = event.target.closest("button[data-action='remove-goal-obstacle']");
+if (goalHeadwindsDraftList) {
+  goalHeadwindsDraftList.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-action='remove-goal-headwind']");
     if (!removeBtn) return;
     const id = String(removeBtn.dataset.id || "");
     if (!id) return;
-    goalObstaclesDraft = goalObstaclesDraft.filter((obs) => obs.id !== id);
-    renderGoalObstaclesDraft();
+    goalHeadwindsDraft = goalHeadwindsDraft.filter((obs) => obs.id !== id);
+    renderGoalHeadwindsDraft();
+  });
+}
+
+if (goalTailwindAddButton) {
+  goalTailwindAddButton.addEventListener("click", () => {
+    const name = String(goalTailwindNameInput ? goalTailwindNameInput.value.trim() : "");
+    if (!name) return;
+    const description = String(goalTailwindDescInput ? goalTailwindDescInput.value.trim() : "");
+    const howHelps = String(goalTailwindHowHelpsInput ? goalTailwindHowHelpsInput.value.trim() : "");
+    const howBuild = String(goalTailwindHowBuildInput ? goalTailwindHowBuildInput.value.trim() : "");
+    goalTailwindsDraft.push({ id: createId(), name, description, howHelps, howBuild });
+    if (goalTailwindNameInput) goalTailwindNameInput.value = "";
+    if (goalTailwindDescInput) goalTailwindDescInput.value = "";
+    if (goalTailwindHowHelpsInput) goalTailwindHowHelpsInput.value = "";
+    if (goalTailwindHowBuildInput) goalTailwindHowBuildInput.value = "";
+    renderGoalTailwindsDraft();
+  });
+}
+
+if (goalTailwindsDraftList) {
+  goalTailwindsDraftList.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-action='remove-goal-tailwind']");
+    if (!removeBtn) return;
+    const id = String(removeBtn.dataset.id || "");
+    if (!id) return;
+    goalTailwindsDraft = goalTailwindsDraft.filter((tw) => tw.id !== id);
+    renderGoalTailwindsDraft();
   });
 }
 
@@ -1866,7 +1905,8 @@ goalForm.addEventListener("submit", (event) => {
     accountabilityPartnerId: "",
     accountabilityShareId: "",
     accountabilityStatus: "none",
-    obstacles: goalObstaclesDraft.map((obs) => ({ ...obs }))
+    headwinds: goalHeadwindsDraft.map((obs) => ({ ...obs })),
+    tailwinds: goalTailwindsDraft.map((tw) => ({ ...tw }))
   };
   trackers.unshift(nextTracker);
   const migrationResult = migrateGoalTrackingToNewGoal(migrateSourceTracker, nextTracker, {
@@ -1930,8 +1970,10 @@ goalForm.addEventListener("submit", (event) => {
   syncGoalAdditionalTrackingVisibility();
   goalIoInputsDraft = [];
   renderGoalIoInputsDraft();
-  goalObstaclesDraft = [];
-  renderGoalObstaclesDraft();
+  goalHeadwindsDraft = [];
+  renderGoalHeadwindsDraft();
+  goalTailwindsDraft = [];
+  renderGoalTailwindsDraft();
   if (goalTermDeadline) goalTermDeadline.value = "";
   if (goalTermTarget) goalTermTarget.value = "0";
   if (goalTermCarryover) goalTermCarryover.checked = false;
@@ -3937,45 +3979,89 @@ if (onboardingModal) {
   });
 }
 
-if (obstaclesModal) {
-  obstaclesModal.addEventListener("click", (event) => {
-    if (event.target.closest("[data-action='close-obstacles-modal']")) {
-      closeObstaclesModal();
+if (headwindsModal) {
+  headwindsModal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action='close-headwinds-modal']")) {
+      closeHeadwindsModal();
       return;
     }
-    const removeBtn = event.target.closest("button[data-action='remove-obstacle']");
+    const removeBtn = event.target.closest("button[data-action='remove-headwind']");
     if (removeBtn) {
       const trackerId = String(removeBtn.dataset.trackerId || "");
-      const obstacleId = String(removeBtn.dataset.id || "");
-      if (!trackerId || !obstacleId) return;
+      const headwindId = String(removeBtn.dataset.id || "");
+      if (!trackerId || !headwindId) return;
       const tracker = trackers.find((t) => t.id === trackerId);
       if (!tracker) return;
-      tracker.obstacles = (tracker.obstacles || []).filter((obs) => obs.id !== obstacleId);
+      tracker.headwinds = (tracker.headwinds || []).filter((obs) => obs.id !== headwindId);
       saveTrackers();
-      renderObstaclesModal();
+      renderHeadwindsModal();
       renderPeriodTabs();
       return;
     }
-    const addForm = event.target.closest("form[data-action='add-obstacle']");
+    const addForm = event.target.closest("form[data-action='add-headwind']");
     if (addForm) {
       event.preventDefault();
-      const nameInput = addForm.querySelector("[name='obstacle-name']");
+      const nameInput = addForm.querySelector("[name='headwind-name']");
       const name = String(nameInput ? nameInput.value.trim() : "");
       if (!name) return;
-      const descInput = addForm.querySelector("[name='obstacle-description']");
-      const prevInput = addForm.querySelector("[name='obstacle-prevention']");
-      const recInput = addForm.querySelector("[name='obstacle-recovery']");
+      const descInput = addForm.querySelector("[name='headwind-description']");
+      const prevInput = addForm.querySelector("[name='headwind-prevention']");
+      const recInput = addForm.querySelector("[name='headwind-recovery']");
       const description = String(descInput ? descInput.value.trim() : "");
       const prevention = String(prevInput ? prevInput.value.trim() : "");
       const recovery = String(recInput ? recInput.value.trim() : "");
-      const trackerId = obstaclesModalState.trackerId;
+      const trackerId = headwindsModalState.trackerId;
       const tracker = trackers.find((t) => t.id === trackerId);
       if (!tracker) return;
-      if (!Array.isArray(tracker.obstacles)) tracker.obstacles = [];
-      tracker.obstacles.push({ id: createId(), name, description, prevention, recovery });
+      if (!Array.isArray(tracker.headwinds)) tracker.headwinds = [];
+      tracker.headwinds.push({ id: createId(), name, description, prevention, recovery });
       saveTrackers();
       addForm.reset();
-      renderObstaclesModal();
+      renderHeadwindsModal();
+      renderPeriodTabs();
+    }
+  });
+}
+
+if (tailwindsModal) {
+  tailwindsModal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action='close-tailwinds-modal']")) {
+      closeTailwindsModal();
+      return;
+    }
+    const removeBtn = event.target.closest("button[data-action='remove-tailwind']");
+    if (removeBtn) {
+      const trackerId = String(removeBtn.dataset.trackerId || "");
+      const tailwindId = String(removeBtn.dataset.id || "");
+      if (!trackerId || !tailwindId) return;
+      const tracker = trackers.find((t) => t.id === trackerId);
+      if (!tracker) return;
+      tracker.tailwinds = (tracker.tailwinds || []).filter((tw) => tw.id !== tailwindId);
+      saveTrackers();
+      renderTailwindsModal();
+      renderPeriodTabs();
+      return;
+    }
+    const addForm = event.target.closest("form[data-action='add-tailwind']");
+    if (addForm) {
+      event.preventDefault();
+      const nameInput = addForm.querySelector("[name='tailwind-name']");
+      const name = String(nameInput ? nameInput.value.trim() : "");
+      if (!name) return;
+      const descInput = addForm.querySelector("[name='tailwind-description']");
+      const howHelpsInput = addForm.querySelector("[name='tailwind-how-helps']");
+      const howBuildInput = addForm.querySelector("[name='tailwind-how-build']");
+      const description = String(descInput ? descInput.value.trim() : "");
+      const howHelps = String(howHelpsInput ? howHelpsInput.value.trim() : "");
+      const howBuild = String(howBuildInput ? howBuildInput.value.trim() : "");
+      const trackerId = tailwindsModalState.trackerId;
+      const tracker = trackers.find((t) => t.id === trackerId);
+      if (!tracker) return;
+      if (!Array.isArray(tracker.tailwinds)) tracker.tailwinds = [];
+      tracker.tailwinds.push({ id: createId(), name, description, howHelps, howBuild });
+      saveTrackers();
+      addForm.reset();
+      renderTailwindsModal();
       renderPeriodTabs();
     }
   });
@@ -4116,15 +4202,27 @@ function handleGraphCardActions(event) {
     return;
   }
 
-  const viewObstaclesButton = event.target.closest("button[data-action='view-obstacles']");
-  if (viewObstaclesButton) {
-    const id = viewObstaclesButton.dataset.id;
+  const viewHeadwindsButton = event.target.closest("button[data-action='view-headwinds']");
+  if (viewHeadwindsButton) {
+    const id = viewHeadwindsButton.dataset.id;
     if (!id) return;
     const tracker = trackers.find((t) => t.id === id);
     if (!tracker) return;
-    obstaclesModalState.open = true;
-    obstaclesModalState.trackerId = id;
-    renderObstaclesModal();
+    headwindsModalState.open = true;
+    headwindsModalState.trackerId = id;
+    renderHeadwindsModal();
+    return;
+  }
+
+  const viewTailwindsButton = event.target.closest("button[data-action='view-tailwinds']");
+  if (viewTailwindsButton) {
+    const id = viewTailwindsButton.dataset.id;
+    if (!id) return;
+    const tracker = trackers.find((t) => t.id === id);
+    if (!tracker) return;
+    tailwindsModalState.open = true;
+    tailwindsModalState.trackerId = id;
+    renderTailwindsModal();
     return;
   }
 
@@ -8568,7 +8666,8 @@ function renderPeriodTabs() {
   renderPeriodTermHistory("week", week, index);
   renderPeriodTermHistory("month", month, index);
   renderGraphModal();
-  renderObstaclesModal();
+  renderHeadwindsModal();
+  renderTailwindsModal();
   renderAuthState();
   scheduleEChartResizePasses();
 }
@@ -8908,18 +9007,27 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
 
       const deadlineBadge = getDeadlineBadgeMarkup(tracker);
       const ioSummary = getInputOutputSummaryMarkup(tracker);
-      const obstacleCount = Array.isArray(tracker.obstacles) ? tracker.obstacles.length : 0;
+      const headwindCount = Array.isArray(tracker.headwinds) ? tracker.headwinds.length : 0;
+      const tailwindCount = Array.isArray(tracker.tailwinds) ? tracker.tailwinds.length : 0;
       const leftActionsMarkup = `
         <span class="pace-actions pace-actions-left">
           <button type="button" class="btn btn-graph" data-action="jump-tab" data-tab-target="settings-goals" title="Goal Settings" aria-label="Goal Settings">⚙</button>
           <button
             type="button"
-            class="btn btn-graph${obstacleCount > 0 ? " btn-obstacles-on" : ""}"
-            data-action="view-obstacles"
+            class="btn btn-graph${headwindCount > 0 ? " btn-headwinds-on" : ""}"
+            data-action="view-headwinds"
             data-id="${escapeAttr(tracker.id)}"
-            title="${obstacleCount > 0 ? `Obstacles (${obstacleCount})` : "Obstacles"}"
-            aria-label="${obstacleCount > 0 ? `Obstacles (${obstacleCount})` : "Obstacles"}"
-          >O</button>
+            title="${headwindCount > 0 ? `Headwinds (${headwindCount})` : "Headwinds"}"
+            aria-label="${headwindCount > 0 ? `Headwinds (${headwindCount})` : "Headwinds"}"
+          >H</button>
+          <button
+            type="button"
+            class="btn btn-graph${tailwindCount > 0 ? " btn-tailwinds-on" : ""}"
+            data-action="view-tailwinds"
+            data-id="${escapeAttr(tracker.id)}"
+            title="${tailwindCount > 0 ? `Tailwinds (${tailwindCount})` : "Tailwinds"}"
+            aria-label="${tailwindCount > 0 ? `Tailwinds (${tailwindCount})` : "Tailwinds"}"
+          >T</button>
           <button
             type="button"
             class="btn btn-graph${stretchValue > 0 ? " btn-stretch-on" : ""}"
@@ -14106,13 +14214,16 @@ function initializeData() {
     settings = getDefaultSettings();
     goalMetricsDraft = [];
     renderGoalMetricsDraft();
-    goalObstaclesDraft = [];
-    renderGoalObstaclesDraft();
+    goalHeadwindsDraft = [];
+    renderGoalHeadwindsDraft();
+    goalTailwindsDraft = [];
+    renderGoalTailwindsDraft();
     if (goalAdditionalTrackingEnabled) {
       goalAdditionalTrackingEnabled.checked = false;
     }
     syncGoalAdditionalTrackingVisibility();
-    closeObstaclesModal();
+    closeHeadwindsModal();
+    closeTailwindsModal();
     return;
   }
 
@@ -14138,8 +14249,10 @@ function initializeData() {
   periodClosePromptNotificationKeys = loadNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY);
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
-  goalObstaclesDraft = [];
-  renderGoalObstaclesDraft();
+  goalHeadwindsDraft = [];
+  renderGoalHeadwindsDraft();
+  goalTailwindsDraft = [];
+  renderGoalTailwindsDraft();
   if (goalAdditionalTrackingEnabled) {
     goalAdditionalTrackingEnabled.checked = false;
   }
@@ -14225,7 +14338,8 @@ function loadTrackers() {
         accountabilityPartnerId: typeof item.accountabilityPartnerId === "string" ? item.accountabilityPartnerId : "",
         accountabilityShareId: typeof item.accountabilityShareId === "string" ? item.accountabilityShareId : "",
         accountabilityStatus: normalizeAccountabilityStatus(item.accountabilityStatus),
-        obstacles: normalizeObstacleList(item.obstacles)
+        headwinds: normalizeHeadwindList(item.headwinds),
+        tailwinds: normalizeTailwindList(item.tailwinds)
       });
       if (item.logs && typeof item.logs === "object") {
         legacyLogs.push({ trackerId: item.id, logs: item.logs });
@@ -15563,7 +15677,7 @@ function renderGoalIoInputsDraft() {
     .join("");
 }
 
-function normalizeObstacle(item) {
+function normalizeHeadwind(item) {
   if (!item || typeof item !== "object") return null;
   const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : createId();
   const name = typeof item.name === "string" ? item.name.trim() : "";
@@ -15577,100 +15691,210 @@ function normalizeObstacle(item) {
   };
 }
 
-function normalizeObstacleList(raw) {
+function normalizeHeadwindList(raw) {
   if (!Array.isArray(raw)) return [];
-  return raw.map(normalizeObstacle).filter(Boolean);
+  return raw.map(normalizeHeadwind).filter(Boolean);
 }
 
-function renderGoalObstaclesDraft() {
-  if (!goalObstaclesDraftList || !goalObstaclesDraftEmpty) return;
-  if (!Array.isArray(goalObstaclesDraft) || goalObstaclesDraft.length < 1) {
-    goalObstaclesDraft = [];
-    goalObstaclesDraftList.innerHTML = "";
-    goalObstaclesDraftEmpty.style.display = "block";
+function renderGoalHeadwindsDraft() {
+  if (!goalHeadwindsDraftList || !goalHeadwindsDraftEmpty) return;
+  if (!Array.isArray(goalHeadwindsDraft) || goalHeadwindsDraft.length < 1) {
+    goalHeadwindsDraft = [];
+    goalHeadwindsDraftList.innerHTML = "";
+    goalHeadwindsDraftEmpty.style.display = "block";
     return;
   }
-  goalObstaclesDraftEmpty.style.display = "none";
-  goalObstaclesDraftList.innerHTML = goalObstaclesDraft
+  goalHeadwindsDraftEmpty.style.display = "none";
+  goalHeadwindsDraftList.innerHTML = goalHeadwindsDraft
     .map((obs, index) => `
-      <li class="obstacle-draft-item quick-item" style="--stagger:${index}">
-        <div class="obstacle-draft-info">
+      <li class="headwind-draft-item quick-item" style="--stagger:${index}">
+        <div class="headwind-draft-info">
           <strong>${escapeHtml(obs.name)}</strong>
           ${obs.description ? `<p class="muted small">${escapeHtml(obs.description)}</p>` : ""}
         </div>
-        <button class="btn btn-danger" type="button" data-action="remove-goal-obstacle" data-id="${escapeAttr(obs.id)}">Remove</button>
+        <button class="btn btn-danger" type="button" data-action="remove-goal-headwind" data-id="${escapeAttr(obs.id)}">Remove</button>
       </li>
     `)
     .join("");
 }
 
-function closeObstaclesModal() {
-  obstaclesModalState.open = false;
-  obstaclesModalState.trackerId = "";
-  if (obstaclesModal) {
-    obstaclesModal.classList.add("hidden");
-    obstaclesModal.setAttribute("aria-hidden", "true");
+function closeHeadwindsModal() {
+  headwindsModalState.open = false;
+  headwindsModalState.trackerId = "";
+  if (headwindsModal) {
+    headwindsModal.classList.add("hidden");
+    headwindsModal.setAttribute("aria-hidden", "true");
   }
 }
 
-function renderObstaclesModal() {
-  if (!obstaclesModal || !obstaclesModalBody) return;
-  if (!currentUser || !obstaclesModalState.open) {
-    obstaclesModal.classList.add("hidden");
-    obstaclesModal.setAttribute("aria-hidden", "true");
+function renderHeadwindsModal() {
+  if (!headwindsModal || !headwindsModalBody) return;
+  if (!currentUser || !headwindsModalState.open) {
+    headwindsModal.classList.add("hidden");
+    headwindsModal.setAttribute("aria-hidden", "true");
     return;
   }
-  const tracker = trackers.find((t) => t.id === obstaclesModalState.trackerId);
+  const tracker = trackers.find((t) => t.id === headwindsModalState.trackerId);
   if (!tracker) {
-    closeObstaclesModal();
+    closeHeadwindsModal();
     return;
   }
-  if (obstaclesModalTitle) {
-    obstaclesModalTitle.textContent = `Obstacles — ${tracker.name}`;
+  if (headwindsModalTitle) {
+    headwindsModalTitle.textContent = `Headwinds — ${tracker.name}`;
   }
-  const obstacles = Array.isArray(tracker.obstacles) ? tracker.obstacles : [];
-  const listMarkup = obstacles.length > 0
-    ? obstacles.map((obs) => `
-        <details class="obstacle-item">
-          <summary class="obstacle-item-summary">${escapeHtml(obs.name)}</summary>
-          <div class="obstacle-item-body">
+  const headwinds = Array.isArray(tracker.headwinds) ? tracker.headwinds : [];
+  const listMarkup = headwinds.length > 0
+    ? headwinds.map((obs) => `
+        <details class="headwind-item">
+          <summary class="headwind-item-summary">${escapeHtml(obs.name)}</summary>
+          <div class="headwind-item-body">
             ${obs.description ? `<p><strong>Description:</strong> ${escapeHtml(obs.description)}</p>` : ""}
             ${obs.prevention ? `<p><strong>How to prevent it:</strong> ${escapeHtml(obs.prevention)}</p>` : ""}
             ${obs.recovery ? `<p><strong>If it happens:</strong> ${escapeHtml(obs.recovery)}</p>` : ""}
-            <button class="btn btn-danger btn-sm" type="button" data-action="remove-obstacle" data-tracker-id="${escapeAttr(tracker.id)}" data-id="${escapeAttr(obs.id)}">Remove</button>
+            <button class="btn btn-danger btn-sm" type="button" data-action="remove-headwind" data-tracker-id="${escapeAttr(tracker.id)}" data-id="${escapeAttr(obs.id)}">Remove</button>
           </div>
         </details>
       `).join("")
-    : `<p class="empty-state">No obstacles defined for this goal yet.</p>`;
-  obstaclesModalBody.innerHTML = `
-    <div class="obstacles-list">${listMarkup}</div>
-    <section class="obstacles-add-section">
-      <h4>Add Obstacle</h4>
-      <form class="form-block" data-action="add-obstacle">
+    : `<p class="empty-state">No headwinds defined for this goal yet.</p>`;
+  headwindsModalBody.innerHTML = `
+    <div class="headwinds-list">${listMarkup}</div>
+    <section class="headwinds-add-section">
+      <h4>Add Headwind</h4>
+      <form class="form-block" data-action="add-headwind">
         <div class="form-grid form-grid-2">
           <label>
             Name
-            <input name="obstacle-name" type="text" maxlength="80" placeholder="Busy schedule, travel..." required />
+            <input name="headwind-name" type="text" maxlength="80" placeholder="Busy schedule, travel..." required />
           </label>
           <label>
             Description
-            <input name="obstacle-description" type="text" maxlength="200" placeholder="Briefly describe the obstacle..." />
+            <input name="headwind-description" type="text" maxlength="200" placeholder="Briefly describe the headwind..." />
           </label>
           <label>
             How to Prevent It
-            <input name="obstacle-prevention" type="text" maxlength="200" placeholder="Block time, set reminders..." />
+            <input name="headwind-prevention" type="text" maxlength="200" placeholder="Block time, set reminders..." />
           </label>
           <label>
             If It Happens
-            <input name="obstacle-recovery" type="text" maxlength="200" placeholder="Make it up the next day..." />
+            <input name="headwind-recovery" type="text" maxlength="200" placeholder="Make it up the next day..." />
           </label>
         </div>
-        <button class="btn btn-primary" type="submit">Add Obstacle</button>
+        <button class="btn btn-primary" type="submit">Add Headwind</button>
       </form>
     </section>
   `;
-  obstaclesModal.classList.remove("hidden");
-  obstaclesModal.setAttribute("aria-hidden", "false");
+  headwindsModal.classList.remove("hidden");
+  headwindsModal.setAttribute("aria-hidden", "false");
+}
+
+function normalizeTailwind(item) {
+  if (!item || typeof item !== "object") return null;
+  const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : createId();
+  const name = typeof item.name === "string" ? item.name.trim() : "";
+  if (!name) return null;
+  return {
+    id,
+    name,
+    description: typeof item.description === "string" ? item.description.trim() : "",
+    howHelps: typeof item.howHelps === "string" ? item.howHelps.trim() : "",
+    howBuild: typeof item.howBuild === "string" ? item.howBuild.trim() : ""
+  };
+}
+
+function normalizeTailwindList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeTailwind).filter(Boolean);
+}
+
+function renderGoalTailwindsDraft() {
+  if (!goalTailwindsDraftList || !goalTailwindsDraftEmpty) return;
+  if (!Array.isArray(goalTailwindsDraft) || goalTailwindsDraft.length < 1) {
+    goalTailwindsDraft = [];
+    goalTailwindsDraftList.innerHTML = "";
+    goalTailwindsDraftEmpty.style.display = "block";
+    return;
+  }
+  goalTailwindsDraftEmpty.style.display = "none";
+  goalTailwindsDraftList.innerHTML = goalTailwindsDraft
+    .map((tw, index) => `
+      <li class="tailwind-draft-item quick-item" style="--stagger:${index}">
+        <div class="tailwind-draft-info">
+          <strong>${escapeHtml(tw.name)}</strong>
+          ${tw.description ? `<p class="muted small">${escapeHtml(tw.description)}</p>` : ""}
+        </div>
+        <button class="btn btn-danger" type="button" data-action="remove-goal-tailwind" data-id="${escapeAttr(tw.id)}">Remove</button>
+      </li>
+    `)
+    .join("");
+}
+
+function closeTailwindsModal() {
+  tailwindsModalState.open = false;
+  tailwindsModalState.trackerId = "";
+  if (tailwindsModal) {
+    tailwindsModal.classList.add("hidden");
+    tailwindsModal.setAttribute("aria-hidden", "true");
+  }
+}
+
+function renderTailwindsModal() {
+  if (!tailwindsModal || !tailwindsModalBody) return;
+  if (!currentUser || !tailwindsModalState.open) {
+    tailwindsModal.classList.add("hidden");
+    tailwindsModal.setAttribute("aria-hidden", "true");
+    return;
+  }
+  const tracker = trackers.find((t) => t.id === tailwindsModalState.trackerId);
+  if (!tracker) {
+    closeTailwindsModal();
+    return;
+  }
+  if (tailwindsModalTitle) {
+    tailwindsModalTitle.textContent = `Tailwinds — ${tracker.name}`;
+  }
+  const tailwinds = Array.isArray(tracker.tailwinds) ? tracker.tailwinds : [];
+  const listMarkup = tailwinds.length > 0
+    ? tailwinds.map((tw) => `
+        <details class="headwind-item">
+          <summary class="headwind-item-summary">${escapeHtml(tw.name)}</summary>
+          <div class="headwind-item-body">
+            ${tw.description ? `<p><strong>Description:</strong> ${escapeHtml(tw.description)}</p>` : ""}
+            ${tw.howHelps ? `<p><strong>How it helps:</strong> ${escapeHtml(tw.howHelps)}</p>` : ""}
+            ${tw.howBuild ? `<p><strong>How to build it:</strong> ${escapeHtml(tw.howBuild)}</p>` : ""}
+            <button class="btn btn-danger btn-sm" type="button" data-action="remove-tailwind" data-tracker-id="${escapeAttr(tracker.id)}" data-id="${escapeAttr(tw.id)}">Remove</button>
+          </div>
+        </details>
+      `).join("")
+    : `<p class="empty-state">No tailwinds defined for this goal yet.</p>`;
+  tailwindsModalBody.innerHTML = `
+    <div class="headwinds-list">${listMarkup}</div>
+    <section class="headwinds-add-section">
+      <h4>Add Tailwind</h4>
+      <form class="form-block" data-action="add-tailwind">
+        <div class="form-grid form-grid-2">
+          <label>
+            Name
+            <input name="tailwind-name" type="text" maxlength="80" placeholder="Morning routine, accountability partner..." required />
+          </label>
+          <label>
+            Description
+            <input name="tailwind-description" type="text" maxlength="200" placeholder="Briefly describe this habit or condition..." />
+          </label>
+          <label>
+            How It Helps
+            <input name="tailwind-how-helps" type="text" maxlength="200" placeholder="Builds momentum, reduces friction..." />
+          </label>
+          <label>
+            How to Build It
+            <input name="tailwind-how-build" type="text" maxlength="200" placeholder="Start small, tie to existing habit..." />
+          </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Add Tailwind</button>
+      </form>
+    </section>
+  `;
+  tailwindsModal.classList.remove("hidden");
+  tailwindsModal.setAttribute("aria-hidden", "false");
 }
 
 function syncGoalAdditionalTrackingVisibility() {
