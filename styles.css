@@ -2606,6 +2606,7 @@ strong.pace-off,
   padding: 0 11px;
   font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2649,8 +2650,80 @@ strong.pace-off,
   color: var(--brand-strong) !important;
 }
 
+.btn-obstacles-on {
+  color: var(--brand) !important;
+}
+
 .pace-actions.pace-actions-left {
   margin-left: 0;
+}
+
+/* Obstacles */
+.obstacle-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.obstacle-item-summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.obstacle-item-summary::after {
+  content: "▸";
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.obstacle-item[open] .obstacle-item-summary::after {
+  transform: rotate(90deg);
+}
+
+.obstacle-item-body {
+  padding: 0 14px 12px;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.obstacle-item-body p {
+  margin: 0;
+}
+
+.obstacles-list {
+  margin-bottom: 16px;
+}
+
+.obstacles-add-section h4 {
+  font-size: 0.95rem;
+  margin: 0 0 10px;
+}
+
+.goal-obstacles-fields {
+  margin-bottom: 10px;
+}
+
+.obstacle-draft-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.obstacle-draft-info strong {
+  display: block;
+  font-size: 0.88rem;
 }
 
 .pbar-stretch-marker {

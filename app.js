@@ -436,6 +436,16 @@ const graphModalTitle = document.querySelector("#graph-modal-title");
 const graphModalClose = document.querySelector("#graph-modal-close");
 const onboardingModal = document.querySelector("#onboarding-modal");
 const onboardingClose = document.querySelector("#onboarding-close");
+const obstaclesModal = document.querySelector("#obstacles-modal");
+const obstaclesModalBody = document.querySelector("#obstacles-modal-body");
+const obstaclesModalTitle = document.querySelector("#obstacles-modal-title");
+const goalObstacleNameInput = document.querySelector("#goal-obstacle-name");
+const goalObstacleDescInput = document.querySelector("#goal-obstacle-description");
+const goalObstaclePreventionInput = document.querySelector("#goal-obstacle-prevention");
+const goalObstacleRecoveryInput = document.querySelector("#goal-obstacle-recovery");
+const goalObstacleAddButton = document.querySelector("#goal-obstacle-add-btn");
+const goalObstaclesDraftList = document.querySelector("#goal-obstacles-draft-list");
+const goalObstaclesDraftEmpty = document.querySelector("#goal-obstacles-draft-empty");
 
 const quarterRangeLabel = document.querySelector("#quarter-range");
 const quarterSummary = document.querySelector("#quarter-summary");
@@ -608,6 +618,8 @@ let goalCustomWeekTargetsEdited = false;
 let goalCustomMonthTargetsEdited = false;
 let goalMetricsDraft = [];
 let goalIoInputsDraft = [];
+let goalObstaclesDraft = [];
+const obstaclesModalState = { open: false, trackerId: "" };
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
 scheduleDate.value = getDateKey(normalizeDate(new Date()));
@@ -1724,6 +1736,33 @@ if (goalIoInputsList) {
   });
 }
 
+if (goalObstacleAddButton) {
+  goalObstacleAddButton.addEventListener("click", () => {
+    const name = String(goalObstacleNameInput ? goalObstacleNameInput.value.trim() : "");
+    if (!name) return;
+    const description = String(goalObstacleDescInput ? goalObstacleDescInput.value.trim() : "");
+    const prevention = String(goalObstaclePreventionInput ? goalObstaclePreventionInput.value.trim() : "");
+    const recovery = String(goalObstacleRecoveryInput ? goalObstacleRecoveryInput.value.trim() : "");
+    goalObstaclesDraft.push({ id: createId(), name, description, prevention, recovery });
+    if (goalObstacleNameInput) goalObstacleNameInput.value = "";
+    if (goalObstacleDescInput) goalObstacleDescInput.value = "";
+    if (goalObstaclePreventionInput) goalObstaclePreventionInput.value = "";
+    if (goalObstacleRecoveryInput) goalObstacleRecoveryInput.value = "";
+    renderGoalObstaclesDraft();
+  });
+}
+
+if (goalObstaclesDraftList) {
+  goalObstaclesDraftList.addEventListener("click", (event) => {
+    const removeBtn = event.target.closest("button[data-action='remove-goal-obstacle']");
+    if (!removeBtn) return;
+    const id = String(removeBtn.dataset.id || "");
+    if (!id) return;
+    goalObstaclesDraft = goalObstaclesDraft.filter((obs) => obs.id !== id);
+    renderGoalObstaclesDraft();
+  });
+}
+
 goalForm.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!currentUser) {
@@ -1826,7 +1865,8 @@ goalForm.addEventListener("submit", (event) => {
     accountabilityPartnerName: "",
     accountabilityPartnerId: "",
     accountabilityShareId: "",
-    accountabilityStatus: "none"
+    accountabilityStatus: "none",
+    obstacles: goalObstaclesDraft.map((obs) => ({ ...obs }))
   };
   trackers.unshift(nextTracker);
   const migrationResult = migrateGoalTrackingToNewGoal(migrateSourceTracker, nextTracker, {
@@ -1890,6 +1930,8 @@ goalForm.addEventListener("submit", (event) => {
   syncGoalAdditionalTrackingVisibility();
   goalIoInputsDraft = [];
   renderGoalIoInputsDraft();
+  goalObstaclesDraft = [];
+  renderGoalObstaclesDraft();
   if (goalTermDeadline) goalTermDeadline.value = "";
   if (goalTermTarget) goalTermTarget.value = "0";
   if (goalTermCarryover) goalTermCarryover.checked = false;
@@ -3895,6 +3937,50 @@ if (onboardingModal) {
   });
 }
 
+if (obstaclesModal) {
+  obstaclesModal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action='close-obstacles-modal']")) {
+      closeObstaclesModal();
+      return;
+    }
+    const removeBtn = event.target.closest("button[data-action='remove-obstacle']");
+    if (removeBtn) {
+      const trackerId = String(removeBtn.dataset.trackerId || "");
+      const obstacleId = String(removeBtn.dataset.id || "");
+      if (!trackerId || !obstacleId) return;
+      const tracker = trackers.find((t) => t.id === trackerId);
+      if (!tracker) return;
+      tracker.obstacles = (tracker.obstacles || []).filter((obs) => obs.id !== obstacleId);
+      saveTrackers();
+      renderObstaclesModal();
+      renderPeriodTabs();
+      return;
+    }
+    const addForm = event.target.closest("form[data-action='add-obstacle']");
+    if (addForm) {
+      event.preventDefault();
+      const nameInput = addForm.querySelector("[name='obstacle-name']");
+      const name = String(nameInput ? nameInput.value.trim() : "");
+      if (!name) return;
+      const descInput = addForm.querySelector("[name='obstacle-description']");
+      const prevInput = addForm.querySelector("[name='obstacle-prevention']");
+      const recInput = addForm.querySelector("[name='obstacle-recovery']");
+      const description = String(descInput ? descInput.value.trim() : "");
+      const prevention = String(prevInput ? prevInput.value.trim() : "");
+      const recovery = String(recInput ? recInput.value.trim() : "");
+      const trackerId = obstaclesModalState.trackerId;
+      const tracker = trackers.find((t) => t.id === trackerId);
+      if (!tracker) return;
+      if (!Array.isArray(tracker.obstacles)) tracker.obstacles = [];
+      tracker.obstacles.push({ id: createId(), name, description, prevention, recovery });
+      saveTrackers();
+      addForm.reset();
+      renderObstaclesModal();
+      renderPeriodTabs();
+    }
+  });
+}
+
 if (trendsWindowSelect) {
   trendsWindowSelect.addEventListener("change", () => {
     renderTrendsTab();
@@ -4027,6 +4113,18 @@ function handleGraphCardActions(event) {
     }
     setStretchGoal(id, period, meta.range, normalizePositiveAmount(input, 0));
     renderPeriodTabs();
+    return;
+  }
+
+  const viewObstaclesButton = event.target.closest("button[data-action='view-obstacles']");
+  if (viewObstaclesButton) {
+    const id = viewObstaclesButton.dataset.id;
+    if (!id) return;
+    const tracker = trackers.find((t) => t.id === id);
+    if (!tracker) return;
+    obstaclesModalState.open = true;
+    obstaclesModalState.trackerId = id;
+    renderObstaclesModal();
     return;
   }
 
@@ -8470,6 +8568,7 @@ function renderPeriodTabs() {
   renderPeriodTermHistory("week", week, index);
   renderPeriodTermHistory("month", month, index);
   renderGraphModal();
+  renderObstaclesModal();
   renderAuthState();
   scheduleEChartResizePasses();
 }
@@ -8809,9 +8908,18 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
 
       const deadlineBadge = getDeadlineBadgeMarkup(tracker);
       const ioSummary = getInputOutputSummaryMarkup(tracker);
+      const obstacleCount = Array.isArray(tracker.obstacles) ? tracker.obstacles.length : 0;
       const leftActionsMarkup = `
         <span class="pace-actions pace-actions-left">
           <button type="button" class="btn btn-graph" data-action="jump-tab" data-tab-target="settings-goals" title="Goal Settings" aria-label="Goal Settings">⚙</button>
+          <button
+            type="button"
+            class="btn btn-graph${obstacleCount > 0 ? " btn-obstacles-on" : ""}"
+            data-action="view-obstacles"
+            data-id="${escapeAttr(tracker.id)}"
+            title="${obstacleCount > 0 ? `Obstacles (${obstacleCount})` : "Obstacles"}"
+            aria-label="${obstacleCount > 0 ? `Obstacles (${obstacleCount})` : "Obstacles"}"
+          >O</button>
           <button
             type="button"
             class="btn btn-graph${stretchValue > 0 ? " btn-stretch-on" : ""}"
@@ -13998,10 +14106,13 @@ function initializeData() {
     settings = getDefaultSettings();
     goalMetricsDraft = [];
     renderGoalMetricsDraft();
+    goalObstaclesDraft = [];
+    renderGoalObstaclesDraft();
     if (goalAdditionalTrackingEnabled) {
       goalAdditionalTrackingEnabled.checked = false;
     }
     syncGoalAdditionalTrackingVisibility();
+    closeObstaclesModal();
     return;
   }
 
@@ -14027,6 +14138,8 @@ function initializeData() {
   periodClosePromptNotificationKeys = loadNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY);
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
+  goalObstaclesDraft = [];
+  renderGoalObstaclesDraft();
   if (goalAdditionalTrackingEnabled) {
     goalAdditionalTrackingEnabled.checked = false;
   }
@@ -14111,7 +14224,8 @@ function loadTrackers() {
         accountabilityPartnerName: normalizeUsername(item.accountabilityPartnerName || ""),
         accountabilityPartnerId: typeof item.accountabilityPartnerId === "string" ? item.accountabilityPartnerId : "",
         accountabilityShareId: typeof item.accountabilityShareId === "string" ? item.accountabilityShareId : "",
-        accountabilityStatus: normalizeAccountabilityStatus(item.accountabilityStatus)
+        accountabilityStatus: normalizeAccountabilityStatus(item.accountabilityStatus),
+        obstacles: normalizeObstacleList(item.obstacles)
       });
       if (item.logs && typeof item.logs === "object") {
         legacyLogs.push({ trackerId: item.id, logs: item.logs });
@@ -15447,6 +15561,116 @@ function renderGoalIoInputsDraft() {
       </li>
     `)
     .join("");
+}
+
+function normalizeObstacle(item) {
+  if (!item || typeof item !== "object") return null;
+  const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : createId();
+  const name = typeof item.name === "string" ? item.name.trim() : "";
+  if (!name) return null;
+  return {
+    id,
+    name,
+    description: typeof item.description === "string" ? item.description.trim() : "",
+    prevention: typeof item.prevention === "string" ? item.prevention.trim() : "",
+    recovery: typeof item.recovery === "string" ? item.recovery.trim() : ""
+  };
+}
+
+function normalizeObstacleList(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(normalizeObstacle).filter(Boolean);
+}
+
+function renderGoalObstaclesDraft() {
+  if (!goalObstaclesDraftList || !goalObstaclesDraftEmpty) return;
+  if (!Array.isArray(goalObstaclesDraft) || goalObstaclesDraft.length < 1) {
+    goalObstaclesDraft = [];
+    goalObstaclesDraftList.innerHTML = "";
+    goalObstaclesDraftEmpty.style.display = "block";
+    return;
+  }
+  goalObstaclesDraftEmpty.style.display = "none";
+  goalObstaclesDraftList.innerHTML = goalObstaclesDraft
+    .map((obs, index) => `
+      <li class="obstacle-draft-item quick-item" style="--stagger:${index}">
+        <div class="obstacle-draft-info">
+          <strong>${escapeHtml(obs.name)}</strong>
+          ${obs.description ? `<p class="muted small">${escapeHtml(obs.description)}</p>` : ""}
+        </div>
+        <button class="btn btn-danger" type="button" data-action="remove-goal-obstacle" data-id="${escapeAttr(obs.id)}">Remove</button>
+      </li>
+    `)
+    .join("");
+}
+
+function closeObstaclesModal() {
+  obstaclesModalState.open = false;
+  obstaclesModalState.trackerId = "";
+  if (obstaclesModal) {
+    obstaclesModal.classList.add("hidden");
+    obstaclesModal.setAttribute("aria-hidden", "true");
+  }
+}
+
+function renderObstaclesModal() {
+  if (!obstaclesModal || !obstaclesModalBody) return;
+  if (!currentUser || !obstaclesModalState.open) {
+    obstaclesModal.classList.add("hidden");
+    obstaclesModal.setAttribute("aria-hidden", "true");
+    return;
+  }
+  const tracker = trackers.find((t) => t.id === obstaclesModalState.trackerId);
+  if (!tracker) {
+    closeObstaclesModal();
+    return;
+  }
+  if (obstaclesModalTitle) {
+    obstaclesModalTitle.textContent = `Obstacles — ${tracker.name}`;
+  }
+  const obstacles = Array.isArray(tracker.obstacles) ? tracker.obstacles : [];
+  const listMarkup = obstacles.length > 0
+    ? obstacles.map((obs) => `
+        <details class="obstacle-item">
+          <summary class="obstacle-item-summary">${escapeHtml(obs.name)}</summary>
+          <div class="obstacle-item-body">
+            ${obs.description ? `<p><strong>Description:</strong> ${escapeHtml(obs.description)}</p>` : ""}
+            ${obs.prevention ? `<p><strong>How to prevent it:</strong> ${escapeHtml(obs.prevention)}</p>` : ""}
+            ${obs.recovery ? `<p><strong>If it happens:</strong> ${escapeHtml(obs.recovery)}</p>` : ""}
+            <button class="btn btn-danger btn-sm" type="button" data-action="remove-obstacle" data-tracker-id="${escapeAttr(tracker.id)}" data-id="${escapeAttr(obs.id)}">Remove</button>
+          </div>
+        </details>
+      `).join("")
+    : `<p class="empty-state">No obstacles defined for this goal yet.</p>`;
+  obstaclesModalBody.innerHTML = `
+    <div class="obstacles-list">${listMarkup}</div>
+    <section class="obstacles-add-section">
+      <h4>Add Obstacle</h4>
+      <form class="form-block" data-action="add-obstacle">
+        <div class="form-grid form-grid-2">
+          <label>
+            Name
+            <input name="obstacle-name" type="text" maxlength="80" placeholder="Busy schedule, travel..." required />
+          </label>
+          <label>
+            Description
+            <input name="obstacle-description" type="text" maxlength="200" placeholder="Briefly describe the obstacle..." />
+          </label>
+          <label>
+            How to Prevent It
+            <input name="obstacle-prevention" type="text" maxlength="200" placeholder="Block time, set reminders..." />
+          </label>
+          <label>
+            If It Happens
+            <input name="obstacle-recovery" type="text" maxlength="200" placeholder="Make it up the next day..." />
+          </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Add Obstacle</button>
+      </form>
+    </section>
+  `;
+  obstaclesModal.classList.remove("hidden");
+  obstaclesModal.setAttribute("aria-hidden", "false");
 }
 
 function syncGoalAdditionalTrackingVisibility() {
