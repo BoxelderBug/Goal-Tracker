@@ -4405,3 +4405,21 @@ body[data-performance="light"] * {
     grid-column: 1 / -1;
   }
 }
+
+.temp-period-goal-card {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+}
+
+.temp-goal-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+  margin-left: 4px;
+}

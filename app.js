@@ -47,6 +47,7 @@ const PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-period-c
 const ONBOARDING_DISMISSED_STORAGE_KEY = "goal-tracker-onboarding-dismissed-v1";
 const STRETCH_GOALS_STORAGE_KEY = "goal-tracker-stretch-goals-v1";
 const VACATION_STORAGE_KEY = "goal-tracker-vacations-v1";
+const TEMP_PERIOD_GOALS_STORAGE_KEY = "goal-tracker-temp-period-goals-v1";
 const PERIOD_GOAL_OVERRIDES_STORAGE_KEY = "goal-tracker-period-goal-overrides-v1";
 const GOAL_JOURNAL_SUBJECT_DEFAULT = "General Journal";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
@@ -641,6 +642,7 @@ const headwindsModalState = { open: false, trackerId: "" };
 let goalTailwindsDraft = [];
 const tailwindsModalState = { open: false, trackerId: "" };
 let vacations = [];
+let tempPeriodGoals = [];
 let periodGoalOverrides = {};
 const viewSettingsModalState = { open: false, period: "" };
 
@@ -4161,6 +4163,35 @@ if (viewSettingsModal) {
       saveVacations();
       renderViewSettingsModal();
       renderPeriodTabs();
+      return;
+    }
+    const addTempGoalForm = event.target.closest("form[data-action='add-temp-goal']");
+    if (addTempGoalForm) {
+      event.preventDefault();
+      const name = String(addTempGoalForm.querySelector("[name='temp-goal-name']")?.value.trim() || "");
+      const unit = String(addTempGoalForm.querySelector("[name='temp-goal-unit']")?.value.trim() || "");
+      const target = parseFloat(addTempGoalForm.querySelector("[name='temp-goal-target']")?.value || "0") || 0;
+      const pKey = String(addTempGoalForm.querySelector("[name='temp-period-key']")?.value || "");
+      const pName = String(addTempGoalForm.querySelector("[name='temp-period-name']")?.value || "");
+      const pStart = String(addTempGoalForm.querySelector("[name='temp-period-start']")?.value || "");
+      const pEnd = String(addTempGoalForm.querySelector("[name='temp-period-end']")?.value || "");
+      if (!name || !unit || !pKey) return;
+      tempPeriodGoals.push({ id: createId(), name, unit, target, periodKey: pKey, periodName: pName, periodStart: pStart, periodEnd: pEnd });
+      saveTempPeriodGoals();
+      renderViewSettingsModal();
+      renderPeriodTabs();
+      renderEntryTab();
+      return;
+    }
+    const removeTempGoalBtn = event.target.closest("button[data-action='remove-temp-goal']");
+    if (removeTempGoalBtn) {
+      const id = String(removeTempGoalBtn.dataset.id || "");
+      if (!id) return;
+      tempPeriodGoals = tempPeriodGoals.filter(g => g.id !== id);
+      saveTempPeriodGoals();
+      renderViewSettingsModal();
+      renderPeriodTabs();
+      renderEntryTab();
       return;
     }
   });
@@ -7914,12 +7945,49 @@ function renderEntryTab() {
 }
 
 function renderSoloEntrySection(standardTrackers) {
-  if (standardTrackers.length < 1) {
+  const todayKeyEarly = getDateKey(normalizeDate(new Date()));
+  const activeTempGoalsEarly = tempPeriodGoals.filter(g => g.periodEnd && todayKeyEarly <= g.periodEnd);
+  if (standardTrackers.length < 1 && activeTempGoalsEarly.length < 1) {
     entryTracker.innerHTML = "<option value=''>No goals</option>";
     entryTracker.disabled = true;
     todayEntriesList.innerHTML = "";
     todayEntriesEmpty.textContent = "Create active quantity/yes-no/floating goals or use Bucket List Entry for bucket goals.";
     todayEntriesEmpty.style.display = "block";
+    updateEntryFormMode();
+    return;
+  }
+  if (standardTrackers.length < 1 && activeTempGoalsEarly.length > 0) {
+    entryTracker.disabled = false;
+    entryTracker.innerHTML = activeTempGoalsEarly
+      .map(g => `<option value="${escapeAttr(g.id)}">${escapeHtml(g.name)} (${escapeHtml(g.unit)} · Period Goal)</option>`)
+      .join("");
+    const todayEntriesForTemp = entries
+      .filter(entry => entry.date === todayKeyEarly && activeTempGoalsEarly.some(g => g.id === entry.trackerId))
+      .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    if (todayEntriesForTemp.length < 1) {
+      todayEntriesList.innerHTML = "";
+      todayEntriesEmpty.textContent = "No entries added today yet.";
+      todayEntriesEmpty.style.display = "block";
+    } else {
+      const tempGoalMap = new Map(activeTempGoalsEarly.map(g => [g.id, g]));
+      todayEntriesEmpty.style.display = "none";
+      todayEntriesList.innerHTML = todayEntriesForTemp.map((entry, idx) => {
+        const tg = tempGoalMap.get(entry.trackerId);
+        const createdAt = new Date(entry.createdAt || `${todayKeyEarly}T00:00:00`);
+        const timeLabel = Number.isNaN(createdAt.getTime()) ? "--:--" : createdAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const amountLabel = `Amount ${formatAmount(entry.amount)}`;
+        const notes = entry.notes ? `<p class="muted small">${escapeHtml(entry.notes)}</p>` : "";
+        return `
+          <li class="quick-item today-entry-item" style="--stagger:${idx}">
+            <div>
+              <strong>${escapeHtml(tg ? tg.name : "Unknown Goal")}</strong>
+              <p class="muted small">${timeLabel} | ${amountLabel}</p>
+              ${notes}
+            </div>
+          </li>
+        `;
+      }).join("");
+    }
     updateEntryFormMode();
     return;
   }
@@ -7938,13 +8006,21 @@ function renderSoloEntrySection(standardTrackers) {
       return `<option value="${tracker.id}">${escapeHtml(tracker.name)} (${suffix})</option>`;
     })
     .join("");
-  if (standardTrackers.some((tracker) => tracker.id === selected)) {
+  const todayKeyForTempGoals = getDateKey(normalizeDate(new Date()));
+  const activeTempGoals = tempPeriodGoals.filter(g => g.periodEnd && todayKeyForTempGoals <= g.periodEnd);
+  if (activeTempGoals.length > 0) {
+    entryTracker.innerHTML += activeTempGoals
+      .map(g => `<option value="${escapeAttr(g.id)}">${escapeHtml(g.name)} (${escapeHtml(g.unit)} · Period Goal)</option>`)
+      .join("");
+  }
+  if (standardTrackers.some((tracker) => tracker.id === selected) || activeTempGoals.some(g => g.id === selected)) {
     entryTracker.value = selected;
   }
 
   const todayKey = getDateKey(normalizeDate(new Date()));
   const trackerById = new Map(trackers.map((tracker) => [tracker.id, tracker]));
-  const allowedTrackerIds = new Set(standardTrackers.map((tracker) => tracker.id));
+  const activeTempGoalIds = new Set(tempPeriodGoals.filter(g => g.periodEnd && todayKey <= g.periodEnd).map(g => g.id));
+  const allowedTrackerIds = new Set([...standardTrackers.map((tracker) => tracker.id), ...activeTempGoalIds]);
   const todayEntries = entries
     .filter((entry) => entry.date === todayKey && allowedTrackerIds.has(entry.trackerId))
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
@@ -7957,10 +8033,13 @@ function renderSoloEntrySection(standardTrackers) {
     return;
   }
 
+  const tempGoalById = new Map(tempPeriodGoals.map(g => [g.id, g]));
   todayEntriesEmpty.style.display = "none";
   todayEntriesList.innerHTML = todayEntries
     .map((entry, index) => {
       const tracker = trackerById.get(entry.trackerId);
+      const tempGoal = !tracker ? tempGoalById.get(entry.trackerId) : null;
+      const displayName = tracker ? tracker.name : (tempGoal ? tempGoal.name : "Unknown Goal");
       const createdAt = new Date(entry.createdAt || `${todayKey}T00:00:00`);
       const timeLabel = Number.isNaN(createdAt.getTime())
         ? "--:--"
@@ -7980,7 +8059,7 @@ function renderSoloEntrySection(standardTrackers) {
       return `
         <li class="quick-item today-entry-item" style="--stagger:${index}">
           <div>
-            <strong>${escapeHtml(tracker ? tracker.name : "Unknown Goal")}</strong>
+            <strong>${escapeHtml(displayName)}</strong>
             <p class="muted small">${timeLabel} | ${amountLabel}</p>
             ${metricMarkup}
             ${notes}
@@ -9242,8 +9321,31 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
     .join("");
   const checkInPeriodLabel = periodName === "year" ? "yearly" : periodName === "month" ? "monthly" : "weekly";
 
+  const periodKey = getPeriodKey(periodName, range);
+  const periodTempGoals = tempPeriodGoals.filter(g => g.periodKey === periodKey);
+  const tempGoalCardsMarkup = periodTempGoals.map((g, i) => {
+    const progress = sumTrackerRange(index, g.id, range);
+    const target = g.target;
+    const pct = percent(progress, target);
+    const goalHit = target > 0 && progress >= target;
+    const toneClass = goalHit ? "pace-on" : "";
+    return `
+      <li class="metric-card temp-period-goal-card" style="--stagger:${filteredTrackers.length + i}">
+        <div class="metric-top">
+          <h3>${escapeHtml(g.name)} <span class="temp-goal-badge">Period Goal</span></h3>
+        </div>
+        <div class="pbar">
+          <div class="pbar-track">
+            <div class="pbar-fill ${toneClass}" style="width:${Math.min(pct, 100)}%"></div>
+            <span class="pbar-inner-label">${escapeHtml(formatAmount(progress))} / ${escapeHtml(formatAmount(target))} ${escapeHtml(normalizeGoalUnit(g.unit))} · ${pct}%</span>
+          </div>
+        </div>
+      </li>
+    `;
+  }).join("");
+
   listEl.innerHTML = `
-    ${createPeriodAccordionSectionMarkup(periodName, "goals", "Goals", goalCardsMarkup, "No goals configured.")}
+    ${createPeriodAccordionSectionMarkup(periodName, "goals", "Goals", goalCardsMarkup + tempGoalCardsMarkup, "No goals configured.")}
     ${createPeriodAccordionSectionMarkup(periodName, "checkins", "Check-ins", checkInCardsMarkup, `No ${checkInPeriodLabel} check-ins configured.`)}
   `;
   initializeEChartsInScope(listEl);
@@ -9732,6 +9834,30 @@ function loadVacations() {
 
 function saveVacations() {
   localStorage.setItem(getScopedStorageKey(VACATION_STORAGE_KEY), JSON.stringify(vacations));
+}
+
+function loadTempPeriodGoals() {
+  try {
+    if (!currentUser) return [];
+    const raw = localStorage.getItem(getScopedStorageKey(TEMP_PERIOD_GOALS_STORAGE_KEY));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(g => g && typeof g.id === "string" && g.name && g.periodKey).map(g => ({
+      id: g.id,
+      name: typeof g.name === "string" ? g.name.trim() : "",
+      unit: typeof g.unit === "string" ? g.unit.trim() : "units",
+      target: typeof g.target === "number" ? g.target : 0,
+      periodKey: g.periodKey,
+      periodName: g.periodName || "week",
+      periodStart: g.periodStart || "",
+      periodEnd: g.periodEnd || ""
+    })).filter(g => g.name);
+  } catch { return []; }
+}
+
+function saveTempPeriodGoals() {
+  localStorage.setItem(getScopedStorageKey(TEMP_PERIOD_GOALS_STORAGE_KEY), JSON.stringify(tempPeriodGoals));
 }
 
 function loadPeriodGoalOverrides() {
@@ -13364,6 +13490,7 @@ function resetStateForSignedOutUser() {
   resetInlineGraphState();
   closeGraphModal();
   vacations = [];
+  tempPeriodGoals = [];
   periodGoalOverrides = {};
   closeViewSettingsModal();
   if (onboardingModal) {
@@ -14418,6 +14545,7 @@ function initializeData() {
     smartReminderNotificationKeys = new Set();
     periodClosePromptNotificationKeys = new Set();
     vacations = [];
+    tempPeriodGoals = [];
     periodGoalOverrides = {};
     settings = getDefaultSettings();
     goalMetricsDraft = [];
@@ -14456,6 +14584,7 @@ function initializeData() {
   smartReminderNotificationKeys = loadNotificationKeySet(SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY);
   periodClosePromptNotificationKeys = loadNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY);
   vacations = loadVacations();
+  tempPeriodGoals = loadTempPeriodGoals();
   periodGoalOverrides = loadPeriodGoalOverrides();
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
@@ -16193,6 +16322,19 @@ function renderViewSettingsModal() {
     </label>
   `).join("");
 
+  const periodTempGoals = tempPeriodGoals.filter(g => g.periodKey === periodKey);
+  const tempGoalListMarkup = periodTempGoals.length > 0
+    ? `<ul class="card-list compact-list" style="margin-bottom:10px">${periodTempGoals.map(g => `
+        <li class="vacation-item">
+          <div class="vacation-item-info">
+            <strong>${escapeHtml(g.name)}</strong>
+            <p class="muted small">Target: ${formatAmount(g.target)} ${escapeHtml(normalizeGoalUnit(g.unit))}</p>
+          </div>
+          <button class="btn btn-danger btn-sm" type="button" data-action="remove-temp-goal" data-id="${escapeAttr(g.id)}">Remove</button>
+        </li>
+      `).join("")}</ul>`
+    : "";
+
   viewSettingsModalBody.innerHTML = `
     <section class="view-settings-section">
       <h4>Period Goal Targets</h4>
@@ -16230,6 +16372,35 @@ function renderViewSettingsModal() {
             Subtract vacation days from week, month, and year targets
           </label>
           <button class="btn btn-primary" type="submit" style="margin-top:10px">Add Vacation</button>
+        </form>
+      </details>
+    </section>
+    <section class="view-settings-section">
+      <h4>Temporary Goals</h4>
+      <p class="muted small">Add a one-off goal for this ${periodName} only. Shows in entry form while the period is still active.</p>
+      ${tempGoalListMarkup}
+      <details class="view-settings-add-vacation">
+        <summary>Add Temporary Goal</summary>
+        <form class="form-block" data-action="add-temp-goal">
+          <input type="hidden" name="temp-period-key" value="${escapeAttr(periodKey)}" />
+          <input type="hidden" name="temp-period-name" value="${escapeAttr(periodName)}" />
+          <input type="hidden" name="temp-period-start" value="${escapeAttr(getDateKey(range.start))}" />
+          <input type="hidden" name="temp-period-end" value="${escapeAttr(getDateKey(range.end))}" />
+          <div class="form-grid form-grid-3">
+            <label>
+              Goal Name
+              <input type="text" name="temp-goal-name" maxlength="80" placeholder="Read 3 books, run 5K..." required />
+            </label>
+            <label>
+              Unit
+              <input type="text" name="temp-goal-unit" maxlength="20" placeholder="miles, pages..." required />
+            </label>
+            <label>
+              Target
+              <input type="number" name="temp-goal-target" min="0" max="1000000" step="0.01" value="1" required />
+            </label>
+          </div>
+          <button class="btn btn-primary" type="submit">Add Goal</button>
         </form>
       </details>
     </section>
@@ -17562,6 +17733,7 @@ function updateEntryFormMode() {
     return;
   }
   const tracker = trackers.find((item) => item.id === entryTracker.value);
+  const tempGoal = !tracker ? tempPeriodGoals.find(g => g.id === entryTracker.value) : null;
   const isBinaryGoal = tracker ? isBinaryGoalType(tracker.goalType) : false;
   const isGoalsPlus = tracker ? isGoalsPlusTracker(tracker) : false;
   const markNotApplicable = Boolean(entryNotApplicable && entryNotApplicable.checked);
