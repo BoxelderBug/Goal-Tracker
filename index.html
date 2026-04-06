@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406k" />
+  <link rel="stylesheet" href="styles.css?v=20260406l" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -329,6 +329,7 @@
                 <option value="running">Running</option>
                 <option value="golf">Golf</option>
                 <option value="disc-golf">Disc Golf</option>
+                <option value="weight">Weight (Health)</option>
               </select>
             </label>
             <label>
@@ -368,6 +369,38 @@
                 <li>Round score per entry</li>
                 <li>Average score and best score tracked automatically</li>
                 <li>Supports standard Golf and Disc Golf</li>
+              </ul>
+            </div>
+            <!-- Weight info panel -->
+            <div id="goal-setup-preview-weight" class="goals-plus-preview" hidden>
+              <p class="goals-plus-preview-title">Weight (Health)</p>
+              <div class="goals-plus-disclaimer">
+                <strong>&#9888; Health Disclaimer</strong>
+                <p>This goal tracker does not provide health or medical advice. Please follow the guidance of a qualified medical professional for safe and healthy weight management.</p>
+              </div>
+              <div class="form-grid form-grid-3" style="margin-top:12px">
+                <label>
+                  Starting Weight
+                  <input id="goal-plus-starting-weight" type="number" min="0" max="2000" step="0.1" placeholder="e.g. 200" />
+                </label>
+                <label>
+                  Target Weight
+                  <input id="goal-plus-target-weight" type="number" min="0" max="2000" step="0.1" placeholder="e.g. 175" />
+                </label>
+                <label>
+                  Unit
+                  <select id="goal-plus-weight-unit">
+                    <option value="lbs">lbs</option>
+                    <option value="kg">kg</option>
+                  </select>
+                </label>
+              </div>
+              <ul class="goals-plus-preview-list" style="margin-top:10px">
+                <li>Log your current weight each entry</li>
+                <li>Year view: % progress toward target weight</li>
+                <li>Month view: weight change this month</li>
+                <li>Week view: meals tracked toward your weekly goal</li>
+                <li>Meals Tracked additional metric auto-configured (21 meals/week)</li>
               </ul>
             </div>
             <!-- Hidden inputs retained for form compatibility -->
@@ -775,6 +808,15 @@
             <label>
               Score
               <input id="entry-goals-plus-golf-score" type="number" min="1" step="1" placeholder="72" />
+            </label>
+          </div>
+        </section>
+        <section id="entry-goals-plus-weight-wrap" class="entry-metrics-wrap" hidden>
+          <p class="muted small"><strong>Weight (Health)</strong> — log your current weight below.</p>
+          <div class="form-grid form-grid-2">
+            <label id="entry-goals-plus-weight-label">
+              Current Weight (lbs)
+              <input id="entry-goals-plus-weight" type="number" min="0" max="2000" step="0.1" placeholder="0.0" />
             </label>
           </div>
         </section>
@@ -1986,7 +2028,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406k"></script>
+  <script type="module" src="app.js?v=20260406l"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {

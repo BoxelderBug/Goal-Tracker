@@ -4314,6 +4314,28 @@ body[data-performance="light"] * {
   color: var(--text-muted, #555);
 }
 
+/* Goals+ Weight disclaimer */
+.goals-plus-disclaimer {
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.goals-plus-disclaimer strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--brand-strong);
+}
+
+.goals-plus-disclaimer p {
+  margin: 0;
+  color: var(--text);
+}
+
 /* View Settings Modal */
 .view-settings-section {
   margin-bottom: 20px;

@@ -64,6 +64,7 @@ const GOAL_TEMPLATE_MONTH_COUNT = 12;
 const GOALS_PLUS_SETUP_STANDARD = "standard";
 const GOALS_PLUS_SETUP_RUNNING = "goalsplus-running";
 const GOALS_PLUS_SETUP_GOLF = "goalsplus-golf";
+const GOALS_PLUS_SETUP_WEIGHT = "goalsplus-weight";
 const GOAL_TYPE_TERM = "term";
 const GOAL_TYPE_WEEK_TERM = "week-term";
 const GOAL_TYPE_MONTH_TERM = "month-term";
@@ -96,7 +97,8 @@ const GOALS_PLUS_GOLF_TYPE_LABEL_BY_VALUE = new Map([
 const GOALS_PLUS_NAME_OPTIONS = [
   { value: "running", label: "Running", mode: GOALS_PLUS_SETUP_RUNNING, runningWorkout: "easy" },
   { value: GOALS_PLUS_GOLF_STANDARD, label: "Golf", mode: GOALS_PLUS_SETUP_GOLF, golfType: GOALS_PLUS_GOLF_STANDARD },
-  { value: GOALS_PLUS_GOLF_DISC, label: "Disc Golf", mode: GOALS_PLUS_SETUP_GOLF, golfType: GOALS_PLUS_GOLF_DISC }
+  { value: GOALS_PLUS_GOLF_DISC, label: "Disc Golf", mode: GOALS_PLUS_SETUP_GOLF, golfType: GOALS_PLUS_GOLF_DISC },
+  { value: "weight", label: "Weight (Health)", mode: GOALS_PLUS_SETUP_WEIGHT }
 ];
 const GOALS_PLUS_NAME_OPTION_BY_VALUE = new Map(
   GOALS_PLUS_NAME_OPTIONS.map((item) => [item.value, item])
@@ -175,6 +177,13 @@ const goalSetupWrap = document.querySelector("#goal-setup-wrap");
 const goalSetupPreviewRunning = document.querySelector("#goal-setup-preview-running");
 const goalSetupPreviewGolf = document.querySelector("#goal-setup-preview-golf");
 const goalSetupPreviewGolfTitle = document.querySelector("#goal-setup-preview-golf-title");
+const goalSetupPreviewWeight = document.querySelector("#goal-setup-preview-weight");
+const goalPlusStartingWeight = document.querySelector("#goal-plus-starting-weight");
+const goalPlusTargetWeight = document.querySelector("#goal-plus-target-weight");
+const goalPlusWeightUnit = document.querySelector("#goal-plus-weight-unit");
+const entryGoalsPlusWeightWrap = document.querySelector("#entry-goals-plus-weight-wrap");
+const entryGoalsPlusWeightInput = document.querySelector("#entry-goals-plus-weight");
+const entryGoalsPlusWeightLabel = document.querySelector("#entry-goals-plus-weight-label");
 const goalPlusRunningWorkout = document.querySelector("#goal-plus-running-workout");
 const goalPlusRunningWorkInterval = document.querySelector("#goal-plus-running-work-interval");
 const goalPlusRunningRecoveryInterval = document.querySelector("#goal-plus-running-recovery-interval");
@@ -1871,6 +1880,14 @@ goalForm.addEventListener("submit", (event) => {
     : (additionalTrackingEnabled
       ? normalizeProgressMetricList(goalMetricsDraft, { fallbackUnit: unit })
       : []);
+  const isWeightMode = goalsPlus.mode === GOALS_PLUS_SETUP_WEIGHT;
+  const weightModeYearlyGoal = isWeightMode
+    ? Math.abs((goalsPlus.startingWeight || 0) - (goalsPlus.targetWeight || 0))
+    : yearlyGoal;
+  const weightModeUnit = isWeightMode ? (goalsPlus.weightUnit || "lbs") : unit;
+  const finalProgressMetrics = isWeightMode
+    ? normalizeProgressMetricList([{ id: createId(), name: "Meals Tracked", unit: "meals", weeklyTarget: 21, monthlyTarget: 90, yearlyTarget: 1095 }], { fallbackUnit: "meals" })
+    : progressMetrics;
   const rewardWeeklyPoints = normalizeGoalPoints(goalRewardWeeklyPoints ? goalRewardWeeklyPoints.value : 1, 1);
   const rewardMonthlyPoints = normalizeGoalPoints(goalRewardMonthlyPoints ? goalRewardMonthlyPoints.value : 3, 3);
   const rewardYearlyPoints = normalizeGoalPoints(goalRewardYearlyPoints ? goalRewardYearlyPoints.value : 10, 10);
@@ -1879,7 +1896,7 @@ goalForm.addEventListener("submit", (event) => {
     ? trackers.find((item) => item.id === migrateSourceId)
     : null;
   const archiveSourceAfterMigration = Boolean(goalMigrateArchiveSource && goalMigrateArchiveSource.checked);
-  if (!name || !unit || weeklyGoal < 0 || monthlyGoal < 0 || yearlyGoal < 0) {
+  if (!name || (!isWeightMode && !unit) || weeklyGoal < 0 || monthlyGoal < 0 || (!isWeightMode && yearlyGoal < 0)) {
     return;
   }
   if (isIoGoalType) {
@@ -1910,11 +1927,11 @@ goalForm.addEventListener("submit", (event) => {
     archived: false,
     priority,
     tags,
-    unit,
-    weeklyGoal,
-    monthlyGoal,
-    yearlyGoal,
-    progressMetrics,
+    unit: weightModeUnit,
+    weeklyGoal: isWeightMode ? 0 : weeklyGoal,
+    monthlyGoal: isWeightMode ? 0 : monthlyGoal,
+    yearlyGoal: weightModeYearlyGoal,
+    progressMetrics: finalProgressMetrics,
     goalsPlus,
     customWeeklyEnabled,
     customWeeklyTargets,
@@ -2527,6 +2544,9 @@ entryForm.addEventListener("submit", (event) => {
   if (!markNotApplicable && goalsPlusEntryData && goalsPlusEntryData.mode === GOALS_PLUS_SETUP_GOLF && goalsPlusEntryData.score > 0) {
     amount = goalsPlusEntryData.score;
   }
+  if (!markNotApplicable && isWeightGoalTracker(tracker)) {
+    amount = normalizePositiveAmount(entryGoalsPlusWeightInput ? entryGoalsPlusWeightInput.value : 0, 0);
+  }
 
   entries.unshift({
     id: createId(),
@@ -2576,6 +2596,9 @@ entryForm.addEventListener("submit", (event) => {
   }
   if (entryGoalsPlusGolfScore) {
     entryGoalsPlusGolfScore.value = "";
+  }
+  if (entryGoalsPlusWeightInput) {
+    entryGoalsPlusWeightInput.value = "";
   }
   updateEntryGoalsPlusDerivedLabel();
   entryNotes.value = "";
@@ -9078,15 +9101,76 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const isFloating = isFloatingGoalType(tracker.goalType);
       const progress = sumTrackerRange(index, tracker.id, range);
       const target = targetFn(tracker);
-      const goalHit = target > 0 && progress >= target;
+
+      // Weight goal override
+      const isWeightGoal = isWeightGoalTracker(tracker);
+      let weightGoalDisplay = null;
+      if (isWeightGoal) {
+        const gp = tracker.goalsPlus;
+        const startingWeight = gp.startingWeight || 0;
+        const targetWeight = gp.targetWeight || 0;
+        const weightUnit = gp.weightUnit || "lbs";
+        const latestWeight = getLatestEntryAmountInRange(tracker.id, range);
+        const hasEntry = latestWeight !== null;
+        if (periodName === "year") {
+          const totalToChange = Math.abs(startingWeight - targetWeight);
+          const isLosing = startingWeight > targetWeight;
+          const currentWeight = hasEntry ? latestWeight : startingWeight;
+          const changed = isLosing
+            ? Math.max(0, startingWeight - currentWeight)
+            : Math.max(0, currentWeight - startingWeight);
+          weightGoalDisplay = {
+            progress: changed,
+            target: totalToChange,
+            progressLabel: hasEntry
+              ? `${formatAmount(currentWeight)} ${weightUnit} · ${formatAmount(changed)} ${weightUnit} ${isLosing ? "lost" : "gained"}`
+              : `No entries yet — starting: ${formatAmount(startingWeight)} ${weightUnit}`,
+            progressAmountLabel: totalToChange > 0
+              ? `${formatAmount(changed)} / ${formatAmount(totalToChange)} ${weightUnit} · ${percent(changed, totalToChange)}%`
+              : `${formatAmount(currentWeight)} ${weightUnit}`
+          };
+        } else if (periodName === "month") {
+          const firstWeight = getFirstEntryAmountInRange(tracker.id, range) || startingWeight;
+          const currentWeight = hasEntry ? latestWeight : firstWeight;
+          const isLosing = startingWeight > targetWeight;
+          const monthChange = firstWeight - currentWeight;
+          const displayChange = Math.abs(monthChange);
+          weightGoalDisplay = {
+            progress: isLosing ? Math.max(0, monthChange) : Math.max(0, -monthChange),
+            target: 0,
+            progressLabel: hasEntry
+              ? `${formatAmount(currentWeight)} ${weightUnit} · ${formatAmount(displayChange)} ${weightUnit} ${monthChange > 0 ? "lost" : monthChange < 0 ? "gained" : "no change"} this month`
+              : `No entries this month`,
+            progressAmountLabel: hasEntry
+              ? `Current: ${formatAmount(currentWeight)} ${weightUnit} · ${monthChange >= 0 ? "-" : "+"}${formatAmount(displayChange)} ${weightUnit} this month`
+              : "No entries this month"
+          };
+        } else if (periodName === "week") {
+          const mealsMetric = Array.isArray(tracker.progressMetrics)
+            ? tracker.progressMetrics.find(m => m.name === "Meals Tracked")
+            : null;
+          const mealsProgress = mealsMetric ? sumMetricForRange(tracker.id, mealsMetric.id, range) : 0;
+          const mealsTarget = mealsMetric ? (mealsMetric.weeklyTarget || 21) : 21;
+          weightGoalDisplay = {
+            progress: mealsProgress,
+            target: mealsTarget,
+            progressLabel: `${formatAmount(mealsProgress)} / ${formatAmount(mealsTarget)} meals`,
+            progressAmountLabel: `${formatAmount(mealsProgress)} / ${formatAmount(mealsTarget)} meals · ${percent(mealsProgress, mealsTarget)}%`
+          };
+        }
+      }
+      const effectiveProgress = weightGoalDisplay ? weightGoalDisplay.progress : progress;
+      const effectiveTarget = weightGoalDisplay ? weightGoalDisplay.target : target;
+
+      const goalHit = effectiveTarget > 0 && effectiveProgress >= effectiveTarget;
       const updatedThroughKey = getLastLoggedDateKey(index, tracker.id, range);
       const updatedThroughDate = updatedThroughKey ? formatDate(parseDateKey(updatedThroughKey)) : "-";
       const updatedThroughLabel = updatedThroughKey ? `Updated through ${updatedThroughDate}` : "Updated through -";
-      const pct = percent(progress, target);
-      const avg = safeDivide(progress, elapsedDays);
-      const needed = safeDivide(target, totalDays);
+      const pct = percent(effectiveProgress, effectiveTarget);
+      const avg = safeDivide(effectiveProgress, elapsedDays);
+      const needed = safeDivide(effectiveTarget, totalDays);
       const projectedTracker = avg * totalDays;
-      const isOnPace = projectedTracker >= target;
+      const isOnPace = projectedTracker >= effectiveTarget;
       const isPastPeriod = range.end < now;
       const hasAllEntriesLogged = hasTrackerEntriesForEveryDay(index, tracker.id, range);
       const useFinalPaceLabel = isPastPeriod && hasAllEntriesLogged;
@@ -9110,7 +9194,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         const projection = projectionAllowed && projectionEnabled
           ? getProjectionSeries(index, tracker.id, range, chartRange, series)
           : null;
-        graphMarkup = createCumulativeGraphSvg(series, target, range, overlaySeries, overlayRange, {
+        graphMarkup = createCumulativeGraphSvg(series, effectiveTarget, range, overlaySeries, overlayRange, {
           showCurrentPoints: true,
           showOverlayPoints: true,
           showProjectionPoints: true,
@@ -9128,11 +9212,11 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const paceDetailText = `Avg ${formatAmount(avg)} | Needed ${formatAmount(needed)} | Proj ${formatAmount(projectedTracker)}`;
       const unit = escapeHtml(normalizeGoalUnit(tracker.unit));
       const stretchValue = isFloating ? 0 : getStretchGoal(tracker.id, periodName, range);
-      const stretchPct = stretchValue > 0 ? Math.min(percent(stretchValue, target), 100) : 0;
+      const stretchPct = stretchValue > 0 ? Math.min(percent(stretchValue, effectiveTarget), 100) : 0;
       const stretchRow = stretchValue > 0
         ? `<span class="pace-popover-row"><span class="pace-popover-key">Stretch</span> <strong>${escapeHtml(formatAmount(stretchValue))} ${unit}</strong></span>`
         : "";
-      const paceButtonMarkup = isFloating ? "" : `
+      const paceButtonMarkup = isFloating || isWeightGoal ? "" : `
         <span class="pace-chip-wrap pace-chip-wrap-right">
           <button
             type="button"
@@ -9142,7 +9226,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             title="Pace"
           >P</button>
           <span class="pace-detail-popover">
-            <span class="pace-popover-row"><span class="pace-popover-key">Current</span> <strong>${escapeHtml(formatAmount(progress))} ${unit}</strong></span>
+            <span class="pace-popover-row"><span class="pace-popover-key">Current</span> <strong>${escapeHtml(formatAmount(effectiveProgress))} ${unit}</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Needed</span> <strong>${escapeHtml(formatAmount(needed))} ${unit}/day</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Avg</span> <strong>${escapeHtml(formatAmount(avg))} ${unit}/day</strong></span>
             <span class="pace-popover-row"><span class="pace-popover-key">Projected</span> <strong>${escapeHtml(formatAmount(projectedTracker))} ${unit}</strong></span>
@@ -9239,14 +9323,18 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           `
         : "";
 
-      const progressLabel = `${formatProgressAgainstGoal(progress, target, tracker.unit)} (${pct}%)`;
-      const progressAmountLabel = `${formatAmount(progress)} / ${formatAmount(target)} · ${pct}%`;
-      const projectedPct = percent(projectedTracker, target);
+      const progressLabel = weightGoalDisplay
+        ? weightGoalDisplay.progressLabel
+        : `${formatProgressAgainstGoal(effectiveProgress, effectiveTarget, tracker.unit)} (${pct}%)`;
+      const progressAmountLabel = weightGoalDisplay
+        ? weightGoalDisplay.progressAmountLabel
+        : `${formatAmount(effectiveProgress)} / ${formatAmount(effectiveTarget)} · ${pct}%`;
+      const projectedPct = percent(projectedTracker, effectiveTarget);
       const projectedLabel = `Projected ${formatAmountWithUnit(projectedTracker, tracker.unit)} (${projectedPct}%)`;
       const progressBarMarkup = isPeriodProgressEChartEnabled(periodName)
         ? createPeriodProgressBarEChartMarkup({
-          progressValue: progress,
-          targetValue: target,
+          progressValue: effectiveProgress,
+          targetValue: effectiveTarget,
           projectedValue: projectedTracker,
           currentPercent: pct,
           projectedPercent: projectedPct,
@@ -9257,7 +9345,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         : `
           <div class="pbar">
             <div class="pbar-track">
-              ${!isPastPeriod && projectedTracker > progress && target > 0 ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min((projectedTracker / target) * 100, 100)}%"></div>` : ""}
+              ${!isPastPeriod && projectedTracker > effectiveProgress && effectiveTarget > 0 ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min((projectedTracker / effectiveTarget) * 100, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
               <span class="pbar-inner-label">${escapeHtml(progressAmountLabel)}</span>
             </div>
@@ -11907,6 +11995,38 @@ function sumTrackerRange(index, trackerId, range) {
     current.setDate(current.getDate() + 1);
   }
   return total;
+}
+
+function getLatestEntryAmountInRange(trackerId, range) {
+  const startKey = getDateKey(range.start);
+  const endKey = getDateKey(range.end);
+  let latest = null;
+  let latestDate = null;
+  entries.forEach(e => {
+    if (e.trackerId !== trackerId) return;
+    if (e.date < startKey || e.date > endKey) return;
+    if (latestDate === null || e.date > latestDate) {
+      latestDate = e.date;
+      latest = e.amount;
+    }
+  });
+  return latest;
+}
+
+function getFirstEntryAmountInRange(trackerId, range) {
+  const startKey = getDateKey(range.start);
+  const endKey = getDateKey(range.end);
+  let first = null;
+  let firstDate = null;
+  entries.forEach(e => {
+    if (e.trackerId !== trackerId) return;
+    if (e.date < startKey || e.date > endKey) return;
+    if (firstDate === null || e.date < firstDate) {
+      firstDate = e.date;
+      first = e.amount;
+    }
+  });
+  return first;
 }
 
 function sumMetricForRange(trackerId, metricId, range) {
@@ -15566,6 +15686,9 @@ function normalizeGoalsPlusSetupMode(value) {
   if (value === GOALS_PLUS_SETUP_GOLF) {
     return GOALS_PLUS_SETUP_GOLF;
   }
+  if (value === GOALS_PLUS_SETUP_WEIGHT) {
+    return GOALS_PLUS_SETUP_WEIGHT;
+  }
   return GOALS_PLUS_SETUP_STANDARD;
 }
 
@@ -15669,6 +15792,18 @@ function normalizeGoalsPlusConfig(value) {
       golfType: normalizeGoalsPlusGolfType(raw.golfType)
     };
   }
+  if (mode === GOALS_PLUS_SETUP_WEIGHT) {
+    return {
+      mode: GOALS_PLUS_SETUP_WEIGHT,
+      startingWeight: normalizePositiveAmount(raw.startingWeight, 0),
+      targetWeight: normalizePositiveAmount(raw.targetWeight, 0),
+      weightUnit: typeof raw.weightUnit === "string" && ["lbs", "kg"].includes(raw.weightUnit) ? raw.weightUnit : "lbs",
+      runningWorkout: "easy",
+      workSpeed: 0,
+      recoverySpeed: 0,
+      golfType: GOALS_PLUS_GOLF_STANDARD
+    };
+  }
   return {
     mode: GOALS_PLUS_SETUP_STANDARD,
     runningWorkout: "easy",
@@ -15699,9 +15834,13 @@ function isGoalsPlusGolfTracker(tracker) {
   return getGoalsPlusSetupModeFromTracker(tracker) === GOALS_PLUS_SETUP_GOLF;
 }
 
+function isWeightGoalTracker(tracker) {
+  return getGoalsPlusSetupModeFromTracker(tracker) === GOALS_PLUS_SETUP_WEIGHT;
+}
+
 function isGoalsPlusTracker(tracker) {
   const mode = getGoalsPlusSetupModeFromTracker(tracker);
-  return mode === GOALS_PLUS_SETUP_RUNNING || mode === GOALS_PLUS_SETUP_GOLF;
+  return mode === GOALS_PLUS_SETUP_RUNNING || mode === GOALS_PLUS_SETUP_GOLF || mode === GOALS_PLUS_SETUP_WEIGHT;
 }
 
 function getPaceMinutesPerMile(distanceMiles, durationMinutes) {
@@ -17573,6 +17712,10 @@ function updateGoalTypeFields() {
     const golfLabel = goalsPlusNameOption.golfType === GOALS_PLUS_GOLF_DISC ? "Disc Golf" : "Golf";
     goalSetupPreviewGolfTitle.textContent = golfLabel;
   }
+  const useGoalsPlusWeight = goalsPlusNameOption.mode === GOALS_PLUS_SETUP_WEIGHT;
+  if (goalSetupPreviewWeight) {
+    goalSetupPreviewWeight.hidden = !useGoalsPlusWeight;
+  }
   // Keep hidden inputs at their defaults
   if (goalPlusRunningWorkInterval) {
     goalPlusRunningWorkInterval.value = String(NORWEGIAN_DEFAULT_WORK_SPEED_MPH);
@@ -17675,6 +17818,12 @@ function buildGoalsPlusConfigFromForm() {
       golfType: normalizeGoalsPlusGolfType(selectedOption.golfType)
     });
   }
+  if (selectedMode === GOALS_PLUS_SETUP_WEIGHT) {
+    const startingWeight = normalizePositiveAmount(goalPlusStartingWeight ? goalPlusStartingWeight.value : 0, 0);
+    const targetWeight = normalizePositiveAmount(goalPlusTargetWeight ? goalPlusTargetWeight.value : 0, 0);
+    const weightUnit = String(goalPlusWeightUnit ? goalPlusWeightUnit.value : "lbs");
+    return normalizeGoalsPlusConfig({ mode: GOALS_PLUS_SETUP_WEIGHT, startingWeight, targetWeight, weightUnit });
+  }
   const runningWorkout = normalizeRunningWorkout(selectedOption.runningWorkout);
   const isNorwegian = runningWorkout === "norwegian4x4";
   return normalizeGoalsPlusConfig({
@@ -17767,11 +17916,19 @@ function syncEntryGoalsPlusWorkoutVisibility(workoutValue) {
 function renderEntryGoalsPlusRunningInputs(tracker) {
   const running = isGoalsPlusRunningTracker(tracker);
   const golf = isGoalsPlusGolfTracker(tracker);
+  const weight = isWeightGoalTracker(tracker);
   if (entryGoalsPlusRunningWrap) {
     entryGoalsPlusRunningWrap.hidden = !running;
   }
   if (entryGoalsPlusGolfWrap) {
     entryGoalsPlusGolfWrap.hidden = !golf;
+  }
+  if (entryGoalsPlusWeightWrap) {
+    entryGoalsPlusWeightWrap.hidden = !weight;
+  }
+  if (weight && tracker && entryGoalsPlusWeightLabel) {
+    const weightUnit = (tracker.goalsPlus && tracker.goalsPlus.weightUnit) || "lbs";
+    entryGoalsPlusWeightLabel.textContent = `Current Weight (${weightUnit})`;
   }
   if (entryGoalsPlusGolfScore) {
     entryGoalsPlusGolfScore.disabled = !golf;
