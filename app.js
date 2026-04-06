@@ -200,6 +200,11 @@ const manageEmpty = document.querySelector("#manage-empty");
 const manageGoalsSearch = document.querySelector("#manage-goals-search");
 const manageTable = document.querySelector("#manage-table");
 const manageGoalsForm = document.querySelector("#manage-goals-form");
+const goalMigrationForm = document.querySelector("#goal-migration-form");
+const migrationSourceSelect = document.querySelector("#migration-source-select");
+const migrationDestSelect = document.querySelector("#migration-dest-select");
+const migrationArchiveSource = document.querySelector("#migration-archive-source");
+const migrationStatus = document.querySelector("#migration-status");
 const homeSummary = document.querySelector("#home-summary");
 const homeInsightsSummary = document.querySelector("#home-insights-summary");
 const homeInsightsList = document.querySelector("#home-insights-list");
@@ -764,6 +769,7 @@ if (trendsMetricSelect) {
 }
 updateGoalTypeFields();
 renderGoalMigrationOptions();
+renderGoalMigrationTab();
 updateEntryGoalsPlusDerivedLabel();
 renderGoalMetricsDraft();
 syncGoalAdditionalTrackingVisibility();
@@ -1238,7 +1244,7 @@ function setActiveTabSafe(tabName, options = {}) {
   const mappedTab = normalizedTab === "settings"
     ? "settings-general"
     : normalizedTab === "manage"
-    ? "settings-goals"
+    ? "settings-active-goals"
     : normalizedTab === "checkins"
     ? "settings-checkins"
     : normalizedTab;
@@ -2173,6 +2179,33 @@ if (manageGoalsForm) {
       alert(`Some accountability updates could not be sent: ${accountabilitySyncErrors.slice(0, 3).join(" | ")}${accountabilitySyncErrors.length > 3 ? " ..." : ""}`);
     }
     saveTrackers();
+    render();
+  });
+}
+
+if (goalMigrationForm) {
+  goalMigrationForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser) return;
+    const sourceId = String(migrationSourceSelect ? migrationSourceSelect.value : "");
+    const destId = String(migrationDestSelect ? migrationDestSelect.value : "");
+    if (!sourceId || !destId || sourceId === destId) {
+      if (migrationStatus) migrationStatus.textContent = "Please select two different goals.";
+      return;
+    }
+    const sourceTracker = trackers.find(t => t.id === sourceId);
+    const destTracker = trackers.find(t => t.id === destId);
+    if (!sourceTracker || !destTracker) return;
+    const archiveSource = Boolean(migrationArchiveSource && migrationArchiveSource.checked);
+    const result = migrateGoalTrackingToNewGoal(sourceTracker, destTracker, { archiveSource });
+    if (result.movedEntries > 0) saveEntries();
+    if (result.movedSchedules > 0) saveSchedules();
+    if (result.movedJournalLinks > 0) saveGoalJournalEntries();
+    if (result.archivedSource) saveTrackers();
+    const archiveNote = result.archivedSource ? " Source goal archived." : "";
+    if (migrationStatus) {
+      migrationStatus.textContent = `Migration complete. Moved ${result.movedEntries} entr${result.movedEntries === 1 ? "y" : "ies"}, ${result.movedSchedules} schedule item${result.movedSchedules === 1 ? "" : "s"}, and ${result.movedJournalLinks} journal link${result.movedJournalLinks === 1 ? "" : "s"}.${archiveNote}`;
+    }
     render();
   });
 }
@@ -5157,6 +5190,7 @@ function render() {
   }
   updateGoalTypeFields();
   renderGoalMigrationOptions();
+  renderGoalMigrationTab();
   applyBucketListFeatureVisibility();
   applyRewardPointsFeatureVisibility();
   applyQuarterFeatureVisibility();
@@ -9214,7 +9248,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
       const tailwindCount = Array.isArray(tracker.tailwinds) ? tracker.tailwinds.length : 0;
       const leftActionsMarkup = `
         <span class="pace-actions pace-actions-left">
-          <button type="button" class="btn btn-graph" data-action="jump-tab" data-tab-target="settings-goals" title="Goal Settings" aria-label="Goal Settings">⚙</button>
+          <button type="button" class="btn btn-graph" data-action="jump-tab" data-tab-target="settings-goal-setup" title="Goal Settings" aria-label="Goal Settings">⚙</button>
           <button
             type="button"
             class="btn btn-graph${headwindCount > 0 ? " btn-headwinds-on" : ""}"
@@ -17253,6 +17287,16 @@ function syncGoalMigrationControls() {
   }
   const hasSource = Boolean(String(goalMigrateSource.value || "").trim());
   goalMigrateArchiveSource.disabled = !hasSource;
+}
+
+function renderGoalMigrationTab() {
+  if (!migrationSourceSelect || !migrationDestSelect) return;
+  const activeGoals = trackers.filter(t => !t.archived);
+  const options = activeGoals.map(t => `<option value="${escapeAttr(t.id)}">${escapeHtml(t.name)}</option>`).join("");
+  const blank = `<option value="">Select goal...</option>`;
+  migrationSourceSelect.innerHTML = blank + options;
+  migrationDestSelect.innerHTML = blank + options;
+  if (migrationStatus) migrationStatus.textContent = "";
 }
 
 function renderGoalMigrationOptions() {

@@ -4423,3 +4423,38 @@ body[data-performance="light"] * {
   vertical-align: middle;
   margin-left: 4px;
 }
+
+.goal-form-collapsible {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.goal-form-collapsible-summary {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.92rem;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+}
+
+.goal-form-collapsible-summary::after {
+  content: "▸";
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.goal-form-collapsible[open] .goal-form-collapsible-summary::after {
+  transform: rotate(90deg);
+}
+
+.goal-form-collapsible > section {
+  padding: 0 16px 16px;
+}

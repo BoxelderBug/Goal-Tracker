@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406h" />
+  <link rel="stylesheet" href="styles.css?v=20260406i" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -136,7 +136,9 @@
               <div class="dropdown-menu user-account-menu">
                 <button class="menu-btn" type="button" data-tab="home">Dashboard</button>
                 <button class="menu-btn" type="button" data-tab="settings-general">Settings Home</button>
-                <button class="menu-btn" type="button" data-tab="settings-goals">Goal Settings</button>
+                <button class="menu-btn" type="button" data-tab="settings-goal-setup">Goal Setup</button>
+                <button class="menu-btn" type="button" data-tab="settings-active-goals">Active Goals</button>
+                <button class="menu-btn" type="button" data-tab="settings-goal-migration">Goal Migration</button>
                 <button class="menu-btn" type="button" data-tab="settings-checkins">Check-in Settings</button>
                 <button class="menu-btn" type="button" data-tab="settings-general" data-scroll-target="#account-security-section">Profile Settings</button>
                 <button class="menu-btn" type="button" data-tab="social" data-social-section="friends">Friends</button>
@@ -201,6 +203,10 @@
             <button class="btn dropdown-toggle" type="button" data-dropdown-toggle>Settings</button>
             <div class="dropdown-menu">
               <button class="menu-btn" type="button" data-tab="settings-general">Settings</button>
+              <button class="menu-btn" type="button" data-tab="settings-goal-setup">Goal Setup</button>
+              <button class="menu-btn" type="button" data-tab="settings-active-goals">Active Goals</button>
+              <button class="menu-btn" type="button" data-tab="settings-goal-migration">Goal Migration</button>
+              <button class="menu-btn" type="button" data-tab="settings-checkins">Check-in Settings</button>
             </div>
           </div>
 
@@ -304,8 +310,8 @@
         </div>
       </section>
 
-      <section class="panel tab-panel" data-tab-panel="settings-goals" hidden>
-        <h2>Goal Settings</h2>
+      <section class="panel tab-panel" data-tab-panel="settings-goal-setup" hidden>
+        <h2>Goal Setup</h2>
         <form id="goal-form" class="form-block">
           <div class="form-grid form-grid-3">
             <label>
@@ -369,25 +375,6 @@
             <input id="goal-plus-running-work-interval" type="hidden" value="8.0" />
             <input id="goal-plus-running-recovery-interval" type="hidden" value="4.0" />
           </section>
-          <section id="goal-migrate-wrap" class="progress-metrics-builder" aria-label="Goal migration">
-            <div class="snapshot-panel-head">
-              <h3>Migration</h3>
-              <p class="muted small">Move tracking history from an existing goal into this new goal.</p>
-            </div>
-            <div class="form-grid form-grid-2">
-              <label>
-                Migrate From Goal
-                <select id="goal-migrate-source">
-                  <option value="">Don't migrate</option>
-                </select>
-              </label>
-              <label class="check-inline">
-                <input id="goal-migrate-archive-source" type="checkbox" checked />
-                Archive source goal after transfer
-              </label>
-            </div>
-            <p class="muted small">Transfers entries, schedules, and goal journal links.</p>
-          </section>
           <div class="form-grid form-grid-3">
             <label>
               Unit
@@ -430,65 +417,71 @@
             </div>
           </section>
           <!-- Headwinds -->
-          <section class="progress-metrics-builder" aria-label="Headwinds">
-            <div class="snapshot-panel-head">
-              <h3>Headwinds</h3>
-              <p class="muted small">Headwinds are challenges that might slow you down.</p>
-            </div>
-            <div class="form-grid form-grid-2 goal-headwinds-fields">
-              <label>
-                Headwind Name
-                <input id="goal-headwind-name" type="text" maxlength="80" placeholder="Busy schedule, travel, low motivation..." />
-              </label>
-              <label>
-                Description
-                <input id="goal-headwind-description" type="text" maxlength="200" placeholder="Briefly describe the headwind..." />
-              </label>
-              <label>
-                How to Prevent It
-                <input id="goal-headwind-prevention" type="text" maxlength="200" placeholder="Block time, set reminders, plan ahead..." />
-              </label>
-              <label>
-                If It Happens
-                <input id="goal-headwind-recovery" type="text" maxlength="200" placeholder="Make it up the next day, adjust weekly target..." />
-              </label>
-            </div>
-            <div class="progress-metrics-actions">
-              <button id="goal-headwind-add-btn" class="btn" type="button">Add Headwind</button>
-            </div>
-            <ul id="goal-headwinds-draft-list" class="card-list compact-list"></ul>
-            <p id="goal-headwinds-draft-empty" class="muted small">No headwinds added yet.</p>
-          </section>
+          <details class="goal-form-collapsible">
+            <summary class="goal-form-collapsible-summary">Headwinds</summary>
+            <section class="progress-metrics-builder" aria-label="Headwinds">
+              <div class="snapshot-panel-head">
+                <h3>Headwinds</h3>
+                <p class="muted small">Headwinds are challenges that might slow you down.</p>
+              </div>
+              <div class="form-grid form-grid-2 goal-headwinds-fields">
+                <label>
+                  Headwind Name
+                  <input id="goal-headwind-name" type="text" maxlength="80" placeholder="Busy schedule, travel, low motivation..." />
+                </label>
+                <label>
+                  Description
+                  <input id="goal-headwind-description" type="text" maxlength="200" placeholder="Briefly describe the headwind..." />
+                </label>
+                <label>
+                  How to Prevent It
+                  <input id="goal-headwind-prevention" type="text" maxlength="200" placeholder="Block time, set reminders, plan ahead..." />
+                </label>
+                <label>
+                  If It Happens
+                  <input id="goal-headwind-recovery" type="text" maxlength="200" placeholder="Make it up the next day, adjust weekly target..." />
+                </label>
+              </div>
+              <div class="progress-metrics-actions">
+                <button id="goal-headwind-add-btn" class="btn" type="button">Add Headwind</button>
+              </div>
+              <ul id="goal-headwinds-draft-list" class="card-list compact-list"></ul>
+              <p id="goal-headwinds-draft-empty" class="muted small">No headwinds added yet.</p>
+            </section>
+          </details>
           <!-- Tailwinds -->
-          <section class="progress-metrics-builder" aria-label="Tailwinds">
-            <div class="snapshot-panel-head">
-              <h3>Tailwinds</h3>
-              <p class="muted small">Habits and conditions that help you follow through on this goal.</p>
-            </div>
-            <div class="form-grid form-grid-2 goal-tailwinds-fields">
-              <label>
-                Tailwind Name
-                <input id="goal-tailwind-name" type="text" maxlength="80" placeholder="Morning routine, accountability partner..." />
-              </label>
-              <label>
-                Description
-                <input id="goal-tailwind-description" type="text" maxlength="200" placeholder="Briefly describe this habit or condition..." />
-              </label>
-              <label>
-                How It Helps
-                <input id="goal-tailwind-how-helps" type="text" maxlength="200" placeholder="Builds momentum, reduces friction..." />
-              </label>
-              <label>
-                How to Build It
-                <input id="goal-tailwind-how-build" type="text" maxlength="200" placeholder="Start small, tie to existing habit..." />
-              </label>
-            </div>
-            <div class="progress-metrics-actions">
-              <button id="goal-tailwind-add-btn" class="btn" type="button">Add Tailwind</button>
-            </div>
-            <ul id="goal-tailwinds-draft-list" class="card-list compact-list"></ul>
-            <p id="goal-tailwinds-draft-empty" class="muted small">No tailwinds added yet.</p>
-          </section>
+          <details class="goal-form-collapsible">
+            <summary class="goal-form-collapsible-summary">Tailwinds</summary>
+            <section class="progress-metrics-builder" aria-label="Tailwinds">
+              <div class="snapshot-panel-head">
+                <h3>Tailwinds</h3>
+                <p class="muted small">Habits and conditions that help you follow through on this goal.</p>
+              </div>
+              <div class="form-grid form-grid-2 goal-tailwinds-fields">
+                <label>
+                  Tailwind Name
+                  <input id="goal-tailwind-name" type="text" maxlength="80" placeholder="Morning routine, accountability partner..." />
+                </label>
+                <label>
+                  Description
+                  <input id="goal-tailwind-description" type="text" maxlength="200" placeholder="Briefly describe this habit or condition..." />
+                </label>
+                <label>
+                  How It Helps
+                  <input id="goal-tailwind-how-helps" type="text" maxlength="200" placeholder="Builds momentum, reduces friction..." />
+                </label>
+                <label>
+                  How to Build It
+                  <input id="goal-tailwind-how-build" type="text" maxlength="200" placeholder="Start small, tie to existing habit..." />
+                </label>
+              </div>
+              <div class="progress-metrics-actions">
+                <button id="goal-tailwind-add-btn" class="btn" type="button">Add Tailwind</button>
+              </div>
+              <ul id="goal-tailwinds-draft-list" class="card-list compact-list"></ul>
+              <p id="goal-tailwinds-draft-empty" class="muted small">No tailwinds added yet.</p>
+            </section>
+          </details>
           <!-- Term goal deadline fields -->
           <div id="goal-term-wrap" hidden>
             <div class="form-grid form-grid-2">
@@ -601,7 +594,10 @@
           </div>
           <button class="btn btn-primary" type="submit">Add Goal</button>
         </form>
+      </section>
 
+      <section class="panel tab-panel" data-tab-panel="settings-active-goals" hidden>
+        <h2>Active Goals</h2>
         <div class="table-filter-row">
           <input id="manage-goals-search" type="search" placeholder="Filter goals by name..." />
         </div>
@@ -633,7 +629,35 @@
             <button id="manage-save-all" class="btn" type="submit">Save All Goals</button>
           </div>
         </form>
-        <p id="manage-empty" class="empty-state">No goals yet. Add your first goal above.</p>
+        <p id="manage-empty" class="empty-state">No goals yet. Add your first goal in Goal Setup.</p>
+      </section>
+
+      <section class="panel tab-panel" data-tab-panel="settings-goal-migration" hidden>
+        <h2>Goal Migration</h2>
+        <p class="muted">Move tracking history, entries, schedules, and journal links from one goal to another.</p>
+        <form id="goal-migration-form" class="form-block">
+          <div class="form-grid form-grid-2">
+            <label>
+              Migrate From (Source)
+              <select id="migration-source-select">
+                <option value="">Select source goal...</option>
+              </select>
+            </label>
+            <label>
+              Migrate To (Destination)
+              <select id="migration-dest-select">
+                <option value="">Select destination goal...</option>
+              </select>
+            </label>
+          </div>
+          <label class="check-inline">
+            <input id="migration-archive-source" type="checkbox" checked />
+            Archive source goal after transfer
+          </label>
+          <p class="muted small">Transfers entries, schedules, and goal journal links. This cannot be undone.</p>
+          <button class="btn btn-primary" type="submit">Run Migration</button>
+        </form>
+        <p id="migration-status" class="muted small"></p>
       </section>
 
       <section class="panel tab-panel" data-tab-panel="entry" hidden>
@@ -1493,7 +1517,7 @@
           <p class="muted small">Use focused settings pages for goals, check-ins, and point store.</p>
         </div>
         <div class="actions">
-          <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-goals">Goal Settings</button>
+          <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-goal-setup">Goal Setup</button>
           <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-checkins">Check-in Settings</button>
           <button class="btn" type="button" data-action="jump-tab" data-tab-target="settings-point-store">Point Store Settings</button>
         </div>
@@ -1950,7 +1974,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406h"></script>
+  <script type="module" src="app.js?v=20260406i"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
