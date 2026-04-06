@@ -165,13 +165,13 @@ const goalMetricAddButton = document.querySelector("#goal-metric-add-btn");
 const goalMetricsDraftList = document.querySelector("#goal-metrics-draft-list");
 const goalMetricsDraftEmpty = document.querySelector("#goal-metrics-draft-empty");
 const goalSetupMode = document.querySelector("#goal-setup-mode");
+const goalSetupWrap = document.querySelector("#goal-setup-wrap");
+const goalSetupPreviewRunning = document.querySelector("#goal-setup-preview-running");
+const goalSetupPreviewGolf = document.querySelector("#goal-setup-preview-golf");
+const goalSetupPreviewGolfTitle = document.querySelector("#goal-setup-preview-golf-title");
 const goalPlusRunningWorkout = document.querySelector("#goal-plus-running-workout");
-const goalPlusRunningWorkoutLabel = document.querySelector("#goal-plus-running-workout-label");
-const goalPlusRunningWorkIntervalLabel = document.querySelector("#goal-plus-running-work-interval-label");
-const goalPlusRunningRecoveryIntervalLabel = document.querySelector("#goal-plus-running-recovery-interval-label");
 const goalPlusRunningWorkInterval = document.querySelector("#goal-plus-running-work-interval");
 const goalPlusRunningRecoveryInterval = document.querySelector("#goal-plus-running-recovery-interval");
-const goalPlusRunningNote = document.querySelector("#goal-plus-running-note");
 const goalMigrateSource = document.querySelector("#goal-migrate-source");
 const goalMigrateArchiveSource = document.querySelector("#goal-migrate-archive-source");
 const goalTermWrap = document.querySelector("#goal-term-wrap");
@@ -16445,33 +16445,26 @@ function updateGoalTypeFields() {
     goalPlusRunningWorkout.value = runningWorkout;
     goalPlusRunningWorkout.disabled = true;
   }
-  const showNorwegianIntervals = useGoalsPlusRunning && runningWorkout === "norwegian4x4";
-  if (goalPlusRunningWorkoutLabel) {
-    goalPlusRunningWorkoutLabel.hidden = true;
+  // Show the Goals+ overview section only when a Goals+ mode is active
+  if (goalSetupWrap) {
+    goalSetupWrap.hidden = !useGoalsPlus;
   }
-  if (goalPlusRunningWorkIntervalLabel) {
-    goalPlusRunningWorkIntervalLabel.hidden = !showNorwegianIntervals;
+  if (goalSetupPreviewRunning) {
+    goalSetupPreviewRunning.hidden = !useGoalsPlusRunning;
   }
-  if (goalPlusRunningRecoveryIntervalLabel) {
-    goalPlusRunningRecoveryIntervalLabel.hidden = !showNorwegianIntervals;
+  if (goalSetupPreviewGolf) {
+    goalSetupPreviewGolf.hidden = !useGoalsPlusGolf;
   }
-  if (goalPlusRunningNote) {
-    goalPlusRunningNote.hidden = !useGoalsPlusRunning;
+  if (goalSetupPreviewGolfTitle && useGoalsPlusGolf) {
+    const golfLabel = goalsPlusNameOption.golfType === GOALS_PLUS_GOLF_DISC ? "Disc Golf" : "Golf";
+    goalSetupPreviewGolfTitle.textContent = golfLabel;
   }
-  if (showNorwegianIntervals) {
-    if (goalPlusRunningWorkInterval && normalizeRunningSpeedMph(goalPlusRunningWorkInterval.value, 0) <= 0) {
-      goalPlusRunningWorkInterval.value = String(NORWEGIAN_DEFAULT_WORK_SPEED_MPH);
-    }
-    if (goalPlusRunningRecoveryInterval && normalizeRunningSpeedMph(goalPlusRunningRecoveryInterval.value, 0) <= 0) {
-      goalPlusRunningRecoveryInterval.value = String(NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH);
-    }
-  } else {
-    if (goalPlusRunningWorkInterval) {
-      goalPlusRunningWorkInterval.value = String(NORWEGIAN_DEFAULT_WORK_SPEED_MPH);
-    }
-    if (goalPlusRunningRecoveryInterval) {
-      goalPlusRunningRecoveryInterval.value = String(NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH);
-    }
+  // Keep hidden inputs at their defaults
+  if (goalPlusRunningWorkInterval) {
+    goalPlusRunningWorkInterval.value = String(NORWEGIAN_DEFAULT_WORK_SPEED_MPH);
+  }
+  if (goalPlusRunningRecoveryInterval) {
+    goalPlusRunningRecoveryInterval.value = String(NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH);
   }
   if (isYesNoMode) {
     goalType.value = "yesno";

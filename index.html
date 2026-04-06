@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406c" />
+  <link rel="stylesheet" href="styles.css?v=20260406d" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -339,37 +339,35 @@
               </select>
             </label>
           </div>
-          <section id="goal-setup-wrap" class="progress-metrics-builder" aria-label="Goal setup">
+          <section id="goal-setup-wrap" class="progress-metrics-builder" aria-label="Goal setup" hidden>
             <div class="snapshot-panel-head">
-              <h3>Goal Setup</h3>
-              <p class="muted small">Use Goals+ for running or golf/disc golf score tracking.</p>
+              <h3>Goals+ Overview</h3>
             </div>
-            <div class="form-grid form-grid-3 goals-plus-config-grid">
-              <label id="goal-plus-running-workout-label" hidden>
-                Running Option
-                <select id="goal-plus-running-workout">
-                  <option value="easy">Easy Run</option>
-                  <option value="tempo">Tempo Run</option>
-                  <option value="long">Long Run</option>
-                  <option value="norwegian4x4">Norwegian 4x4</option>
-                  <option value="intervals">Intervals</option>
-                  <option value="hill-repeats">Hill Repeats</option>
-                  <option value="fartlek">Fartlek</option>
-                  <option value="recovery">Recovery Run</option>
-                  <option value="progression">Progression Run</option>
-                  <option value="threshold">Threshold Run</option>
-                </select>
-              </label>
-              <label id="goal-plus-running-work-interval-label" hidden>
-                Work Speed (mph)
-                <input id="goal-plus-running-work-interval" type="number" min="0.1" max="20" step="0.1" value="8.0" />
-              </label>
-              <label id="goal-plus-running-recovery-interval-label" hidden>
-                Recovery Speed (mph)
-                <input id="goal-plus-running-recovery-interval" type="number" min="0.1" max="20" step="0.1" value="4.0" />
-              </label>
+            <!-- Running info panel -->
+            <div id="goal-setup-preview-running" class="goals-plus-preview" hidden>
+              <p class="goals-plus-preview-title">Running</p>
+              <ul class="goals-plus-preview-list">
+                <li>Workout type (Easy, Tempo, Long, Intervals, Fartlek, and more)</li>
+                <li>Distance (miles) and duration (minutes)</li>
+                <li>Automatic pace calculation (min/mile)</li>
+                <li>Estimated VO2 max from effort</li>
+                <li>Norwegian 4x4 interval support with configurable work &amp; recovery speeds</li>
+                <li>Custom exercise tracking (name, reps, weight)</li>
+              </ul>
             </div>
-            <p id="goal-plus-running-note" class="muted small" hidden>Running Goals+ entries include workout type, distance, and time with automatic pace and estimated VO2.</p>
+            <!-- Golf info panel -->
+            <div id="goal-setup-preview-golf" class="goals-plus-preview" hidden>
+              <p class="goals-plus-preview-title" id="goal-setup-preview-golf-title">Golf</p>
+              <ul class="goals-plus-preview-list">
+                <li>Round score per entry</li>
+                <li>Average score and best score tracked automatically</li>
+                <li>Supports standard Golf and Disc Golf</li>
+              </ul>
+            </div>
+            <!-- Hidden inputs retained for form compatibility -->
+            <input id="goal-plus-running-workout" type="hidden" value="easy" />
+            <input id="goal-plus-running-work-interval" type="hidden" value="8.0" />
+            <input id="goal-plus-running-recovery-interval" type="hidden" value="4.0" />
           </section>
           <section id="goal-migrate-wrap" class="progress-metrics-builder" aria-label="Goal migration">
             <div class="snapshot-panel-head">
@@ -1858,7 +1856,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406c"></script>
+  <script type="module" src="app.js?v=20260406d"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
