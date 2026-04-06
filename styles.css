@@ -4458,3 +4458,33 @@ body[data-performance="light"] * {
 .goal-form-collapsible > section {
   padding: 0 16px 16px;
 }
+
+.btn-metrics-on {
+  color: var(--brand) !important;
+}
+
+.metrics-expand-section {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.metric-sub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-sub-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

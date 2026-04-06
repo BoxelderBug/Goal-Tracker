@@ -164,6 +164,9 @@ const goalAdditionalTrackingEnabled = document.querySelector("#goal-additional-t
 const goalAdditionalTrackingFields = document.querySelector("#goal-additional-tracking-fields");
 const goalMetricName = document.querySelector("#goal-metric-name");
 const goalMetricUnit = document.querySelector("#goal-metric-unit");
+const goalMetricWeeklyTarget = document.querySelector("#goal-metric-weekly-target");
+const goalMetricMonthlyTarget = document.querySelector("#goal-metric-monthly-target");
+const goalMetricYearlyTarget = document.querySelector("#goal-metric-yearly-target");
 const goalMetricAddButton = document.querySelector("#goal-metric-add-btn");
 const goalMetricsDraftList = document.querySelector("#goal-metrics-draft-list");
 const goalMetricsDraftEmpty = document.querySelector("#goal-metrics-draft-empty");
@@ -611,6 +614,12 @@ const projectionLineState = {
   quarter: {}
 };
 const inlineGraphState = {
+  week: {},
+  month: {},
+  year: {},
+  quarter: {}
+};
+const metricExpansionState = {
   week: {},
   month: {},
   year: {},
@@ -1984,6 +1993,9 @@ goalForm.addEventListener("submit", (event) => {
   if (goalMetricUnit) {
     goalMetricUnit.value = "";
   }
+  if (goalMetricWeeklyTarget) goalMetricWeeklyTarget.value = "0";
+  if (goalMetricMonthlyTarget) goalMetricMonthlyTarget.value = "0";
+  if (goalMetricYearlyTarget) goalMetricYearlyTarget.value = "0";
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
   syncGoalAdditionalTrackingVisibility();
@@ -4362,6 +4374,16 @@ function handleGraphCardActions(event) {
       return;
     }
     inlineGraphState[period][id] = !getInlineGraphVisible(period, id);
+    renderPeriodTabs();
+    return;
+  }
+
+  const metricsExpandButton = event.target.closest("button[data-action='toggle-metrics-expand']");
+  if (metricsExpandButton) {
+    const period = metricsExpandButton.dataset.period;
+    const id = metricsExpandButton.dataset.id;
+    if (!period || !id || !metricExpansionState[period]) return;
+    metricExpansionState[period][id] = !getMetricExpansionVisible(period, id);
     renderPeriodTabs();
     return;
   }
@@ -9242,6 +9264,44 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           </div>
         `;
 
+      const hasMetrics = Array.isArray(tracker.progressMetrics) && tracker.progressMetrics.length > 0;
+      const metricsVisible = getMetricExpansionVisible(periodName, tracker.id);
+      const metricsButtonMarkup = hasMetrics ? `
+        <button
+          type="button"
+          class="btn btn-graph${metricsVisible ? " btn-metrics-on" : ""}"
+          data-action="toggle-metrics-expand"
+          data-period="${periodName}"
+          data-id="${escapeAttr(tracker.id)}"
+          aria-expanded="${metricsVisible ? "true" : "false"}"
+          title="${metricsVisible ? "Hide metrics" : "Show metrics"}"
+          aria-label="${metricsVisible ? "Hide metrics" : "Show metrics"}"
+        >M</button>
+      ` : "";
+
+      let metricsExpandMarkup = "";
+      if (hasMetrics && metricsVisible) {
+        const metricCards = tracker.progressMetrics.map(metric => {
+          const metricProgress = sumMetricForRange(tracker.id, metric.id, range);
+          const metricTarget = periodName === "month" ? metric.monthlyTarget
+            : periodName === "year" ? metric.yearlyTarget
+            : metric.weeklyTarget;
+          const metricPct = metricTarget > 0 ? percent(metricProgress, metricTarget) : null;
+          const metricHit = metricTarget > 0 && metricProgress >= metricTarget;
+          const toneClass = metricHit ? "pace-on" : "";
+          const progressBarHtml = metricTarget > 0
+            ? `<div class="pbar"><div class="pbar-track"><div class="pbar-fill ${toneClass}" style="width:${Math.min(metricPct, 100)}%"></div><span class="pbar-inner-label">${escapeHtml(formatAmount(metricProgress))} / ${escapeHtml(formatAmount(metricTarget))} ${escapeHtml(normalizeGoalUnit(metric.unit))} · ${metricPct}%</span></div></div>`
+            : `<p class="muted small">${escapeHtml(formatAmount(metricProgress))} ${escapeHtml(normalizeGoalUnit(metric.unit))} logged</p>`;
+          return `
+            <div class="metric-sub-card">
+              <p class="metric-sub-name">${escapeHtml(metric.name)}</p>
+              ${progressBarHtml}
+            </div>
+          `;
+        }).join("");
+        metricsExpandMarkup = `<div class="metrics-expand-section">${metricCards}</div>`;
+      }
+
       const deadlineBadge = getDeadlineBadgeMarkup(tracker);
       const ioSummary = getInputOutputSummaryMarkup(tracker);
       const headwindCount = Array.isArray(tracker.headwinds) ? tracker.headwinds.length : 0;
@@ -9292,6 +9352,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
             <span class="pace-actions">
               ${paceButtonMarkup}
               <button type="button" class="btn btn-graph" data-action="deep-dive-graph" data-period="${periodName}" data-id="${tracker.id}" title="Deep Dive" aria-label="Deep Dive">D</button>
+              ${metricsButtonMarkup}
               <button
                 type="button"
                 class="btn btn-icon"
@@ -9318,6 +9379,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
               </div>
             </div>
           </div>
+          ${metricsExpandMarkup}
         </li>
       `;
     })
@@ -11599,6 +11661,10 @@ function getInlineGraphVisible(periodName, trackerId) {
   return inlineGraphState[periodName][trackerId];
 }
 
+function getMetricExpansionVisible(periodName, trackerId) {
+  return Boolean(metricExpansionState[periodName] && metricExpansionState[periodName][trackerId]);
+}
+
 function syncGoalCompareState() {
   const trackerIds = new Set(trackers.map((tracker) => tracker.id));
   Object.keys(goalCompareState).forEach((periodName) => {
@@ -11831,6 +11897,21 @@ function sumTrackerRange(index, trackerId, range) {
     total = addAmount(total, index.trackerDateTotals.get(key) || 0);
     current.setDate(current.getDate() + 1);
   }
+  return total;
+}
+
+function sumMetricForRange(trackerId, metricId, range) {
+  const startKey = getDateKey(range.start);
+  const endKey = getDateKey(range.end);
+  let total = 0;
+  entries.forEach(entry => {
+    if (entry.trackerId !== trackerId) return;
+    if (entry.date < startKey || entry.date > endKey) return;
+    const val = entry.metricValues && entry.metricValues[metricId];
+    if (typeof val === "number" && val > 0) {
+      total = addAmount(total, val);
+    }
+  });
   return total;
 }
 
@@ -15983,7 +16064,10 @@ function normalizeProgressMetricList(value, options = {}) {
     normalized.push({
       id,
       name,
-      unit
+      unit,
+      weeklyTarget: normalizePositiveAmount(item.weeklyTarget, 0),
+      monthlyTarget: normalizePositiveAmount(item.monthlyTarget, 0),
+      yearlyTarget: normalizePositiveAmount(item.yearlyTarget, 0)
     });
   });
   return normalized.slice(0, 12);
@@ -16016,15 +16100,22 @@ function renderGoalMetricsDraft() {
   }
   goalMetricsDraftEmpty.style.display = "none";
   goalMetricsDraftList.innerHTML = goalMetricsDraft
-    .map((metric, index) => `
+    .map((metric, index) => {
+      const targetText = [
+        metric.weeklyTarget > 0 ? `W: ${formatAmount(metric.weeklyTarget)}` : null,
+        metric.monthlyTarget > 0 ? `M: ${formatAmount(metric.monthlyTarget)}` : null,
+        metric.yearlyTarget > 0 ? `Y: ${formatAmount(metric.yearlyTarget)}` : null
+      ].filter(Boolean).join(" · ");
+      return `
       <li class="quick-item progress-metric-item" style="--stagger:${index}">
         <div>
           <strong>${escapeHtml(metric.name)}</strong>
-          <p class="muted small">${escapeHtml(metric.unit)}</p>
+          <p class="muted small">${escapeHtml(metric.unit)}${targetText ? ` · ${escapeHtml(targetText)}` : ""}</p>
         </div>
         <button class="btn btn-danger" type="button" data-action="remove-goal-metric" data-id="${escapeAttr(metric.id)}">Remove</button>
       </li>
-    `)
+    `;
+    })
     .join("");
 }
 
@@ -16723,9 +16814,15 @@ function addGoalMetricToDraft() {
   if (!metricName) {
     return;
   }
+  const weeklyTarget = normalizePositiveAmount(goalMetricWeeklyTarget ? goalMetricWeeklyTarget.value : 0, 0);
+  const monthlyTarget = normalizePositiveAmount(goalMetricMonthlyTarget ? goalMetricMonthlyTarget.value : 0, 0);
+  const yearlyTarget = normalizePositiveAmount(goalMetricYearlyTarget ? goalMetricYearlyTarget.value : 0, 0);
   const nextMetric = {
     name: metricName,
-    unit: goalMetricUnit ? goalMetricUnit.value : ""
+    unit: goalMetricUnit ? goalMetricUnit.value : "",
+    weeklyTarget,
+    monthlyTarget,
+    yearlyTarget
   };
   const fallbackUnit = goalUnit ? goalUnit.value : "units";
   const nextMetrics = normalizeProgressMetricList(
@@ -16743,6 +16840,9 @@ function addGoalMetricToDraft() {
   if (goalMetricUnit) {
     goalMetricUnit.value = "";
   }
+  if (goalMetricWeeklyTarget) goalMetricWeeklyTarget.value = "0";
+  if (goalMetricMonthlyTarget) goalMetricMonthlyTarget.value = "0";
+  if (goalMetricYearlyTarget) goalMetricYearlyTarget.value = "0";
   goalMetricName.focus();
   renderGoalMetricsDraft();
 }

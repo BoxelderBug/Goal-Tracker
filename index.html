@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406i" />
+  <link rel="stylesheet" href="styles.css?v=20260406j" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -411,6 +411,18 @@
                 <div class="progress-metrics-actions">
                   <button id="goal-metric-add-btn" class="btn" type="button">Add Metric</button>
                 </div>
+                <label>
+                  Weekly Target
+                  <input id="goal-metric-weekly-target" type="number" min="0" max="1000000" step="0.01" value="0" placeholder="0" />
+                </label>
+                <label>
+                  Monthly Target
+                  <input id="goal-metric-monthly-target" type="number" min="0" max="1000000" step="0.01" value="0" placeholder="0" />
+                </label>
+                <label>
+                  Yearly Target
+                  <input id="goal-metric-yearly-target" type="number" min="0" max="1000000" step="0.01" value="0" placeholder="0" />
+                </label>
               </div>
               <ul id="goal-metrics-draft-list" class="card-list compact-list"></ul>
               <p id="goal-metrics-draft-empty" class="muted small">No additional tracking metrics yet.</p>
@@ -1974,7 +1986,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406i"></script>
+  <script type="module" src="app.js?v=20260406j"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
