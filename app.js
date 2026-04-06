@@ -1230,6 +1230,9 @@ function setActiveTabSafe(tabName, options = {}) {
     if (activeTab === "goal-schedule") {
       renderGoalScheduleTab();
     }
+    if (activeTab === "missed-entries") {
+      renderMissedEntriesTab();
+    }
     scheduleEChartResizePasses();
   }
 }
@@ -6788,8 +6791,13 @@ function getMissingEntryDateItems(now = new Date()) {
   const today = normalizeDate(now);
   const todayKey = getDateKey(today);
   const todayDay = dateKeyToDayNumber(todayKey);
+  // Clamp scan to the start of the current year so we don't surface years of historical gaps
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  const yearStartDay = dateKeyToDayNumber(getDateKey(yearStart));
   const activeGoals = trackers
-    .filter((tracker) => tracker && !tracker.archived && normalizeGoalType(tracker.goalType) !== "bucket");
+    .filter((tracker) => tracker && !tracker.archived
+      && normalizeGoalType(tracker.goalType) !== "bucket"
+      && !isFloatingGoalType(tracker.goalType));
   if (activeGoals.length < 1) {
     return [];
   }
@@ -6820,8 +6828,10 @@ function getMissingEntryDateItems(now = new Date()) {
     }
     return Math.min(minimum, startDay);
   }, todayDay);
+  // Never scan further back than the start of the current year
+  const scanStart = Math.max(firstDay, yearStartDay);
   const missingByDate = [];
-  for (let dayNumber = firstDay; dayNumber <= todayDay; dayNumber += 1) {
+  for (let dayNumber = scanStart; dayNumber <= todayDay; dayNumber += 1) {
     const dateKey = dayNumberToDateKey(dayNumber);
     const trackerSet = entryTrackerMapByDate.get(dateKey) || new Set();
     const missingGoalNames = activeGoals
