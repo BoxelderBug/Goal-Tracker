@@ -920,6 +920,19 @@ document.addEventListener("keydown", (event) => {
     }
     setMobileMenuOpen(false);
   }
+
+  // Navigation shortcuts — only fire when not typing in a field
+  const tag = document.activeElement ? document.activeElement.tagName : "";
+  const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
+    || (document.activeElement && document.activeElement.isContentEditable);
+  if (!isTyping && !event.ctrlKey && !event.metaKey && !event.altKey && currentUser) {
+    if (event.key === "w" || event.key === "W") navigateToTab("week");
+    if (event.key === "m" || event.key === "M") navigateToTab("month");
+    if (event.key === "y" || event.key === "Y") navigateToTab("year");
+    if (event.key === "e" || event.key === "E") navigateToTab("entry");
+    if (event.key === "h" || event.key === "H") navigateToTab("home");
+    if (event.key === "q" || event.key === "Q") navigateToTab("quarter");
+  }
 });
 
 menuButtons.forEach((button) => {
@@ -2384,6 +2397,7 @@ entryForm.addEventListener("submit", (event) => {
   notifyAccountabilityPartnerEntryUpdate(tracker, amount, dateValue);
 
   saveEntries();
+  showToast(`Entry saved for ${tracker.name}`);
   if (isBinaryGoal) {
     if (entryYesNo) {
       entryYesNo.value = "yes";
@@ -2897,8 +2911,12 @@ entryListAll.addEventListener("click", (event) => {
     return;
   }
   const entryToDelete = entries.find((item) => item.id === button.dataset.id);
+  const tracker = entryToDelete ? trackers.find((item) => item.id === entryToDelete.trackerId) : null;
+  const entryLabel = tracker ? `${tracker.name} entry` : "this entry";
+  if (!confirm(`Delete ${entryLabel}? It will be moved to the trash.`)) {
+    return;
+  }
   if (entryToDelete) {
-    const tracker = trackers.find((item) => item.id === entryToDelete.trackerId);
     saveDeletedItem("entry", tracker ? `${tracker.name} entry` : "Entry", {
       entry: { ...entryToDelete }
     });
@@ -14814,6 +14832,23 @@ function safeDivide(value, by) {
     return 0;
   }
   return value / by;
+}
+
+let _toastTimer = null;
+function showToast(message, type = "success") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { toast.classList.add("toast-visible"); });
+  });
+  setTimeout(() => {
+    toast.classList.remove("toast-visible");
+    setTimeout(() => toast.remove(), 250);
+  }, 2500);
 }
 
 function formatAmount(value) {
