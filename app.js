@@ -2642,9 +2642,7 @@ entryForm.addEventListener("submit", (event) => {
   if (!markNotApplicable && goalsPlusEntryData && goalsPlusEntryData.mode === GOALS_PLUS_SETUP_GOLF && goalsPlusEntryData.score > 0) {
     amount = goalsPlusEntryData.score;
   }
-  if (!markNotApplicable && isWeightGoalTracker(tracker)) {
-    amount = normalizePositiveAmount(entryGoalsPlusWeightInput ? entryGoalsPlusWeightInput.value : 0, 0);
-  }
+  // Weight goals use the regular entryAmount field (relabeled "Current Weight") — no special handling needed
 
   entries.unshift({
     id: createId(),
@@ -18197,12 +18195,9 @@ function renderEntryGoalsPlusRunningInputs(tracker) {
   if (entryGoalsPlusGolfWrap) {
     entryGoalsPlusGolfWrap.hidden = !golf;
   }
+  // Weight goals now use the regular amount field — this separate wrap is no longer needed
   if (entryGoalsPlusWeightWrap) {
-    entryGoalsPlusWeightWrap.hidden = !weight;
-  }
-  if (weight && tracker && entryGoalsPlusWeightLabel) {
-    const weightUnit = (tracker.goalsPlus && tracker.goalsPlus.weightUnit) || "lbs";
-    entryGoalsPlusWeightLabel.textContent = `Current Weight (${weightUnit})`;
+    entryGoalsPlusWeightWrap.hidden = true;
   }
   if (entryGoalsPlusGolfScore) {
     entryGoalsPlusGolfScore.disabled = !golf;
@@ -18320,10 +18315,23 @@ function updateEntryFormMode() {
   const tempGoal = !tracker ? tempPeriodGoals.find(g => g.id === entryTracker.value) : null;
   const isBinaryGoal = tracker ? isBinaryGoalType(tracker.goalType) : false;
   const isGoalsPlus = tracker ? isGoalsPlusTracker(tracker) : false;
+  const isWeightGoal = tracker ? isWeightGoalTracker(tracker) : false;
+  // Weight goals reuse the regular amount field — only other Goals+ types hide it
+  const isGoalsPlusNotWeight = isGoalsPlus && !isWeightGoal;
   const markNotApplicable = Boolean(entryNotApplicable && entryNotApplicable.checked);
-  entryAmountLabel.hidden = isBinaryGoal || isGoalsPlus;
+  entryAmountLabel.hidden = isBinaryGoal || isGoalsPlusNotWeight;
   entryYesNoLabel.hidden = !isBinaryGoal || isGoalsPlus;
-  entryAmount.disabled = isBinaryGoal || isGoalsPlus || markNotApplicable;
+  entryAmount.disabled = isBinaryGoal || isGoalsPlusNotWeight || markNotApplicable;
+  // Relabel the amount field for weight goals
+  const amountLabelText = document.querySelector("#entry-amount-label-text");
+  if (amountLabelText) {
+    if (isWeightGoal && tracker) {
+      const weightUnit = (tracker.goalsPlus && tracker.goalsPlus.weightUnit) || "lbs";
+      amountLabelText.textContent = `Current Weight (${weightUnit})`;
+    } else {
+      amountLabelText.textContent = "Quantity";
+    }
+  }
   if (entryYesNo) {
     entryYesNo.disabled = !isBinaryGoal || isGoalsPlus || markNotApplicable;
   }
@@ -18339,7 +18347,7 @@ function updateEntryFormMode() {
     return;
   }
   renderEntryMetricInputs(tracker || null);
-  renderEntryGoalsPlusRunningInputs(isGoalsPlus ? tracker : null);
+  renderEntryGoalsPlusRunningInputs(isGoalsPlusNotWeight ? tracker : null);
 }
 
 function formatAmountWithUnit(value, unit) {

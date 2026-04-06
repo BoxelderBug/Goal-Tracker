@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406m" />
+  <link rel="stylesheet" href="styles.css?v=20260406n" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -749,7 +749,7 @@
             <input id="entry-date" type="date" required />
           </label>
           <label id="entry-amount-label">
-            Quantity
+            <span id="entry-amount-label-text">Quantity</span>
             <input id="entry-amount" type="number" min="0" step="0.01" value="1.00" required />
           </label>
           <label id="entry-yesno-label" hidden>
@@ -2044,7 +2044,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406m"></script>
+  <script type="module" src="app.js?v=20260406n"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
