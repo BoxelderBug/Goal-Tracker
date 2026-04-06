@@ -8772,7 +8772,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
         : `
           <div class="pbar">
             <div class="pbar-track">
-              ${!isPastPeriod && projectedPct > pct ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min(projectedPct, 100)}%"></div>` : ""}
+              ${!isPastPeriod && projectedTracker > progress && target > 0 ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min((projectedTracker / target) * 100, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
               <span class="pbar-inner-label">${escapeHtml(progressAmountLabel)}</span>
             </div>
@@ -9035,7 +9035,7 @@ function buildSharedGoalCardsMarkup(periodName, range, approvedShares) {
         : `
           <div class="pbar">
             <div class="pbar-track">
-              ${!isPastPeriod && projectedPct > pct ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min(projectedPct, 100)}%"></div>` : ""}
+              ${!isPastPeriod && projected > progress && target > 0 ? `<div class="pbar-fill-projected ${progressToneClass}" style="width:${Math.min((projected / target) * 100, 100)}%"></div>` : ""}
               <div class="pbar-fill ${progressToneClass}" style="width:${Math.min(pct, 100)}%"></div>
               <span class="pbar-inner-label">${escapeHtml(progressAmountLabel)}</span>
             </div>
