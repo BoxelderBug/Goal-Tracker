@@ -9266,7 +9266,7 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
 
       const hasMetrics = Array.isArray(tracker.progressMetrics) && tracker.progressMetrics.length > 0;
       const metricsVisible = getMetricExpansionVisible(periodName, tracker.id);
-      const metricsButtonMarkup = hasMetrics ? `
+      const metricsButtonMarkup = `
         <button
           type="button"
           class="btn btn-graph${metricsVisible ? " btn-metrics-on" : ""}"
@@ -9274,32 +9274,41 @@ function renderPeriod(periodName, range, now, summaryEl, listEl, emptyEl, target
           data-period="${periodName}"
           data-id="${escapeAttr(tracker.id)}"
           aria-expanded="${metricsVisible ? "true" : "false"}"
-          title="${metricsVisible ? "Hide metrics" : "Show metrics"}"
-          aria-label="${metricsVisible ? "Hide metrics" : "Show metrics"}"
-        >M</button>
-      ` : "";
+          title="${metricsVisible ? "Hide additional tracking" : "Additional tracking"}"
+          aria-label="${metricsVisible ? "Hide additional tracking" : "Additional tracking"}"
+        >A</button>
+      `;
 
       let metricsExpandMarkup = "";
-      if (hasMetrics && metricsVisible) {
-        const metricCards = tracker.progressMetrics.map(metric => {
-          const metricProgress = sumMetricForRange(tracker.id, metric.id, range);
-          const metricTarget = periodName === "month" ? metric.monthlyTarget
-            : periodName === "year" ? metric.yearlyTarget
-            : metric.weeklyTarget;
-          const metricPct = metricTarget > 0 ? percent(metricProgress, metricTarget) : null;
-          const metricHit = metricTarget > 0 && metricProgress >= metricTarget;
-          const toneClass = metricHit ? "pace-on" : "";
-          const progressBarHtml = metricTarget > 0
-            ? `<div class="pbar"><div class="pbar-track"><div class="pbar-fill ${toneClass}" style="width:${Math.min(metricPct, 100)}%"></div><span class="pbar-inner-label">${escapeHtml(formatAmount(metricProgress))} / ${escapeHtml(formatAmount(metricTarget))} ${escapeHtml(normalizeGoalUnit(metric.unit))} · ${metricPct}%</span></div></div>`
-            : `<p class="muted small">${escapeHtml(formatAmount(metricProgress))} ${escapeHtml(normalizeGoalUnit(metric.unit))} logged</p>`;
-          return `
-            <div class="metric-sub-card">
-              <p class="metric-sub-name">${escapeHtml(metric.name)}</p>
-              ${progressBarHtml}
+      if (metricsVisible) {
+        if (hasMetrics) {
+          const metricCards = tracker.progressMetrics.map(metric => {
+            const metricProgress = sumMetricForRange(tracker.id, metric.id, range);
+            const metricTarget = periodName === "month" ? metric.monthlyTarget
+              : periodName === "year" ? metric.yearlyTarget
+              : metric.weeklyTarget;
+            const metricPct = metricTarget > 0 ? percent(metricProgress, metricTarget) : null;
+            const metricHit = metricTarget > 0 && metricProgress >= metricTarget;
+            const toneClass = metricHit ? "pace-on" : "";
+            const progressBarHtml = metricTarget > 0
+              ? `<div class="pbar"><div class="pbar-track"><div class="pbar-fill ${toneClass}" style="width:${Math.min(metricPct, 100)}%"></div><span class="pbar-inner-label">${escapeHtml(formatAmount(metricProgress))} / ${escapeHtml(formatAmount(metricTarget))} ${escapeHtml(normalizeGoalUnit(metric.unit))} · ${metricPct}%</span></div></div>`
+              : `<p class="muted small">${escapeHtml(formatAmount(metricProgress))} ${escapeHtml(normalizeGoalUnit(metric.unit))} logged</p>`;
+            return `
+              <div class="metric-sub-card">
+                <p class="metric-sub-name">${escapeHtml(metric.name)}</p>
+                ${progressBarHtml}
+              </div>
+            `;
+          }).join("");
+          metricsExpandMarkup = `<div class="metrics-expand-section">${metricCards}</div>`;
+        } else {
+          metricsExpandMarkup = `
+            <div class="metrics-expand-section metrics-expand-empty">
+              <p class="muted small">No additional tracking set up for this goal.</p>
+              <button class="btn btn-nav-compact" type="button" data-action="jump-tab" data-tab-target="settings-goal-setup">Set Up in Goal Setup</button>
             </div>
           `;
-        }).join("");
-        metricsExpandMarkup = `<div class="metrics-expand-section">${metricCards}</div>`;
+        }
       }
 
       const deadlineBadge = getDeadlineBadgeMarkup(tracker);
