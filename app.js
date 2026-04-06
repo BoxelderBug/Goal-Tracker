@@ -46,6 +46,8 @@ const SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-smart-reminde
 const PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY = "goal-tracker-period-close-prompt-notification-keys-v1";
 const ONBOARDING_DISMISSED_STORAGE_KEY = "goal-tracker-onboarding-dismissed-v1";
 const STRETCH_GOALS_STORAGE_KEY = "goal-tracker-stretch-goals-v1";
+const VACATION_STORAGE_KEY = "goal-tracker-vacations-v1";
+const PERIOD_GOAL_OVERRIDES_STORAGE_KEY = "goal-tracker-period-goal-overrides-v1";
 const GOAL_JOURNAL_SUBJECT_DEFAULT = "General Journal";
 const LEGACY_TRACKERS_KEY = "goal-tracker-trackers-v2";
 const USERS_STORAGE_KEY = "goal-tracker-users-v1";
@@ -456,6 +458,12 @@ const goalTailwindHowBuildInput = document.querySelector("#goal-tailwind-how-bui
 const goalTailwindAddButton = document.querySelector("#goal-tailwind-add-btn");
 const goalTailwindsDraftList = document.querySelector("#goal-tailwinds-draft-list");
 const goalTailwindsDraftEmpty = document.querySelector("#goal-tailwinds-draft-empty");
+const viewSettingsModal = document.querySelector("#view-settings-modal");
+const viewSettingsModalBody = document.querySelector("#view-settings-modal-body");
+const viewSettingsModalTitle = document.querySelector("#view-settings-modal-title");
+const weekViewSettingsButton = document.querySelector("#week-view-settings");
+const monthViewSettingsButton = document.querySelector("#month-view-settings");
+const yearViewSettingsButton = document.querySelector("#year-view-settings");
 
 const quarterRangeLabel = document.querySelector("#quarter-range");
 const quarterSummary = document.querySelector("#quarter-summary");
@@ -632,6 +640,9 @@ let goalHeadwindsDraft = [];
 const headwindsModalState = { open: false, trackerId: "" };
 let goalTailwindsDraft = [];
 const tailwindsModalState = { open: false, trackerId: "" };
+let vacations = [];
+let periodGoalOverrides = {};
+const viewSettingsModalState = { open: false, period: "" };
 
 entryDate.value = getDateKey(normalizeDate(new Date()));
 scheduleDate.value = getDateKey(normalizeDate(new Date()));
@@ -4064,6 +4075,118 @@ if (tailwindsModal) {
       renderTailwindsModal();
       renderPeriodTabs();
     }
+  });
+}
+
+if (viewSettingsModal) {
+  viewSettingsModal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action='close-view-settings-modal']")) {
+      closeViewSettingsModal();
+      renderPeriodTabs();
+      return;
+    }
+    const removeVacationBtn = event.target.closest("button[data-action='remove-vacation']");
+    if (removeVacationBtn) {
+      const id = String(removeVacationBtn.dataset.id || "");
+      if (!id) return;
+      vacations = vacations.filter(v => v.id !== id);
+      saveVacations();
+      renderViewSettingsModal();
+      renderPeriodTabs();
+      return;
+    }
+    const clearBtn = event.target.closest("button[data-action='clear-period-targets']");
+    if (clearBtn) {
+      const periodKey = String(clearBtn.dataset.periodKey || "");
+      if (!periodKey) return;
+      delete periodGoalOverrides[periodKey];
+      savePeriodGoalOverrides();
+      renderViewSettingsModal();
+      renderPeriodTabs();
+      return;
+    }
+    const saveTargetsForm = event.target.closest("form[data-action='save-period-targets']");
+    if (saveTargetsForm) {
+      event.preventDefault();
+      const periodKeyInput = saveTargetsForm.querySelector("[name='period-key']");
+      const periodKey = String(periodKeyInput ? periodKeyInput.value : "");
+      if (!periodKey) return;
+      const activeGoals = trackers.filter(t => !t.archived);
+      const overrideMap = {};
+      activeGoals.forEach(t => {
+        const input = saveTargetsForm.querySelector(`[name='target-${t.id}']`);
+        if (input && input.value.trim() !== "") {
+          const val = parseFloat(input.value);
+          if (!isNaN(val) && val >= 0) {
+            overrideMap[t.id] = val;
+          }
+        }
+      });
+      if (Object.keys(overrideMap).length > 0) {
+        periodGoalOverrides[periodKey] = overrideMap;
+      } else {
+        delete periodGoalOverrides[periodKey];
+      }
+      savePeriodGoalOverrides();
+      renderViewSettingsModal();
+      renderPeriodTabs();
+      return;
+    }
+    const addVacationForm = event.target.closest("form[data-action='add-vacation']");
+    if (addVacationForm) {
+      event.preventDefault();
+      const nameInput = addVacationForm.querySelector("[name='vacation-name']");
+      const startInput = addVacationForm.querySelector("[name='vacation-start']");
+      const endInput = addVacationForm.querySelector("[name='vacation-end']");
+      const adjustInput = addVacationForm.querySelector("[name='vacation-adjust-targets']");
+      const startDate = String(startInput ? startInput.value : "");
+      const endDate = String(endInput ? endInput.value : "");
+      if (!startDate || !endDate) return;
+      if (startDate > endDate) return;
+      const activeGoals = trackers.filter(t => !t.archived);
+      const pausedGoalIds = activeGoals
+        .filter(t => {
+          const cb = addVacationForm.querySelector(`[name='pause-goal-${t.id}']`);
+          return cb && cb.checked;
+        })
+        .map(t => t.id);
+      vacations.push({
+        id: createId(),
+        name: String(nameInput ? nameInput.value.trim() : ""),
+        startDate,
+        endDate,
+        pausedGoalIds,
+        adjustTargets: Boolean(adjustInput && adjustInput.checked)
+      });
+      saveVacations();
+      renderViewSettingsModal();
+      renderPeriodTabs();
+      return;
+    }
+  });
+}
+
+if (weekViewSettingsButton) {
+  weekViewSettingsButton.addEventListener("click", () => {
+    viewSettingsModalState.open = true;
+    viewSettingsModalState.period = "week";
+    renderViewSettingsModal();
+  });
+}
+
+if (monthViewSettingsButton) {
+  monthViewSettingsButton.addEventListener("click", () => {
+    viewSettingsModalState.open = true;
+    viewSettingsModalState.period = "month";
+    renderViewSettingsModal();
+  });
+}
+
+if (yearViewSettingsButton) {
+  yearViewSettingsButton.addEventListener("click", () => {
+    viewSettingsModalState.open = true;
+    viewSettingsModalState.period = "year";
+    renderViewSettingsModal();
   });
 }
 
@@ -8668,6 +8791,7 @@ function renderPeriodTabs() {
   renderGraphModal();
   renderHeadwindsModal();
   renderTailwindsModal();
+  renderViewSettingsModal();
   renderAuthState();
   scheduleEChartResizePasses();
 }
@@ -9573,7 +9697,59 @@ function getTrackerCustomMonthTargetForRange(tracker, range) {
   return monthlyTargets[monthIndex] || 0;
 }
 
-function getTrackerTargetForPeriod(tracker, periodName, range = null) {
+function getPeriodKey(periodName, range) {
+  if (periodName === "month") return `month:${getDateKey(range.start).slice(0, 7)}`;
+  if (periodName === "year") return `year:${range.start.getFullYear()}`;
+  return `week:${getDateKey(range.start)}`;
+}
+
+function getVacationOverlapDays(vacation, range) {
+  const vStart = normalizeDate(new Date(vacation.startDate + "T00:00:00"));
+  const vEnd = normalizeDate(new Date(vacation.endDate + "T00:00:00"));
+  const overlapStart = vStart > range.start ? vStart : range.start;
+  const overlapEnd = vEnd < range.end ? vEnd : range.end;
+  if (overlapStart > overlapEnd) return 0;
+  return Math.round((overlapEnd - overlapStart) / DAY_MS) + 1;
+}
+
+function loadVacations() {
+  try {
+    if (!currentUser) return [];
+    const raw = localStorage.getItem(getScopedStorageKey(VACATION_STORAGE_KEY));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(v => v && typeof v.id === "string").map(v => ({
+      id: v.id,
+      name: typeof v.name === "string" ? v.name.trim() : "",
+      startDate: typeof v.startDate === "string" ? v.startDate : "",
+      endDate: typeof v.endDate === "string" ? v.endDate : "",
+      pausedGoalIds: Array.isArray(v.pausedGoalIds) ? v.pausedGoalIds.filter(id => typeof id === "string") : [],
+      adjustTargets: Boolean(v.adjustTargets)
+    })).filter(v => v.startDate && v.endDate);
+  } catch { return []; }
+}
+
+function saveVacations() {
+  localStorage.setItem(getScopedStorageKey(VACATION_STORAGE_KEY), JSON.stringify(vacations));
+}
+
+function loadPeriodGoalOverrides() {
+  try {
+    if (!currentUser) return {};
+    const raw = localStorage.getItem(getScopedStorageKey(PERIOD_GOAL_OVERRIDES_STORAGE_KEY));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch { return {}; }
+}
+
+function savePeriodGoalOverrides() {
+  localStorage.setItem(getScopedStorageKey(PERIOD_GOAL_OVERRIDES_STORAGE_KEY), JSON.stringify(periodGoalOverrides));
+}
+
+function getTrackerDefaultTargetForPeriod(tracker, periodName, range) {
   const weeklyGoal = normalizeGoalTargetInt(tracker && tracker.weeklyGoal, 0);
   const monthlyGoal = normalizeGoalTargetInt(tracker && tracker.monthlyGoal, 0);
   const yearlyGoal = normalizeGoalTargetInt(tracker && tracker.yearlyGoal, 0);
@@ -9620,6 +9796,33 @@ function getTrackerTargetForPeriod(tracker, periodName, range = null) {
     return getTrackerCustomWeekTargetForRange(tracker, range);
   }
   return weeklyGoal;
+}
+
+function getTrackerTargetForPeriod(tracker, periodName, range = null) {
+  let target = getTrackerDefaultTargetForPeriod(tracker, periodName, range);
+  // Apply period goal override (only for week/month/year, not quarter)
+  if (periodName !== "quarter" && range) {
+    const periodKey = getPeriodKey(periodName, range);
+    const overrideMap = periodGoalOverrides[periodKey];
+    if (overrideMap && typeof overrideMap[tracker.id] === "number") {
+      target = overrideMap[tracker.id];
+    }
+    // Apply vacation adjustment
+    const periodDays = getRangeDays(range);
+    if (periodDays > 0) {
+      let vacationDays = 0;
+      vacations.forEach(v => {
+        if (v.adjustTargets && v.pausedGoalIds.includes(tracker.id)) {
+          vacationDays += getVacationOverlapDays(v, range);
+        }
+      });
+      if (vacationDays > 0) {
+        const effectiveDays = Math.max(0, periodDays - vacationDays);
+        target = Math.max(0, parseFloat((target * effectiveDays / periodDays).toFixed(2)));
+      }
+    }
+  }
+  return target;
 }
 
 function getTrackerGoalPointsForPeriod(tracker, periodName) {
@@ -13160,6 +13363,9 @@ function resetStateForSignedOutUser() {
   resetPeriodAccordionState();
   resetInlineGraphState();
   closeGraphModal();
+  vacations = [];
+  periodGoalOverrides = {};
+  closeViewSettingsModal();
   if (onboardingModal) {
     onboardingModal.classList.add("hidden");
     onboardingModal.setAttribute("aria-hidden", "true");
@@ -14211,6 +14417,8 @@ function initializeData() {
     milestoneNotificationKeys = new Set();
     smartReminderNotificationKeys = new Set();
     periodClosePromptNotificationKeys = new Set();
+    vacations = [];
+    periodGoalOverrides = {};
     settings = getDefaultSettings();
     goalMetricsDraft = [];
     renderGoalMetricsDraft();
@@ -14247,6 +14455,8 @@ function initializeData() {
   milestoneNotificationKeys = loadNotificationKeySet(MILESTONE_NOTIFICATION_KEYS_STORAGE_KEY);
   smartReminderNotificationKeys = loadNotificationKeySet(SMART_REMINDER_NOTIFICATION_KEYS_STORAGE_KEY);
   periodClosePromptNotificationKeys = loadNotificationKeySet(PERIOD_CLOSE_PROMPT_NOTIFICATION_KEYS_STORAGE_KEY);
+  vacations = loadVacations();
+  periodGoalOverrides = loadPeriodGoalOverrides();
   goalMetricsDraft = [];
   renderGoalMetricsDraft();
   goalHeadwindsDraft = [];
@@ -15895,6 +16105,138 @@ function renderTailwindsModal() {
   `;
   tailwindsModal.classList.remove("hidden");
   tailwindsModal.setAttribute("aria-hidden", "false");
+}
+
+function closeViewSettingsModal() {
+  viewSettingsModalState.open = false;
+  viewSettingsModalState.period = "";
+  if (viewSettingsModal) {
+    viewSettingsModal.classList.add("hidden");
+    viewSettingsModal.setAttribute("aria-hidden", "true");
+  }
+}
+
+function renderViewSettingsModal() {
+  if (!viewSettingsModal || !viewSettingsModalBody) return;
+  if (!currentUser || !viewSettingsModalState.open) {
+    viewSettingsModal.classList.add("hidden");
+    viewSettingsModal.setAttribute("aria-hidden", "true");
+    return;
+  }
+  const periodName = viewSettingsModalState.period;
+  const meta = getPeriodMeta(periodName);
+  if (!meta) { closeViewSettingsModal(); return; }
+  const range = meta.range;
+  const periodKey = getPeriodKey(periodName, range);
+  const overrideMap = periodGoalOverrides[periodKey] || {};
+
+  if (viewSettingsModalTitle) {
+    const label = periodName === "week" ? "Week" : periodName === "month" ? "Month" : "Year";
+    viewSettingsModalTitle.textContent = `${label} Settings`;
+  }
+
+  // Active goals
+  const activeGoals = trackers.filter(t => !t.archived);
+
+  // Period target overrides section
+  const targetsMarkup = activeGoals.length > 0 ? `
+    <form class="form-block" data-action="save-period-targets">
+      <input type="hidden" name="period-key" value="${escapeAttr(periodKey)}" />
+      <div class="view-settings-targets-grid">
+        ${activeGoals.map(t => {
+          const defaultTarget = getTrackerDefaultTargetForPeriod(t, periodName, range);
+          const override = typeof overrideMap[t.id] === "number" ? overrideMap[t.id] : "";
+          return `
+            <label class="view-settings-target-row">
+              <span class="view-settings-goal-name">${escapeHtml(t.name)}</span>
+              <span class="muted small">Default: ${formatAmount(defaultTarget)} ${escapeHtml(normalizeGoalUnit(t.unit))}</span>
+              <input
+                type="number"
+                min="0"
+                max="1000000"
+                step="0.01"
+                name="target-${escapeAttr(t.id)}"
+                value="${override}"
+                placeholder="${formatAmount(defaultTarget)}"
+              />
+            </label>
+          `;
+        }).join("")}
+      </div>
+      <p class="muted small">Leave blank to use the default target. Overrides only apply to this specific ${periodName}.</p>
+      <button class="btn btn-primary" type="submit">Save Targets</button>
+      ${Object.keys(overrideMap).length > 0 ? `<button class="btn" type="button" data-action="clear-period-targets" data-period-key="${escapeAttr(periodKey)}">Clear All Overrides</button>` : ""}
+    </form>
+  ` : `<p class="empty-state">No active goals.</p>`;
+
+  // Vacations list
+  const allVacations = vacations;
+
+  const vacationListMarkup = allVacations.length > 0 ? allVacations.map(v => {
+    const overlap = getVacationOverlapDays(v, range);
+    const label = v.name || `${v.startDate} \u2013 ${v.endDate}`;
+    return `
+      <li class="vacation-item">
+        <div class="vacation-item-info">
+          <strong>${escapeHtml(label)}</strong>
+          <p class="muted small">${escapeHtml(v.startDate)} \u2013 ${escapeHtml(v.endDate)}${overlap > 0 ? ` \u00b7 ${overlap} day${overlap !== 1 ? "s" : ""} overlap` : ""} \u00b7 ${v.adjustTargets ? "Adjusts targets" : "No target adjustment"} \u00b7 ${v.pausedGoalIds.length} goal${v.pausedGoalIds.length !== 1 ? "s" : ""} paused</p>
+        </div>
+        <button class="btn btn-danger btn-sm" type="button" data-action="remove-vacation" data-id="${escapeAttr(v.id)}">Remove</button>
+      </li>
+    `;
+  }).join("") : "";
+
+  const goalCheckboxes = activeGoals.map(t => `
+    <label class="check-inline">
+      <input type="checkbox" name="pause-goal-${escapeAttr(t.id)}" value="${escapeAttr(t.id)}" />
+      ${escapeHtml(t.name)}
+    </label>
+  `).join("");
+
+  viewSettingsModalBody.innerHTML = `
+    <section class="view-settings-section">
+      <h4>Period Goal Targets</h4>
+      <p class="muted small">Override the target for each goal for this specific ${periodName} only.</p>
+      ${targetsMarkup}
+    </section>
+    <section class="view-settings-section">
+      <h4>Vacation Mode</h4>
+      <p class="muted small">Define a vacation period to pause goals and optionally adjust targets.</p>
+      ${allVacations.length > 0 ? `<ul class="card-list compact-list vacation-list">${vacationListMarkup}</ul>` : ""}
+      <details class="view-settings-add-vacation">
+        <summary>Add Vacation</summary>
+        <form class="form-block" data-action="add-vacation">
+          <div class="form-grid form-grid-2">
+            <label>
+              Name (optional)
+              <input type="text" name="vacation-name" maxlength="80" placeholder="Summer break, business trip..." />
+            </label>
+            <div></div>
+            <label>
+              Start Date
+              <input type="date" name="vacation-start" required />
+            </label>
+            <label>
+              End Date
+              <input type="date" name="vacation-end" required />
+            </label>
+          </div>
+          <p class="muted small" style="margin:8px 0 4px"><strong>Goals to pause:</strong></p>
+          <div class="vacation-goal-checks">
+            ${goalCheckboxes}
+          </div>
+          <label class="check-inline" style="margin-top:10px">
+            <input type="checkbox" name="vacation-adjust-targets" />
+            Subtract vacation days from week, month, and year targets
+          </label>
+          <button class="btn btn-primary" type="submit" style="margin-top:10px">Add Vacation</button>
+        </form>
+      </details>
+    </section>
+  `;
+
+  viewSettingsModal.classList.remove("hidden");
+  viewSettingsModal.setAttribute("aria-hidden", "false");
 }
 
 function syncGoalAdditionalTrackingVisibility() {

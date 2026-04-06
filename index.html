@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260406f" />
+  <link rel="stylesheet" href="styles.css?v=20260406g" />
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -1087,6 +1087,7 @@
             <button id="week-next" class="btn btn-nav-pill" type="button" aria-label="Next week">&gt;</button>
           </div>
           <button id="week-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <button id="week-view-settings" class="btn btn-nav-compact" type="button">Settings</button>
           <details class="view-filters-disclosure">
             <summary>Filters</summary>
             <div class="view-filters-popover">
@@ -1140,6 +1141,7 @@
             <button id="month-next" class="btn btn-nav-pill" type="button" aria-label="Next month">&gt;</button>
           </div>
           <button id="month-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <button id="month-view-settings" class="btn btn-nav-compact" type="button">Settings</button>
           <details class="view-filters-disclosure">
             <summary>Filters</summary>
             <div class="view-filters-popover">
@@ -1193,6 +1195,7 @@
             <button id="year-next" class="btn btn-nav-pill" type="button" aria-label="Next year">&gt;</button>
           </div>
           <button id="year-closeout" class="btn btn-nav-compact" type="button">Close Out</button>
+          <button id="year-view-settings" class="btn btn-nav-compact" type="button">Settings</button>
           <details class="view-filters-disclosure">
             <summary>Filters</summary>
             <div class="view-filters-popover">
@@ -1929,6 +1932,16 @@
           <div class="graph-modal-body" id="tailwinds-modal-body"></div>
         </section>
       </div>
+      <div id="view-settings-modal" class="graph-modal hidden" aria-hidden="true">
+        <div class="graph-modal-backdrop" data-action="close-view-settings-modal"></div>
+        <section class="graph-modal-card view-settings-card" role="dialog" aria-modal="true" aria-labelledby="view-settings-modal-title">
+          <div class="graph-modal-head">
+            <h3 id="view-settings-modal-title">View Settings</h3>
+            <button class="btn" type="button" data-action="close-view-settings-modal">Close</button>
+          </div>
+          <div class="graph-modal-body" id="view-settings-modal-body"></div>
+        </section>
+      </div>
     </div>
   </main>
 
@@ -1937,7 +1950,7 @@
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script type="module" src="app.js?v=20260406f"></script>
+  <script type="module" src="app.js?v=20260406g"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {

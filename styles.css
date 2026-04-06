@@ -4313,3 +4313,95 @@ body[data-performance="light"] * {
   font-size: 0.83rem;
   color: var(--text-muted, #555);
 }
+
+/* View Settings Modal */
+.view-settings-section {
+  margin-bottom: 20px;
+}
+
+.view-settings-section h4 {
+  font-size: 0.95rem;
+  margin: 0 0 6px;
+}
+
+.view-settings-targets-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.view-settings-target-row {
+  display: grid;
+  grid-template-columns: 1fr auto 120px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+
+.view-settings-goal-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vacation-list {
+  margin-bottom: 12px;
+}
+
+.vacation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.vacation-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vacation-item-info strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.vacation-goal-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.view-settings-add-vacation {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.view-settings-add-vacation > summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  list-style: none;
+  user-select: none;
+}
+
+.view-settings-add-vacation > .form-block {
+  padding: 0 14px 14px;
+}
+
+@media (max-width: 540px) {
+  .view-settings-target-row {
+    grid-template-columns: 1fr 100px;
+    grid-template-rows: auto auto;
+  }
+  .view-settings-target-row .muted {
+    grid-column: 1 / -1;
+  }
+}
