@@ -31,6 +31,7 @@ const ENTRIES_STORAGE_KEY = "goal-tracker-entries-v1";
 const CHECKINS_STORAGE_KEY = "goal-tracker-checkins-v1";
 const CHECKIN_ENTRIES_STORAGE_KEY = "goal-tracker-checkin-entries-v1";
 const GOAL_JOURNAL_STORAGE_KEY = "goal-tracker-goal-journal-v1";
+const IDEAS_STORAGE_KEY = "goal-tracker-ideas-v1";
 const SCHEDULE_STORAGE_KEY = "goal-tracker-schedules-v1";
 const SETTINGS_STORAGE_KEY = "goal-tracker-settings-v1";
 const FRIENDS_STORAGE_KEY = "goal-tracker-friends-v1";
@@ -271,6 +272,9 @@ const entryGoalsPlusCustomExercise = document.querySelector("#entry-goals-plus-c
 const entryGoalsPlusCustomReps = document.querySelector("#entry-goals-plus-custom-reps");
 const entryGoalsPlusCustomWeight = document.querySelector("#entry-goals-plus-custom-weight");
 const entryGoalsPlusDerived = document.querySelector("#entry-goals-plus-derived");
+const entryGoalsPlusSplitsWrap = document.querySelector("#entry-goals-plus-splits-wrap");
+const entryGoalsPlusSplitsList = document.querySelector("#entry-goals-plus-splits-list");
+const entryGoalsPlusAddSplit = document.querySelector("#entry-goals-plus-add-split");
 const entryGoalsPlusGolfWrap = document.querySelector("#entry-goals-plus-golf-wrap");
 const entryGoalsPlusGolfScore = document.querySelector("#entry-goals-plus-golf-score");
 const entryGoalsPlusGolfNote = document.querySelector("#entry-goals-plus-golf-note");
@@ -351,6 +355,14 @@ const goalJournalTitle = document.querySelector("#goal-journal-title");
 const goalJournalContent = document.querySelector("#goal-journal-content");
 const goalJournalList = document.querySelector("#goal-journal-list");
 const goalJournalEmpty = document.querySelector("#goal-journal-empty");
+
+const ideasForm = document.querySelector("#ideas-form");
+const ideasType = document.querySelector("#ideas-type");
+const ideasContent = document.querySelector("#ideas-content");
+const ideasList = document.querySelector("#ideas-list");
+const ideasEmpty = document.querySelector("#ideas-empty");
+const ideasWeeklyGoalInput = document.querySelector("#ideas-weekly-goal");
+const ideasProgress = document.querySelector("#ideas-progress");
 
 const scheduleForm = document.querySelector("#schedule-form");
 const scheduleGoal = document.querySelector("#schedule-goal");
@@ -542,6 +554,7 @@ let entries = [];
 let checkIns = [];
 let checkInEntries = [];
 let goalJournalEntries = [];
+let ideaEntries = [];
 let schedules = [];
 let friends = [];
 let squads = [];
@@ -1145,6 +1158,12 @@ if (entryGoalsPlusRunningWorkout) {
       updateEntryGoalsPlusDerivedLabel();
     });
   });
+
+if (entryGoalsPlusAddSplit) {
+  entryGoalsPlusAddSplit.addEventListener("click", () => {
+    addGoalsPlusSplitRow();
+  });
+}
 
 if (entryModeSelect) {
   entryModeSelect.addEventListener("change", () => {
@@ -2696,6 +2715,7 @@ entryForm.addEventListener("submit", (event) => {
   if (entryGoalsPlusWeightInput) {
     entryGoalsPlusWeightInput.value = "";
   }
+  clearGoalsPlusSplitRows();
   updateEntryGoalsPlusDerivedLabel();
   entryNotes.value = "";
   entryDate.value = getDateKey(normalizeDate(new Date()));
@@ -3389,6 +3409,62 @@ if (goalJournalList) {
     goalJournalEntries = goalJournalEntries.filter((item) => item.id !== journalId);
     saveGoalJournalEntries();
     renderGoalJournalTab();
+  });
+}
+
+if (ideasForm) {
+  ideasForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentUser) {
+      return;
+    }
+    const content = String(ideasContent ? ideasContent.value : "").trim();
+    if (!content) {
+      return;
+    }
+    const type = ideasType && ideasType.value === "question" ? "question" : "idea";
+    ideaEntries.unshift({
+      id: createId(),
+      date: getDateKey(normalizeDate(new Date())),
+      type,
+      content,
+      createdAt: new Date().toISOString()
+    });
+    saveIdeaEntries();
+    if (ideasContent) {
+      ideasContent.value = "";
+    }
+    renderIdeasTab();
+  });
+}
+
+if (ideasList) {
+  ideasList.addEventListener("click", (event) => {
+    if (!currentUser) {
+      return;
+    }
+    const deleteButton = event.target.closest("button[data-action='delete-idea']");
+    if (!deleteButton) {
+      return;
+    }
+    const ideaId = String(deleteButton.dataset.id || "");
+    if (!ideaId) {
+      return;
+    }
+    ideaEntries = ideaEntries.filter((item) => item.id !== ideaId);
+    saveIdeaEntries();
+    renderIdeasTab();
+  });
+}
+
+if (ideasWeeklyGoalInput) {
+  ideasWeeklyGoalInput.addEventListener("change", () => {
+    if (!currentUser) {
+      return;
+    }
+    settings.ideasWeeklyGoal = normalizePositiveInt(ideasWeeklyGoalInput.value, 0);
+    saveSettings();
+    renderIdeasTab();
   });
 }
 
@@ -5411,6 +5487,7 @@ function render() {
   renderCheckinsTab();
   renderEntryTab();
   renderGoalJournalTab();
+  renderIdeasTab();
   renderBucketEntryTab();
   renderCheckinEntryTab();
   renderEntryListTab();
@@ -8472,6 +8549,66 @@ function renderGoalJournalTab() {
               <p class="muted small">${formatDate(parseDateKey(item.date))} | ${escapeHtml(goalLabel)}</p>
             </div>
             <button class="btn btn-danger" type="button" data-action="delete-goal-journal" data-id="${item.id}">Delete</button>
+          </div>
+          <p class="metric-line">${contentHtml}</p>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function renderIdeasTab() {
+  if (!ideasList || !ideasEmpty) {
+    return;
+  }
+  const weeklyGoal = normalizePositiveInt(settings.ideasWeeklyGoal, 0);
+  if (ideasWeeklyGoalInput && document.activeElement !== ideasWeeklyGoalInput) {
+    ideasWeeklyGoalInput.value = weeklyGoal > 0 ? String(weeklyGoal) : "";
+  }
+  const week = getWeekRange(new Date());
+  const thisWeekCount = ideaEntries.filter((item) => {
+    if (!isDateKey(item.date)) {
+      return false;
+    }
+    const itemDate = parseDateKey(item.date);
+    return itemDate >= week.start && itemDate <= week.end;
+  }).length;
+  if (ideasProgress) {
+    if (weeklyGoal > 0) {
+      const reached = thisWeekCount >= weeklyGoal;
+      ideasProgress.textContent = `${thisWeekCount} / ${weeklyGoal} captured this week${reached ? " — weekly goal reached! 🎉" : ""}`;
+      ideasProgress.classList.toggle("goal-reached", reached);
+    } else {
+      ideasProgress.textContent = `${thisWeekCount} captured this week. Set a weekly goal to track your pace.`;
+      ideasProgress.classList.remove("goal-reached");
+    }
+  }
+  const sortedIdeas = [...ideaEntries].sort((a, b) => {
+    const dateCompare = String(b.date || "").localeCompare(String(a.date || ""));
+    if (dateCompare !== 0) {
+      return dateCompare;
+    }
+    return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+  });
+  if (sortedIdeas.length < 1) {
+    ideasList.innerHTML = "";
+    ideasEmpty.style.display = "block";
+    ideasEmpty.textContent = "No questions or ideas yet. Jot one down above.";
+    return;
+  }
+  ideasEmpty.style.display = "none";
+  ideasList.innerHTML = sortedIdeas
+    .map((item, index) => {
+      const typeLabel = item.type === "question" ? "Question" : "Idea";
+      const contentHtml = escapeHtml(item.content || "").replaceAll("\n", "<br />");
+      return `
+        <li class="entry-card" style="--stagger:${index}">
+          <div class="metric-top">
+            <div>
+              <strong>${typeLabel}</strong>
+              <p class="muted small">${formatDate(parseDateKey(item.date))}</p>
+            </div>
+            <button class="btn btn-danger" type="button" data-action="delete-idea" data-id="${item.id}">Delete</button>
           </div>
           <p class="metric-line">${contentHtml}</p>
         </li>
@@ -13624,6 +13761,7 @@ function buildCloudPayload() {
     checkIns,
     checkInEntries,
     goalJournalEntries,
+    ideaEntries,
     schedules,
     friends,
     squads,
@@ -13680,6 +13818,7 @@ function isLocalDataEmpty() {
   const hasEntries = Array.isArray(entries) && entries.length > 0;
   const hasCheckIns = Array.isArray(checkIns) && checkIns.length > 0;
   const hasJournal = Array.isArray(goalJournalEntries) && goalJournalEntries.length > 0;
+  const hasIdeas = Array.isArray(ideaEntries) && ideaEntries.length > 0;
   const hasSchedules = Array.isArray(schedules) && schedules.length > 0;
   const hasFriends = Array.isArray(friends) && friends.length > 0;
   const hasSquads = Array.isArray(squads) && squads.length > 0;
@@ -13688,7 +13827,7 @@ function isLocalDataEmpty() {
   const hasRewards = Array.isArray(rewards) && rewards.length > 0;
   const hasRewardPurchases = Array.isArray(rewardPurchases) && rewardPurchases.length > 0;
   const hasTransactions = Array.isArray(pointTransactions) && pointTransactions.length > 0;
-  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasSchedules || hasFriends || hasSquads || hasTrash || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
+  return !(hasGoals || hasEntries || hasCheckIns || hasJournal || hasIdeas || hasSchedules || hasFriends || hasSquads || hasTrash || hasSnapshots || hasRewards || hasRewardPurchases || hasTransactions);
 }
 
 function writeCloudPayloadToLocal(payload) {
@@ -13701,6 +13840,7 @@ function writeCloudPayloadToLocal(payload) {
     [CHECKINS_STORAGE_KEY, Array.isArray(payload.checkIns) ? payload.checkIns : []],
     [CHECKIN_ENTRIES_STORAGE_KEY, Array.isArray(payload.checkInEntries) ? payload.checkInEntries : []],
     [GOAL_JOURNAL_STORAGE_KEY, Array.isArray(payload.goalJournalEntries) ? payload.goalJournalEntries : []],
+    [IDEAS_STORAGE_KEY, Array.isArray(payload.ideaEntries) ? payload.ideaEntries : []],
     [SCHEDULE_STORAGE_KEY, Array.isArray(payload.schedules) ? payload.schedules : []],
     [FRIENDS_STORAGE_KEY, Array.isArray(payload.friends) ? payload.friends : []],
     [SQUADS_STORAGE_KEY, Array.isArray(payload.squads) ? payload.squads : []],
@@ -13846,6 +13986,7 @@ function resetStateForSignedOutUser() {
   checkIns = [];
   checkInEntries = [];
   goalJournalEntries = [];
+  ideaEntries = [];
   schedules = [];
   friends = [];
   squads = [];
@@ -14164,6 +14305,7 @@ function resetUiStateForLogin() {
   if (entryGoalsPlusGolfScore) {
     entryGoalsPlusGolfScore.value = "";
   }
+  clearGoalsPlusSplitRows();
   updateEntryGoalsPlusDerivedLabel();
   if (goalJournalDate) {
     goalJournalDate.value = getDateKey(normalizeDate(new Date()));
@@ -14422,6 +14564,7 @@ function exportAllDataToJson() {
     checkIns,
     checkInEntries,
     goalJournalEntries,
+    ideaEntries,
     schedules,
     periodSnapshots,
     rewards,
@@ -14545,6 +14688,7 @@ function getDefaultSettings() {
     mobileQuickActionsEnabled: true,
     onboardingEnabled: true,
     performanceMode: "standard",
+    ideasWeeklyGoal: 0,
     theme: "teal"
   };
 }
@@ -14914,6 +15058,7 @@ function migrateLegacyDataToUser() {
     CHECKINS_STORAGE_KEY,
     CHECKIN_ENTRIES_STORAGE_KEY,
     GOAL_JOURNAL_STORAGE_KEY,
+    IDEAS_STORAGE_KEY,
     SCHEDULE_STORAGE_KEY,
     SETTINGS_STORAGE_KEY,
     FRIENDS_STORAGE_KEY,
@@ -14944,6 +15089,7 @@ function initializeData() {
     checkIns = [];
     checkInEntries = [];
     goalJournalEntries = [];
+    ideaEntries = [];
     schedules = [];
     friends = [];
     squads = [];
@@ -14991,6 +15137,7 @@ function initializeData() {
   checkIns = loadCheckIns();
   checkInEntries = loadCheckInEntries().filter((entry) => checkIns.some((item) => item.id === entry.checkInId));
   goalJournalEntries = loadGoalJournalEntries();
+  ideaEntries = loadIdeaEntries();
   schedules = loadSchedules().filter((item) => trackers.some((tracker) => tracker.id === item.trackerId));
   friends = loadFriends();
   squads = loadSquads();
@@ -15226,6 +15373,34 @@ function loadGoalJournalEntries() {
         trackerId: typeof item.trackerId === "string" ? item.trackerId : "",
         goalName: typeof item.goalName === "string" ? item.goalName.trim() : "",
         title: typeof item.title === "string" ? item.title.trim() : "",
+        content: typeof item.content === "string" ? item.content.trim() : "",
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }))
+      .filter((item) => item.content);
+  } catch {
+    return [];
+  }
+}
+
+function loadIdeaEntries() {
+  try {
+    if (!currentUser) {
+      return [];
+    }
+    const raw = localStorage.getItem(getScopedStorageKey(IDEAS_STORAGE_KEY));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((item) => item && typeof item.id === "string")
+      .map((item) => ({
+        id: item.id,
+        date: isDateKey(item.date) ? item.date : getDateKey(normalizeDate(new Date())),
+        type: item.type === "question" ? "question" : "idea",
         content: typeof item.content === "string" ? item.content.trim() : "",
         createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
       }))
@@ -15536,6 +15711,7 @@ function loadSettings() {
       mobileQuickActionsEnabled: !(parsed && (parsed.mobileQuickActionsEnabled === false || parsed.mobileQuickActionsEnabled === "off")),
       onboardingEnabled: !(parsed && (parsed.onboardingEnabled === false || parsed.onboardingEnabled === "off")),
       performanceMode: normalizePerformanceMode(parsed && parsed.performanceMode),
+      ideasWeeklyGoal: normalizePositiveInt(parsed && parsed.ideasWeeklyGoal, defaults.ideasWeeklyGoal),
       theme: normalizeThemeKey(parsed && parsed.theme)
     };
   } catch {
@@ -15612,6 +15788,15 @@ function saveGoalJournalEntries() {
     return;
   }
   localStorage.setItem(getScopedStorageKey(GOAL_JOURNAL_STORAGE_KEY), JSON.stringify(goalJournalEntries));
+  markLocalDataUpdatedAt();
+  queueCloudSync();
+}
+
+function saveIdeaEntries() {
+  if (!currentUser) {
+    return;
+  }
+  localStorage.setItem(getScopedStorageKey(IDEAS_STORAGE_KEY), JSON.stringify(ideaEntries));
   markLocalDataUpdatedAt();
   queueCloudSync();
 }
@@ -15939,6 +16124,34 @@ function normalizeRunningSpeedMph(value, fallback = 0) {
   return normalized;
 }
 
+const RUNNING_SPLITS_MAX = 50;
+
+function normalizeRunningSplits(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const splits = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") {
+      continue;
+    }
+    const distance = normalizePositiveAmount(raw.distance, 0);
+    const durationMinutes = normalizePositiveAmount(raw.durationMinutes, 0);
+    if (distance <= 0 || durationMinutes <= 0) {
+      continue;
+    }
+    splits.push({
+      distance,
+      durationMinutes,
+      paceMinutesPerMile: getPaceMinutesPerMile(distance, durationMinutes)
+    });
+    if (splits.length >= RUNNING_SPLITS_MAX) {
+      break;
+    }
+  }
+  return splits;
+}
+
 function normalizeCustomExerciseName(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
 }
@@ -16091,6 +16304,7 @@ function normalizeGoalsPlusEntryData(entry) {
     durationMinutes,
     paceMinutesPerMile,
     estimatedVo2,
+    splits: normalizeRunningSplits(raw.splits),
     workSpeed: isNorwegian ? normalizeRunningSpeedMph(rawWorkSpeed, 0) : 0,
     recoverySpeed: isNorwegian ? normalizeRunningSpeedMph(rawRecoverySpeed, 0) : 0,
     customExerciseName: isCustomWorkout ? normalizeCustomExerciseName(raw.customExerciseName) : "",
@@ -17410,7 +17624,11 @@ function formatEntryGoalsPlusDetails(entry, tracker) {
     }
   }
   const customExerciseText = customExerciseParts.length > 0 ? ` | ${customExerciseParts.join(" | ")}` : "";
-  return `Goals+ | ${formatRunningWorkout(running.runningWorkout)}${runMetricText}${intervalText}${customExerciseText}`;
+  const splits = Array.isArray(running.splits) ? running.splits : [];
+  const splitsText = splits.length > 0
+    ? ` | Splits ${splits.map((split) => `${formatAmount(split.distance)} mi ${formatAmount(split.durationMinutes)} min (${formatPaceFromMinutes(split.paceMinutesPerMile)})`).join(", ")}`
+    : "";
+  return `Goals+ | ${formatRunningWorkout(running.runningWorkout)}${runMetricText}${intervalText}${customExerciseText}${splitsText}`;
 }
 
 function formatGoalTags(value) {
@@ -18185,6 +18403,74 @@ function syncEntryGoalsPlusWorkoutVisibility(workoutValue) {
   }
 }
 
+function renumberGoalsPlusSplitRows() {
+  if (!entryGoalsPlusSplitsList) {
+    return;
+  }
+  Array.from(entryGoalsPlusSplitsList.querySelectorAll(".goals-plus-split-index"))
+    .forEach((el, index) => {
+      el.textContent = String(index + 1);
+    });
+}
+
+function addGoalsPlusSplitRow(distance = "", durationMinutes = "") {
+  if (!entryGoalsPlusSplitsList) {
+    return;
+  }
+  if (entryGoalsPlusSplitsList.querySelectorAll(".goals-plus-split-row").length >= RUNNING_SPLITS_MAX) {
+    return;
+  }
+  const row = document.createElement("div");
+  row.className = "goals-plus-split-row";
+  row.innerHTML = `
+    <span class="goals-plus-split-index"></span>
+    <label class="goals-plus-split-field">
+      <span class="muted small">Distance (mi)</span>
+      <input type="number" class="goals-plus-split-distance" min="0" step="0.01" placeholder="1" />
+    </label>
+    <label class="goals-plus-split-field">
+      <span class="muted small">Time (min)</span>
+      <input type="number" class="goals-plus-split-time" min="0" step="0.01" placeholder="8.25" />
+    </label>
+    <button type="button" class="btn btn-sm goals-plus-split-remove" aria-label="Remove split">&times;</button>
+  `;
+  const distanceInput = row.querySelector(".goals-plus-split-distance");
+  const timeInput = row.querySelector(".goals-plus-split-time");
+  if (distance !== "" && distance != null) {
+    distanceInput.value = String(distance);
+  }
+  if (durationMinutes !== "" && durationMinutes != null) {
+    timeInput.value = String(durationMinutes);
+  }
+  row.querySelector(".goals-plus-split-remove").addEventListener("click", () => {
+    row.remove();
+    renumberGoalsPlusSplitRows();
+  });
+  entryGoalsPlusSplitsList.appendChild(row);
+  renumberGoalsPlusSplitRows();
+}
+
+function clearGoalsPlusSplitRows() {
+  if (entryGoalsPlusSplitsList) {
+    entryGoalsPlusSplitsList.innerHTML = "";
+  }
+}
+
+function collectGoalsPlusSplitsFromForm() {
+  if (!entryGoalsPlusSplitsList) {
+    return [];
+  }
+  const rows = Array.from(entryGoalsPlusSplitsList.querySelectorAll(".goals-plus-split-row"));
+  return normalizeRunningSplits(rows.map((row) => {
+    const distanceInput = row.querySelector(".goals-plus-split-distance");
+    const timeInput = row.querySelector(".goals-plus-split-time");
+    return {
+      distance: distanceInput ? distanceInput.value : 0,
+      durationMinutes: timeInput ? timeInput.value : 0
+    };
+  }));
+}
+
 function renderEntryGoalsPlusRunningInputs(tracker) {
   const running = isGoalsPlusRunningTracker(tracker);
   const golf = isGoalsPlusGolfTracker(tracker);
@@ -18235,6 +18521,7 @@ function renderEntryGoalsPlusRunningInputs(tracker) {
     if (!golf && entryGoalsPlusGolfScore) {
       entryGoalsPlusGolfScore.value = "";
     }
+    clearGoalsPlusSplitRows();
     updateEntryGoalsPlusDerivedLabel();
     return;
   }
@@ -18283,6 +18570,7 @@ function collectGoalsPlusEntryDataFromForm(tracker) {
     durationMinutes,
     paceMinutesPerMile,
     estimatedVo2,
+    splits: collectGoalsPlusSplitsFromForm(),
     workSpeed: isNorwegian
       ? normalizeRunningSpeedMph(
         entryGoalsPlusWorkInterval ? entryGoalsPlusWorkInterval.value : config.workSpeed,
