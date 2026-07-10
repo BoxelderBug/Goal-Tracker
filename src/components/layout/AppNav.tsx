@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Settings } from "@/types/models";
 import { cn } from "@/lib/cn";
 import { useSettings } from "@/components/data/UserDataProvider";
 
 interface NavItem {
   href: string;
   label: string;
+  /** hide the item unless this returns true */
+  show?: (settings: Settings) => boolean;
 }
 
 const GROUPS: { heading: string; items: NavItem[] }[] = [
@@ -25,12 +28,19 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
     items: [
       { href: "/week", label: "Week" },
       { href: "/month", label: "Month" },
+      { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled },
       { href: "/year", label: "Year" },
       { href: "/entries", label: "All Entries" },
       { href: "/snapshots", label: "Snapshots" },
       { href: "/trends", label: "Trends" },
       { href: "/goals-plus", label: "Goals+" },
       { href: "/data", label: "Data" },
+    ],
+  },
+  {
+    heading: "More",
+    items: [
+      { href: "/points", label: "Points", show: (s) => s.rewardPointsEnabled },
     ],
   },
   {
@@ -58,34 +68,24 @@ export function AppNav() {
             {group.heading}
           </span>
           <div className="flex flex-wrap gap-1">
-            {group.items.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "rounded-lg px-2.5 py-1 text-sm font-medium transition-colors",
-                    active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-            {group.heading === "Review" && settings.quartersEnabled ? (
-              <Link
-                href="/quarter"
-                aria-current={pathname === "/quarter" ? "page" : undefined}
-                className={cn(
-                  "rounded-lg px-2.5 py-1 text-sm font-medium transition-colors",
-                  pathname === "/quarter" ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
-                )}
-              >
-                Quarter
-              </Link>
-            ) : null}
+            {group.items
+              .filter((item) => !item.show || item.show(settings))
+              .map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "rounded-lg px-2.5 py-1 text-sm font-medium transition-colors",
+                      active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
           </div>
         </div>
       ))}

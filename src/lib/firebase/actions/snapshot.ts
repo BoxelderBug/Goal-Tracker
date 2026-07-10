@@ -9,9 +9,11 @@ import type {
 import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
 import type { PeriodGoalOverrides } from "@/lib/domain/targets";
+import { where } from "firebase/firestore";
 import { getDateKey } from "@/lib/domain/dates";
 import { computeSnapshot } from "@/lib/domain/snapshot";
-import { snapshotsRepo } from "@/lib/firebase/repos";
+import { closeoutRefKey, newPointTransaction } from "@/lib/domain/points";
+import { pointTransactionsRepo, snapshotsRepo } from "@/lib/firebase/repos";
 import { createId } from "@/lib/id";
 
 /**
@@ -47,5 +49,23 @@ export async function closeOutPeriod(
     checkIns: [],
   };
   await snapshotsRepo.set(uid, snapshot);
+
+  // Award close-out points once per period (deduped by refKey) when enabled.
+  if (params.rewardPointsEnabled && summary.goalPointsEarned > 0) {
+    const refKey = closeoutRefKey(params.period, snapshot.rangeStart);
+    const existing = await pointTransactionsRepo.list(uid, where("refKey", "==", refKey));
+    if (existing.length === 0) {
+      await pointTransactionsRepo.set(
+        uid,
+        newPointTransaction({
+          type: "earn-closeout",
+          amount: summary.goalPointsEarned,
+          note: `${params.period} close-out (${snapshot.rangeStart})`,
+          refKey,
+        }),
+      );
+    }
+  }
+
   return snapshot;
 }
