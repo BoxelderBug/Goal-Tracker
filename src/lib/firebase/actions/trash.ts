@@ -35,13 +35,27 @@ function makeTrashItem(itemType: TrashItemType, payload: WithId, label: string):
   };
 }
 
+/**
+ * Move any restorable entity into trash, then remove it from its source
+ * collection. The payload is stored verbatim so restore is a plain re-insert.
+ */
+export async function moveToTrash(
+  uid: string,
+  itemType: TrashItemType,
+  payload: WithId,
+  label: string,
+): Promise<void> {
+  await trashRepo.set(uid, makeTrashItem(itemType, payload, label));
+  const repo = REPO_BY_TYPE[itemType];
+  if (repo) await repo.remove(uid, payload.id);
+  await enforceCap(uid);
+}
+
 /** Drop the entry into trash, then remove it from the live collection. */
-export async function moveEntryToTrash(uid: string, entry: Entry, goalName: string): Promise<void> {
+export function moveEntryToTrash(uid: string, entry: Entry, goalName: string): Promise<void> {
   const value = entry.notApplicable ? "N/A" : formatAmount(entry.amount);
   const label = `${goalName} — ${value} (${entry.date})`;
-  await trashRepo.set(uid, makeTrashItem("entry", entry, label));
-  await entriesRepo.remove(uid, entry.id);
-  await enforceCap(uid);
+  return moveToTrash(uid, "entry", entry, label);
 }
 
 /** Restore a trashed item back into its source collection and clear it from trash. */
