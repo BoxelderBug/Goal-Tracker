@@ -165,10 +165,9 @@ export interface Goal {
 // ---------------------------------------------------------------------------
 
 export interface RunningSplit {
-  /** mile index, 1-based */
-  mile: number;
-  /** minutes for this mile */
-  minutes: number;
+  distance: number;
+  durationMinutes: number;
+  paceMinutesPerMile: number;
 }
 
 export interface GoalsPlusRunningEntry {
