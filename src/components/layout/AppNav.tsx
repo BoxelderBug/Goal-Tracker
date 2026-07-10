@@ -41,6 +41,9 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
     heading: "More",
     items: [
       { href: "/points", label: "Points", show: (s) => s.rewardPointsEnabled },
+      { href: "/bucket-list", label: "Bucket List", show: (s) => s.bucketListEnabled },
+      { href: "/journal", label: "Journal" },
+      { href: "/ideas", label: "Ideas" },
     ],
   },
   {
