@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase/client";
@@ -47,6 +48,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </header>
             <AppNav />
             <main className="flex-1">{children}</main>
+            <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-muted">
+              <span>Goal Tracker</span>
+              <Link href="/legal" className="hover:text-text">Privacy &amp; terms</Link>
+            </footer>
           </div>
         </UserDataProvider>
       </MigrationGate>
