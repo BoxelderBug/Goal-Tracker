@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import type { Entry } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { entriesRepo } from "@/lib/firebase/repos";
+import { moveEntryToTrash } from "@/lib/firebase/actions/trash";
 import { newEntry } from "@/lib/domain/newEntry";
 import { getDateKey, normalizeDate } from "@/lib/domain/dates";
 import { isYesNoGoal, formatAmount } from "@/lib/domain/format";
@@ -67,11 +69,15 @@ export default function EntryPage() {
     }
   }
 
-  async function deleteEntry(id: string) {
-    const ok = await confirm({ message: "Delete this entry?", confirmLabel: "Delete", danger: true });
+  async function deleteEntry(entry: Entry) {
+    const ok = await confirm({ message: "Move this entry to trash?", confirmLabel: "Delete", danger: true });
     if (!ok) return;
-    await entriesRepo.remove(uid, id);
-    toast.success("Entry deleted");
+    try {
+      await moveEntryToTrash(uid, entry, goalName(entry.trackerId));
+      toast.success("Moved to trash");
+    } catch {
+      toast.error("Could not delete entry");
+    }
   }
 
   if (active.length === 0) {
@@ -143,7 +149,7 @@ export default function EntryPage() {
                     {e.notes ? ` — ${e.notes}` : ""}
                   </span>
                 </span>
-                <Button size="sm" variant="ghost" onClick={() => deleteEntry(e.id)}>Delete</Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteEntry(e)}>Delete</Button>
               </li>
             ))}
           </ul>
