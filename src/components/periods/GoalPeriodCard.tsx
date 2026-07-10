@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Goal, PeriodKind } from "@/types/models";
+import type { Goal, PeriodKind, Vacation } from "@/types/models";
 import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
 import { computePace, getCumulativeSeries, paceTone, sumRange } from "@/lib/domain/progress";
-import { getTargetForPeriod } from "@/lib/domain/targets";
+import { getTargetForPeriod, type PeriodGoalOverrides } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import type { WeekStart } from "@/types/models";
 import { Card } from "@/components/ui/Card";
@@ -28,6 +28,8 @@ export function GoalPeriodCard({
   period,
   range,
   weekStart,
+  overrides,
+  vacations,
   now,
 }: {
   goal: Goal;
@@ -35,16 +37,18 @@ export function GoalPeriodCard({
   period: PeriodKind;
   range: DateRange;
   weekStart: WeekStart;
+  overrides?: PeriodGoalOverrides;
+  vacations?: Vacation[];
   now: Date;
 }) {
   const [open, setOpen] = useState(false);
 
   const { progress, target, pace, tone } = useMemo(() => {
     const progress = sumRange(totals, goal.id, range);
-    const target = getTargetForPeriod(goal, period, range, { weekStart });
+    const target = getTargetForPeriod(goal, period, range, { weekStart, overrides, vacations });
     const pace = computePace(progress, target, range, now);
     return { progress, target, pace, tone: paceTone(pace) };
-  }, [totals, goal, period, range, weekStart, now]);
+  }, [totals, goal, period, range, weekStart, overrides, vacations, now]);
 
   const chartOption = useMemo(() => {
     if (!open) return null;

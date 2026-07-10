@@ -1,4 +1,10 @@
-import { doc, getDoc, setDoc, type DocumentReference } from "firebase/firestore";
+import {
+  deleteField,
+  doc,
+  getDoc,
+  setDoc,
+  type DocumentReference,
+} from "firebase/firestore";
 import { getDb, USERS_COLLECTION } from "@/lib/firebase/client";
 import type { KeyedValueMapDoc } from "@/types/models";
 
@@ -9,7 +15,7 @@ import type { KeyedValueMapDoc } from "@/types/models";
  */
 const META = "meta";
 
-function metaRef(uid: string, id: string): DocumentReference<KeyedValueMapDoc> {
+export function metaRef(uid: string, id: string): DocumentReference<KeyedValueMapDoc> {
   return doc(getDb(), USERS_COLLECTION, uid, META, id) as DocumentReference<KeyedValueMapDoc>;
 }
 
@@ -21,6 +27,20 @@ export async function getMetaMap(uid: string, id: string): Promise<Record<string
 /** Merge-write so a second device's contributions are not clobbered. */
 export function mergeMetaMap(uid: string, id: string, values: Record<string, number>): Promise<void> {
   return setDoc(metaRef(uid, id), { values }, { merge: true });
+}
+
+/** Set one key in the map without touching the others. */
+export function setMetaValue(uid: string, id: string, key: string, value: number): Promise<void> {
+  return setDoc(metaRef(uid, id), { values: { [key]: value } }, { merge: true });
+}
+
+/** Remove one key from the map (used to clear a per-period override). */
+export function deleteMetaValue(uid: string, id: string, key: string): Promise<void> {
+  return setDoc(
+    metaRef(uid, id),
+    { values: { [key]: deleteField() } },
+    { merge: true },
+  );
 }
 
 export const PERIOD_GOAL_OVERRIDES = "periodGoalOverrides";

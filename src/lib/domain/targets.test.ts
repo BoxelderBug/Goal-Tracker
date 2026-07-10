@@ -8,6 +8,8 @@ import {
   getTargetForPeriod,
   getVacationOverlapDays,
   normalizeCustomTargetList,
+  overrideKey,
+  overridesFromFlatMap,
   type TargetGoalLike,
 } from "./targets";
 
@@ -190,5 +192,36 @@ describe("getGoalPointsForPeriod", () => {
     const goal = baseGoal({ goalPoints: 7 });
     expect(getGoalPointsForPeriod(goal, "week")).toBe(7);
     expect(getGoalPointsForPeriod(goal, "year")).toBe(7);
+  });
+});
+
+describe("overridesFromFlatMap", () => {
+  it("expands flat keys into nested periodKey -> goalId -> value", () => {
+    const flat = {
+      [overrideKey("week:2026-07-06", "g1")]: 12,
+      [overrideKey("week:2026-07-06", "g2")]: 5,
+      [overrideKey("month:2026-07", "g1")]: 40,
+      "malformed-no-separator": 9,
+    };
+    expect(overridesFromFlatMap(flat)).toEqual({
+      "week:2026-07-06": { g1: 12, g2: 5 },
+      "month:2026-07": { g1: 40 },
+    });
+  });
+
+  it("returns an empty object for empty/undefined input", () => {
+    expect(overridesFromFlatMap({})).toEqual({});
+    expect(overridesFromFlatMap(undefined as unknown as Record<string, number>)).toEqual({});
+  });
+
+  it("feeds getTargetForPeriod so an override wins over the default", () => {
+    const goal = baseGoal({ weeklyGoal: 10 });
+    const week = getWeekRange(parseDateKey("2026-07-08"), "monday");
+    const flat = { [overrideKey("week:2026-07-06", goal.id)]: 25 };
+    const target = getTargetForPeriod(goal, "week", week, {
+      weekStart: "monday",
+      overrides: overridesFromFlatMap(flat),
+    });
+    expect(target).toBe(25);
   });
 });

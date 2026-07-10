@@ -1,14 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { PeriodKind } from "@/types/models";
+import type { KeyedValueMapDoc, PeriodKind, TempPeriodGoal, Vacation } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { addDays, addMonths, addYears, getDateKey, normalizeDate } from "@/lib/domain/dates";
-import { getPeriodRange } from "@/lib/domain/periods";
+import { getPeriodKey, getPeriodRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange } from "@/lib/domain/progress";
-import { getTargetForPeriod } from "@/lib/domain/targets";
+import { getTargetForPeriod, overridesFromFlatMap } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { closeOutPeriod } from "@/lib/firebase/actions/snapshot";
+import { tempPeriodGoalsRepo, vacationsRepo } from "@/lib/firebase/repos";
+import { PERIOD_GOAL_OVERRIDES, metaRef } from "@/lib/firebase/repos/meta";
+import { useCollection } from "@/hooks/useCollection";
+import { useDoc } from "@/hooks/useDoc";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
@@ -16,6 +20,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/ui/Toaster";
 import { GoalPeriodCard } from "./GoalPeriodCard";
+import { ViewSettingsModal } from "./ViewSettingsModal";
 
 const TITLES: Record<PeriodKind, string> = {
   week: "Week",
@@ -24,11 +29,23 @@ const TITLES: Record<PeriodKind, string> = {
   year: "Year",
 };
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
 function shiftAnchor(anchor: Date, period: PeriodKind, dir: number): Date {
   if (period === "week") return addDays(anchor, 7 * dir);
   if (period === "month") return addMonths(anchor, dir);
   if (period === "quarter") return addMonths(anchor, 3 * dir);
   return addYears(anchor, dir);
+}
+
+function periodDisplayName(period: PeriodKind, start: Date): string {
+  if (period === "month") return `${MONTH_NAMES[start.getMonth()]} ${start.getFullYear()}`;
+  if (period === "year") return String(start.getFullYear());
+  if (period === "quarter") return `Q${Math.floor(start.getMonth() / 3) + 1} ${start.getFullYear()}`;
+  return `Week of ${getDateKey(start)}`;
 }
 
 export function PeriodView({ period }: { period: PeriodKind }) {
@@ -40,12 +57,37 @@ export function PeriodView({ period }: { period: PeriodKind }) {
   const [statusFilter, setStatusFilter] = useState<"active" | "all">("active");
   const [tagFilter, setTagFilter] = useState("all");
   const [closing, setClosing] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Period adjustments (only needed on period views, so subscribed here).
+  const vacations = useCollection<Vacation>(() => vacationsRepo.query(uid), [uid]);
+  const tempGoals = useCollection<TempPeriodGoal>(() => tempPeriodGoalsRepo.query(uid), [uid]);
+  const overridesDoc = useDoc<KeyedValueMapDoc>(() => metaRef(uid, PERIOD_GOAL_OVERRIDES), [uid]);
 
   const range = useMemo(
     () => getPeriodRange(period, anchor, settings.weekStart),
     [period, anchor, settings.weekStart],
   );
   const totals = useMemo(() => buildDailyTotals(entries), [entries]);
+
+  // quarter has no per-period key in legacy (no overrides / temp goals).
+  const periodKey = period === "quarter" ? null : getPeriodKey(period, range);
+  const periodName = periodDisplayName(period, range.start);
+  const overridesFlat = useMemo(() => overridesDoc.data?.values ?? {}, [overridesDoc.data]);
+
+  const targetContext = useMemo(
+    () => ({
+      weekStart: settings.weekStart,
+      overrides: overridesFromFlatMap(overridesFlat),
+      vacations: vacations.data,
+    }),
+    [settings.weekStart, overridesFlat, vacations.data],
+  );
+
+  const periodTempGoals = useMemo(
+    () => (periodKey ? tempGoals.data.filter((t) => t.periodKey === periodKey) : []),
+    [tempGoals.data, periodKey],
+  );
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -69,14 +111,14 @@ export function PeriodView({ period }: { period: PeriodKind }) {
     let hitCount = 0;
     for (const goal of visibleGoals) {
       const progress = sumRange(totals, goal.id, range);
-      const target = getTargetForPeriod(goal, period, range, { weekStart: settings.weekStart });
+      const target = getTargetForPeriod(goal, period, range, targetContext);
       totalProgress += progress;
       totalTarget += target;
       if (computePace(progress, target, range, now).goalHit) hitCount += 1;
     }
     const completion = totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
     return { totalProgress, totalTarget, hitCount, completion };
-  }, [visibleGoals, totals, range, period, settings.weekStart, now]);
+  }, [visibleGoals, totals, range, period, targetContext, now]);
 
   const rangeLabel = `${getDateKey(range.start)} → ${getDateKey(range.end)}`;
 
@@ -96,6 +138,8 @@ export function PeriodView({ period }: { period: PeriodKind }) {
         now,
         weekStart: settings.weekStart,
         rewardPointsEnabled: settings.rewardPointsEnabled,
+        overrides: targetContext.overrides,
+        vacations: targetContext.vacations,
         filters: { type: "all", status: statusFilter, tag: tagFilter },
       });
       toast.success("Snapshot saved");
@@ -114,6 +158,7 @@ export function PeriodView({ period }: { period: PeriodKind }) {
           <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, -1))}>← Prev</Button>
           <Button size="sm" onClick={() => setAnchor(normalizeDate(new Date()))}>Today</Button>
           <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, 1))}>Next →</Button>
+          <Button size="sm" onClick={() => setSettingsOpen(true)}>View settings</Button>
           <Button
             size="sm"
             variant="primary"
@@ -166,11 +211,42 @@ export function PeriodView({ period }: { period: PeriodKind }) {
               period={period}
               range={range}
               weekStart={settings.weekStart}
+              overrides={targetContext.overrides}
+              vacations={targetContext.vacations}
               now={now}
             />
           ))}
         </div>
       )}
+
+      {periodTempGoals.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Extra goals this period</h2>
+          <div className="grid gap-3">
+            {periodTempGoals.map((t) => (
+              <Card key={t.id} className="flex items-center justify-between gap-3">
+                <span className="font-medium">{t.name}</span>
+                <span className="text-sm text-muted">Target {formatAmount(t.target)} {t.unit}</span>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <ViewSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        uid={uid}
+        period={period}
+        periodKey={periodKey}
+        periodName={periodName}
+        range={range}
+        goals={goals}
+        vacations={vacations.data}
+        tempGoals={tempGoals.data}
+        overridesFlat={overridesFlat}
+        weekStart={settings.weekStart}
+      />
     </div>
   );
 }

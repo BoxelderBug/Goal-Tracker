@@ -37,6 +37,24 @@ export interface TargetGoalLike {
 /** periodKey -> goalId -> overridden target */
 export type PeriodGoalOverrides = Record<string, Record<string, number>>;
 
+/** Flat storage key for one override in the meta/periodGoalOverrides map. */
+export function overrideKey(periodKey: string, goalId: string): string {
+  return `${periodKey}::${goalId}`;
+}
+
+/** Expand the flat meta override map into the nested PeriodGoalOverrides shape. */
+export function overridesFromFlatMap(values: Record<string, number>): PeriodGoalOverrides {
+  const nested: PeriodGoalOverrides = {};
+  for (const [key, value] of Object.entries(values ?? {})) {
+    const sep = key.indexOf("::");
+    if (sep < 0) continue;
+    const periodKey = key.slice(0, sep);
+    const goalId = key.slice(sep + 2);
+    (nested[periodKey] ??= {})[goalId] = value;
+  }
+  return nested;
+}
+
 export function normalizeCustomTargetList(
   value: unknown,
   count: number,

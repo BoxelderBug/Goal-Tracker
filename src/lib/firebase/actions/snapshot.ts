@@ -3,10 +3,12 @@ import type {
   PeriodKind,
   PeriodSnapshot,
   SnapshotFilters,
+  Vacation,
   WeekStart,
 } from "@/types/models";
 import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
+import type { PeriodGoalOverrides } from "@/lib/domain/targets";
 import { getDateKey } from "@/lib/domain/dates";
 import { computeSnapshot } from "@/lib/domain/snapshot";
 import { snapshotsRepo } from "@/lib/firebase/repos";
@@ -27,6 +29,8 @@ export async function closeOutPeriod(
     now: Date;
     weekStart: WeekStart;
     rewardPointsEnabled: boolean;
+    overrides?: PeriodGoalOverrides;
+    vacations?: Vacation[];
     filters: SnapshotFilters;
   },
 ): Promise<PeriodSnapshot> {

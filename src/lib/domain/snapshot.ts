@@ -12,12 +12,13 @@ import type {
   PeriodKind,
   SnapshotGoal,
   SnapshotSummary,
+  Vacation,
   WeekStart,
 } from "@/types/models";
 import type { DailyTotals } from "./progress";
 import type { DateRange } from "./dates";
 import { computePace, sumRange } from "./progress";
-import { getTargetForPeriod } from "./targets";
+import { getTargetForPeriod, type PeriodGoalOverrides } from "./targets";
 
 const POINTS_FIELD: Record<PeriodKind, "goalPointsWeekly" | "goalPointsMonthly" | "goalPointsYearly" | null> = {
   week: "goalPointsWeekly",
@@ -39,9 +40,12 @@ export function computeSnapshot(params: {
   now: Date;
   weekStart: WeekStart;
   rewardPointsEnabled: boolean;
+  overrides?: PeriodGoalOverrides;
+  vacations?: Vacation[];
 }): SnapshotComputation {
   const { goals, totals, period, range, now, weekStart, rewardPointsEnabled } = params;
   const pointsField = POINTS_FIELD[period];
+  const targetContext = { weekStart, overrides: params.overrides, vacations: params.vacations };
 
   const snapshotGoals: SnapshotGoal[] = [];
   let totalProgress = 0;
@@ -51,7 +55,7 @@ export function computeSnapshot(params: {
 
   for (const goal of goals) {
     const progress = sumRange(totals, goal.id, range);
-    const target = getTargetForPeriod(goal, period, range, { weekStart });
+    const target = getTargetForPeriod(goal, period, range, targetContext);
     const hit = computePace(progress, target, range, now).goalHit;
     const pointsEarned =
       hit && rewardPointsEnabled && pointsField ? Number(goal[pointsField]) || 0 : 0;
