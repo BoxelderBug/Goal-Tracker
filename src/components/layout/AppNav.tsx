@@ -26,6 +26,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/month", label: "Month" },
       { href: "/year", label: "Year" },
       { href: "/entries", label: "All Entries" },
+      { href: "/snapshots", label: "Snapshots" },
     ],
   },
   {

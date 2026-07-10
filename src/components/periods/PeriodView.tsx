@@ -8,10 +8,13 @@ import { getPeriodRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange } from "@/lib/domain/progress";
 import { getTargetForPeriod } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
+import { closeOutPeriod } from "@/lib/firebase/actions/snapshot";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/ui/Toaster";
 import { GoalPeriodCard } from "./GoalPeriodCard";
 
 const TITLES: Record<PeriodKind, string> = {
@@ -29,12 +32,14 @@ function shiftAnchor(anchor: Date, period: PeriodKind, dir: number): Date {
 }
 
 export function PeriodView({ period }: { period: PeriodKind }) {
-  const { goals, entries } = useUserData();
+  const { uid, goals, entries } = useUserData();
   const settings = useSettings();
+  const confirm = useConfirm();
   const now = useMemo(() => new Date(), []);
   const [anchor, setAnchor] = useState(() => normalizeDate(new Date()));
   const [statusFilter, setStatusFilter] = useState<"active" | "all">("active");
   const [tagFilter, setTagFilter] = useState("all");
+  const [closing, setClosing] = useState(false);
 
   const range = useMemo(
     () => getPeriodRange(period, anchor, settings.weekStart),
@@ -75,6 +80,32 @@ export function PeriodView({ period }: { period: PeriodKind }) {
 
   const rangeLabel = `${getDateKey(range.start)} → ${getDateKey(range.end)}`;
 
+  async function handleCloseOut() {
+    const ok = await confirm({
+      message: `Close out this ${period} for ${visibleGoals.length} goal${visibleGoals.length === 1 ? "" : "s"}? This saves a snapshot of the current results.`,
+      confirmLabel: "Close out",
+    });
+    if (!ok) return;
+    setClosing(true);
+    try {
+      await closeOutPeriod(uid, {
+        goals: visibleGoals,
+        totals,
+        period,
+        range,
+        now,
+        weekStart: settings.weekStart,
+        rewardPointsEnabled: settings.rewardPointsEnabled,
+        filters: { type: "all", status: statusFilter, tag: tagFilter },
+      });
+      toast.success("Snapshot saved");
+    } catch {
+      toast.error("Could not close out period");
+    } finally {
+      setClosing(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -83,6 +114,14 @@ export function PeriodView({ period }: { period: PeriodKind }) {
           <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, -1))}>← Prev</Button>
           <Button size="sm" onClick={() => setAnchor(normalizeDate(new Date()))}>Today</Button>
           <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, 1))}>Next →</Button>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleCloseOut}
+            disabled={closing || visibleGoals.length === 0}
+          >
+            {closing ? "Saving…" : "Close out"}
+          </Button>
         </div>
       </div>
       <p className="text-sm text-muted">{rangeLabel}</p>
