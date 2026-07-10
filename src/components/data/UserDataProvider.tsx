@@ -1,0 +1,70 @@
+"use client";
+
+import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { orderBy, query, where } from "firebase/firestore";
+import type { Entry, Goal, Settings } from "@/types/models";
+import { addDays, getDateKey } from "@/lib/domain/dates";
+import { entriesRepo, goalsRepo } from "@/lib/firebase/repos";
+import { userDocRef, type UserDocData } from "@/lib/firebase/repos/userDoc";
+import { normalizeSettings } from "@/lib/migration/normalize";
+import { useCollection } from "@/hooks/useCollection";
+import { useDoc } from "@/hooks/useDoc";
+
+interface UserData {
+  uid: string;
+  settings: Settings;
+  goals: Goal[];
+  /** entries within the live rolling window (see windowStartKey) */
+  entries: Entry[];
+  windowStartKey: string;
+  loading: boolean;
+}
+
+const UserDataContext = createContext<UserData | null>(null);
+
+/** Start of the current year minus 26 weeks — the live entries subscription
+ *  window (covers home, week/month/year, and 26-week trends). Older ranges are
+ *  fetched on demand elsewhere. */
+function computeWindowStartKey(now: Date): string {
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  return getDateKey(addDays(startOfYear, -182));
+}
+
+export function UserDataProvider({ uid, children }: { uid: string; children: ReactNode }) {
+  const windowStartKey = useMemo(() => computeWindowStartKey(new Date()), []);
+
+  const userDoc = useDoc<UserDocData>(() => userDocRef(uid), [uid]);
+  const goals = useCollection<Goal>(() => goalsRepo.query(uid, orderBy("priority", "desc")), [uid]);
+  const entries = useCollection<Entry>(
+    () => query(entriesRepo.ref(uid), where("date", ">=", windowStartKey), orderBy("date", "asc")),
+    [uid, windowStartKey],
+  );
+
+  const value = useMemo<UserData>(
+    () => ({
+      uid,
+      settings: normalizeSettings(userDoc.data?.settings),
+      goals: goals.data,
+      entries: entries.data,
+      windowStartKey,
+      loading: userDoc.loading || goals.loading || entries.loading,
+    }),
+    [uid, userDoc.data, userDoc.loading, goals.data, goals.loading, entries.data, entries.loading, windowStartKey],
+  );
+
+  return <UserDataContext.Provider value={value}>{children}</UserDataContext.Provider>;
+}
+
+export function useUserData(): UserData {
+  const ctx = useContext(UserDataContext);
+  if (!ctx) throw new Error("useUserData must be used inside UserDataProvider");
+  return ctx;
+}
+
+export function useGoals(): Goal[] {
+  return useUserData().goals;
+}
+
+export function useSettings(): Settings {
+  return useUserData().settings;
+}

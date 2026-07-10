@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function share() {
+      return get(/databases/$(database)/documents/goalTrackerGoalShares/$(request.resource.data.shareId)).data;
+    }
+
+    // Per-user data. Owner has full access to everything under their tree.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /{collection}/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /meta/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Entries also accept writes from an approved accountability partner.
+      // Partners may create/update entries they authored (createdBy == self)
+      // for the specific shared goal, but never read the collection or delete.
+      match /entries/{entryId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) || (
+          isSignedIn()
+          && request.resource.data.shareId is string
+          && share().status == 'approved'
+          && share().partnerUid == request.auth.uid
+          && share().ownerUid == uid
+          && request.resource.data.trackerId == share().goalId
+          && request.resource.data.createdBy == request.auth.uid
+        );
+      }
+    }
+
+    // Cross-user email directory for friend/partner lookup.
+    match /goalTrackerProfiles/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+
+    // Accountability shares: readable/updatable by owner or partner.
+    match /goalTrackerGoalShares/{id} {
+      allow read, update: if isSignedIn()
+        && request.auth.uid in [resource.data.ownerUid, resource.data.partnerUid];
+      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Notifications: anyone signed in may create one for a recipient; only the
+    // recipient may read/mutate it.
+    match /goalTrackerNotifications/{id} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isSignedIn()
+        && request.auth.uid == resource.data.recipientId;
+    }
+
+    // Legacy whole-blob doc: readable by its owner (migration source / rollback),
+    // frozen against writes from the new app.
+    match /goalTrackerData/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+  }
+}
