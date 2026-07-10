@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { getDateKey } from "./dates";
-import { getMonthRange, getQuarterRange, getWeekRange, getWeekTemplateIndexForDate, getYearRange } from "./periods";
+import { getWeekRange, getWeekTemplateIndexForDate } from "./periods";
 import { getTargetForPeriod, type PeriodGoalOverrides, type TargetGoalLike } from "./targets";
 import type { PeriodKind, Vacation, WeekStart } from "@/types/models";
 
@@ -287,14 +287,16 @@ describe("legacy parity (differential fuzz)", () => {
       const period = pick(PERIODS);
       const weekStart = pick(WEEK_STARTS);
       const anchor = randomDate();
+      // Ranges come from the ORACLE side so a range bug in the port can't
+      // mask a matching target bug.
       const range =
         period === "week"
-          ? getWeekRange(anchor, weekStart)
+          ? legacyGetWeekRange(anchor, weekStart)
           : period === "month"
-            ? getMonthRange(anchor)
+            ? legacyGetMonthRange(anchor)
             : period === "quarter"
-              ? getQuarterRange(anchor)
-              : getYearRange(anchor);
+              ? legacyGetQuarterRange(anchor)
+              : legacyGetYearRange(anchor);
       const overrides: PeriodGoalOverrides =
         rand() < 0.5
           ? { [legacyGetPeriodKey(period, range)]: { [pick(["g1", "g2"])]: randInt(50) } }
