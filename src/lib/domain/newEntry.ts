@@ -1,4 +1,4 @@
-import type { Entry } from "@/types/models";
+import type { Entry, GoalsPlusEntryData } from "@/types/models";
 import { createId } from "@/lib/id";
 
 export function newEntry(params: {
@@ -7,6 +7,8 @@ export function newEntry(params: {
   amount: number;
   notApplicable?: boolean;
   notes?: string;
+  goalsPlus?: GoalsPlusEntryData | null;
+  metricValues?: Record<string, number>;
   createdBy?: string;
 }): Entry {
   return {
@@ -15,8 +17,8 @@ export function newEntry(params: {
     date: params.date,
     amount: params.amount,
     notApplicable: params.notApplicable ?? false,
-    goalsPlus: null,
-    metricValues: {},
+    goalsPlus: params.goalsPlus ?? null,
+    metricValues: params.metricValues ?? {},
     notes: params.notes ?? "",
     createdAt: new Date().toISOString(),
     ...(params.createdBy ? { createdBy: params.createdBy } : {}),
