@@ -12,6 +12,7 @@ import { ThemeControls } from "@/components/layout/ThemeControls";
 import { MigrationGate } from "@/components/data/MigrationGate";
 import { UserDataProvider } from "@/components/data/UserDataProvider";
 import { AppNav } from "@/components/layout/AppNav";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -37,6 +38,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-soft">
               <span className="font-display text-lg text-accent-strong">Goal Tracker</span>
               <div className="flex flex-wrap items-center gap-2">
+                <NotificationsBell />
                 <ThemeControls />
                 <Button size="sm" onClick={() => signOut(getFirebaseAuth())}>
                   Logout
