@@ -6,11 +6,11 @@ import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { addDays, addMonths, addYears, getDateKey, normalizeDate } from "@/lib/domain/dates";
 import { getPeriodKey, getPeriodRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange } from "@/lib/domain/progress";
-import { getTargetForPeriod, overridesFromFlatMap } from "@/lib/domain/targets";
+import { getTargetForPeriod, overrideKey, overridesFromFlatMap } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { closeOutPeriod } from "@/lib/firebase/actions/snapshot";
 import { tempPeriodGoalsRepo, vacationsRepo } from "@/lib/firebase/repos";
-import { PERIOD_GOAL_OVERRIDES, metaRef } from "@/lib/firebase/repos/meta";
+import { PERIOD_GOAL_OVERRIDES, STRETCH_GOALS, metaRef } from "@/lib/firebase/repos/meta";
 import { useCollection } from "@/hooks/useCollection";
 import { useDoc } from "@/hooks/useDoc";
 import { Button } from "@/components/ui/Button";
@@ -63,6 +63,7 @@ export function PeriodView({ period }: { period: PeriodKind }) {
   const vacations = useCollection<Vacation>(() => vacationsRepo.query(uid), [uid]);
   const tempGoals = useCollection<TempPeriodGoal>(() => tempPeriodGoalsRepo.query(uid), [uid]);
   const overridesDoc = useDoc<KeyedValueMapDoc>(() => metaRef(uid, PERIOD_GOAL_OVERRIDES), [uid]);
+  const stretchDoc = useDoc<KeyedValueMapDoc>(() => metaRef(uid, STRETCH_GOALS), [uid]);
 
   const range = useMemo(
     () => getPeriodRange(period, anchor, settings.weekStart),
@@ -74,6 +75,7 @@ export function PeriodView({ period }: { period: PeriodKind }) {
   const periodKey = period === "quarter" ? null : getPeriodKey(period, range);
   const periodName = periodDisplayName(period, range.start);
   const overridesFlat = useMemo(() => overridesDoc.data?.values ?? {}, [overridesDoc.data]);
+  const stretchFlat = useMemo(() => stretchDoc.data?.values ?? {}, [stretchDoc.data]);
 
   const targetContext = useMemo(
     () => ({
@@ -213,6 +215,9 @@ export function PeriodView({ period }: { period: PeriodKind }) {
               weekStart={settings.weekStart}
               overrides={targetContext.overrides}
               vacations={targetContext.vacations}
+              uid={uid}
+              stretchKey={periodKey ? overrideKey(periodKey, goal.id) : null}
+              stretchTarget={periodKey ? stretchFlat[overrideKey(periodKey, goal.id)] : undefined}
               now={now}
             />
           ))}
