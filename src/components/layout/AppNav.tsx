@@ -17,6 +17,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/", label: "Home" },
       { href: "/entry", label: "Add Entry" },
       { href: "/entry/week", label: "Week Update" },
+      { href: "/entry/year", label: "Year Update" },
     ],
   },
   {
