@@ -40,16 +40,21 @@ export function UserDataProvider({ uid, children }: { uid: string; children: Rea
     [uid, windowStartKey],
   );
 
+  // Memoize settings on the stored settings only, so its identity stays stable
+  // when unrelated data (goals, entries) updates — consumers can safely reset
+  // local drafts when this reference changes.
+  const settings = useMemo(() => normalizeSettings(userDoc.data?.settings), [userDoc.data?.settings]);
+
   const value = useMemo<UserData>(
     () => ({
       uid,
-      settings: normalizeSettings(userDoc.data?.settings),
+      settings,
       goals: goals.data,
       entries: entries.data,
       windowStartKey,
       loading: userDoc.loading || goals.loading || entries.loading,
     }),
-    [uid, userDoc.data, userDoc.loading, goals.data, goals.loading, entries.data, entries.loading, windowStartKey],
+    [uid, settings, userDoc.loading, goals.data, goals.loading, entries.data, entries.loading, windowStartKey],
   );
 
   return <UserDataContext.Provider value={value}>{children}</UserDataContext.Provider>;

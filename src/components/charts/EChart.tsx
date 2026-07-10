@@ -1,0 +1,63 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import type { EChartsOption, EChartsType } from "echarts";
+
+/**
+ * The single chart wrapper. ECharts is dynamically imported so it stays out of
+ * the initial bundle; the instance is disposed on unmount and resized with a
+ * ResizeObserver. Options are pure (built by lib/charts/options/*) and rebuilt
+ * whenever `option` changes.
+ */
+export function EChart({
+  option,
+  height = 280,
+  className,
+  onReady,
+}: {
+  option: EChartsOption;
+  height?: number;
+  className?: string;
+  onReady?: (chart: EChartsType) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<EChartsType | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let observer: ResizeObserver | undefined;
+
+    (async () => {
+      const echarts = await import("echarts");
+      if (disposed || !containerRef.current) return;
+      const chart = echarts.init(containerRef.current, undefined, { renderer: "canvas" });
+      chartRef.current = chart;
+      chart.setOption(option);
+      onReady?.(chart);
+      observer = new ResizeObserver(() => chart.resize());
+      observer.observe(containerRef.current);
+    })();
+
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      chartRef.current?.dispose();
+      chartRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Push option updates to an already-initialized chart.
+  useEffect(() => {
+    chartRef.current?.setOption(option, { notMerge: true });
+  }, [option]);
+
+  return <div ref={containerRef} className={className} style={{ height, width: "100%" }} />;
+}
+
+/** Read a theme token from CSS custom properties (charts follow the theme). */
+export function themeColor(name: string, fallback = "#888"): string {
+  if (typeof window === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
