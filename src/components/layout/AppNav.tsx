@@ -40,6 +40,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/settings/goals", label: "Goals" },
       { href: "/settings/active-goals", label: "Quick Edit" },
       { href: "/settings/checkins", label: "Check-ins" },
+      { href: "/settings/goal-migration", label: "Move Entries" },
       { href: "/trash", label: "Trash" },
     ],
   },
