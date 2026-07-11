@@ -1,0 +1,71 @@
+rules_version = '2';
+
+// TRANSITIONAL rules for zero-downtime cutover. Identical to firestore.rules
+// EXCEPT the legacy blob stays WRITABLE so the still-live legacy app keeps
+// saving while the new app runs in parallel. Deploy this FIRST (enables the new
+// app's subcollections without breaking legacy). After the new app is promoted
+// to production, verified with a real login, and legacy is retired, deploy the
+// final firestore.rules to freeze the blob.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function share() {
+      return get(/databases/$(database)/documents/goalTrackerGoalShares/$(request.resource.data.shareId)).data;
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /{collection}/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /meta/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /entries/{entryId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) || (
+          isSignedIn()
+          && request.resource.data.shareId is string
+          && share().status == 'approved'
+          && share().partnerUid == request.auth.uid
+          && share().ownerUid == uid
+          && request.resource.data.trackerId == share().goalId
+          && request.resource.data.createdBy == request.auth.uid
+        );
+      }
+    }
+
+    match /goalTrackerProfiles/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+
+    match /goalTrackerGoalShares/{id} {
+      allow read, update: if isSignedIn()
+        && request.auth.uid in [resource.data.ownerUid, resource.data.partnerUid];
+      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    match /goalTrackerNotifications/{id} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isSignedIn()
+        && request.auth.uid == resource.data.recipientId;
+    }
+
+    // DIFFERENCE FROM FINAL RULES: legacy blob still writable during transition.
+    match /goalTrackerData/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+  }
+}
