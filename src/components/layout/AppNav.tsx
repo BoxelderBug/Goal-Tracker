@@ -16,12 +16,14 @@ interface NavItem {
   hint?: string;
 }
 
+const HOME: NavItem = { href: "/", label: "Home", hint: "H" };
+
 const GROUPS: { heading: string; items: NavItem[] }[] = [
   {
-    heading: "Track",
+    heading: "Entries",
     items: [
-      { href: "/", label: "Home", hint: "H" },
       { href: "/entry", label: "Add Entry", hint: "A" },
+      { href: "/entries", label: "All Entries" },
       { href: "/entry/week", label: "Week Update", hint: "E" },
       { href: "/entry/year", label: "Year Update" },
     ],
@@ -33,7 +35,6 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/month", label: "Month", hint: "M" },
       { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
       { href: "/year", label: "Year", hint: "Y" },
-      { href: "/entries", label: "All Entries" },
       { href: "/snapshots", label: "Snapshots" },
       { href: "/trends", label: "Trends" },
       { href: "/goals-plus", label: "Goals+" },
@@ -75,13 +76,35 @@ function activeHeading(pathname: string): string | null {
   return null;
 }
 
+function NavLinkItem({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate?: () => void }) {
+  const active = pathname === item.href;
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+        active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
+      )}
+    >
+      <span>{item.label}</span>
+      {item.hint ? (
+        <kbd className="ml-auto shrink-0 rounded px-1 font-sans text-[10px] font-semibold opacity-50" aria-hidden>
+          {item.hint}
+        </kbd>
+      ) : null}
+    </Link>
+  );
+}
+
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const settings = useSettings();
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const h = activeHeading(pathname);
-    return new Set(h ? [h] : ["Track"]);
+    return new Set(h ? [h] : ["Entries"]);
   });
 
   // keep the group you navigate into expanded (without collapsing others you opened)
@@ -101,6 +124,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="Primary" className="flex flex-col gap-1">
+      <div className="mb-1">
+        <NavLinkItem item={HOME} pathname={pathname} onNavigate={onNavigate} />
+      </div>
       {GROUPS.map((group) => {
         const isOpen = openGroups.has(group.heading);
         const items = group.items.filter((item) => !item.show || item.show(settings));
@@ -123,31 +149,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
             </button>
             {isOpen ? (
               <div className="mt-0.5 mb-1 flex flex-col gap-0.5">
-                {items.map((item) => {
-                  const active = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={onNavigate}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                        active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
-                      )}
-                    >
-                      <span>{item.label}</span>
-                      {item.hint ? (
-                        <kbd
-                          className="ml-auto shrink-0 rounded px-1 font-sans text-[10px] font-semibold opacity-50"
-                          aria-hidden
-                        >
-                          {item.hint}
-                        </kbd>
-                      ) : null}
-                    </Link>
-                  );
-                })}
+                {items.map((item) => (
+                  <NavLinkItem key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+                ))}
               </div>
             ) : null}
           </div>
