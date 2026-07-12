@@ -12,25 +12,27 @@ interface NavItem {
   label: string;
   /** hide the item unless this returns true */
   show?: (settings: Settings) => boolean;
+  /** single-key shortcut hint shown as a chip (see KeyboardShortcuts) */
+  hint?: string;
 }
 
 const GROUPS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Track",
     items: [
-      { href: "/", label: "Home" },
+      { href: "/", label: "Home", hint: "H" },
       { href: "/entry", label: "Add Entry" },
-      { href: "/entry/week", label: "Week Update" },
+      { href: "/entry/week", label: "Week Update", hint: "E" },
       { href: "/entry/year", label: "Year Update" },
     ],
   },
   {
     heading: "Review",
     items: [
-      { href: "/week", label: "Week" },
-      { href: "/month", label: "Month" },
-      { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled },
-      { href: "/year", label: "Year" },
+      { href: "/week", label: "Week", hint: "W" },
+      { href: "/month", label: "Month", hint: "M" },
+      { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
+      { href: "/year", label: "Year", hint: "Y" },
       { href: "/entries", label: "All Entries" },
       { href: "/snapshots", label: "Snapshots" },
       { href: "/trends", label: "Trends" },
@@ -130,11 +132,19 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                        "flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                         active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
                       )}
                     >
-                      {item.label}
+                      <span>{item.label}</span>
+                      {item.hint ? (
+                        <kbd
+                          className="ml-auto shrink-0 rounded px-1 font-sans text-[10px] font-semibold opacity-50"
+                          aria-hidden
+                        >
+                          {item.hint}
+                        </kbd>
+                      ) : null}
                     </Link>
                   );
                 })}

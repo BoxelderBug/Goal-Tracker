@@ -155,7 +155,7 @@ export default function HomePage() {
                 <span className="text-sm font-medium">{goal.name}</span>
                 <div className="flex items-center gap-2">
                   <Badge tone="missed">{latest ? `last ${latest.slice(5)}` : "no entries"}</Badge>
-                  <Link href="/entry"><Button size="sm" variant="ghost">Log</Button></Link>
+                  <Link href={`/entry?goal=${goal.id}`}><Button size="sm" variant="ghost">Log</Button></Link>
                 </div>
               </li>
             ))}

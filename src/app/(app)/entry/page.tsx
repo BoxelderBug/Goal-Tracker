@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Entry, GoalsPlusEntryData, RunningWorkout } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { entriesRepo } from "@/lib/firebase/repos";
@@ -41,6 +41,15 @@ export default function EntryPage() {
   const active = useMemo(() => goals.filter((g) => !g.archived), [goals]);
 
   const [trackerId, setTrackerId] = useState("");
+
+  // preselect the goal from ?goal=<id> (e.g. dashboard "Log" deep-links), once
+  const didPreselect = useRef(false);
+  useEffect(() => {
+    if (didPreselect.current || active.length === 0) return;
+    const g = new URLSearchParams(window.location.search).get("goal");
+    if (g && active.some((x) => x.id === g)) setTrackerId(g);
+    didPreselect.current = true;
+  }, [active]);
   const [date, setDate] = useState(todayKey());
   const [amount, setAmount] = useState("");
   const [yesNo, setYesNo] = useState("1");
