@@ -65,14 +65,16 @@
 [data-mode="dark"] {
   color-scheme: dark;
 
-  --bg: color-mix(in oklab, var(--accent) 10%, #0c100f);
-  --bg-soft: color-mix(in oklab, var(--accent) 14%, #101514);
-  --surface: color-mix(in oklab, var(--accent) 7%, #161b1a);
-  --surface-2: color-mix(in oklab, var(--accent) 11%, #1b2120);
-  --border: color-mix(in oklab, var(--accent) 24%, #2b3331);
-  --text: color-mix(in oklab, var(--accent) 8%, #eaf1ef);
-  --muted: color-mix(in oklab, var(--accent) 12%, #9fadaa);
-  --accent-soft: color-mix(in oklab, var(--accent) 22%, #131817);
+  /* warm charcoal neutrals — lifted a touch lighter, less accent cast so dark
+     mode reads modern/warm instead of cold near-black */
+  --bg: color-mix(in oklab, var(--accent) 6%, #16130f);
+  --bg-soft: color-mix(in oklab, var(--accent) 8%, #1d1915);
+  --surface: color-mix(in oklab, var(--accent) 5%, #221e1a);
+  --surface-2: color-mix(in oklab, var(--accent) 7%, #2a251f);
+  --border: color-mix(in oklab, var(--accent) 15%, #3a342d);
+  --text: color-mix(in oklab, var(--accent) 5%, #f2ece4);
+  --muted: color-mix(in oklab, var(--accent) 8%, #aaa295);
+  --accent-soft: color-mix(in oklab, var(--accent) 20%, #201b16);
 
   --success: #34b37e;
   --success-soft: color-mix(in oklab, #34b37e 18%, #131817);

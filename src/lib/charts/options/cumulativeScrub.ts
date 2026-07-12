@@ -78,6 +78,8 @@ export function cumulativeScrubOption(
         symbol: "circle",
         symbolSize: 7,
         showSymbol: false,
+        // keep both segments fully drawn while scrubbing (no hover blur/fade)
+        emphasis: { disabled: true },
         lineStyle: { width: 2, color: colors.accent },
         itemStyle: { color: colors.accent },
         areaStyle: { color: colors.accent, opacity: 0.08 },
@@ -98,6 +100,7 @@ export function cumulativeScrubOption(
         smooth: false,
         showSymbol: false,
         connectNulls: true,
+        emphasis: { disabled: true },
         lineStyle: { width: 2, color: colors.projected, type: "dashed" },
         itemStyle: { color: colors.projected },
       },

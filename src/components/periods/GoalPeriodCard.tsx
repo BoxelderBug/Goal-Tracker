@@ -128,7 +128,11 @@ export function GoalPeriodCard({
           {target > 0 ? ` / ${formatAmount(target)}` : ""} {goal.unit}
         </span>
       </div>
-      <ProgressBar percent={pace.completion} tone={tone} />
+      <ProgressBar
+        percent={pace.completion}
+        tone={tone}
+        projectedPercent={target > 0 ? (pace.projected / target) * 100 : undefined}
+      />
       <div className="flex items-center justify-between text-xs text-muted">
         <span>
           {target > 0 ? `${pace.completion}% · ` : ""}
