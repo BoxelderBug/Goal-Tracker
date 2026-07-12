@@ -19,6 +19,17 @@ import { weeklyTrendOption } from "@/lib/charts/options/weeklyTrend";
 
 type ChartView = "activity" | "volume" | "hitRate";
 
+function DeltaLabel({ value, unit }: { value: number; unit: string }) {
+  if (value === 0) return <span className="text-xs text-muted">no change vs last week</span>;
+  const up = value > 0;
+  return (
+    <span className={up ? "text-xs text-success" : "text-xs text-danger"}>
+      {up ? "▲" : "▼"} {Math.abs(value)}
+      {unit} vs last week
+    </span>
+  );
+}
+
 export default function HomePage() {
   const { goals, entries } = useUserData();
   const settings = useSettings();
@@ -41,6 +52,24 @@ export default function HomePage() {
     }
     return { completion: target > 0 ? Math.round((progress / target) * 100) : 0, hit };
   }, [active, totals, week, settings.weekStart, now]);
+
+  const prevWeekSummary = useMemo(() => {
+    const prev = getWeekRange(addDays(now, -7), settings.weekStart);
+    let progress = 0;
+    let target = 0;
+    let hit = 0;
+    for (const goal of active) {
+      const p = sumRange(totals, goal.id, prev);
+      const t = getTargetForPeriod(goal, "week", prev, { weekStart: settings.weekStart });
+      progress += p;
+      target += t;
+      if (computePace(p, t, prev, now).goalHit) hit += 1;
+    }
+    return { completion: target > 0 ? Math.round((progress / target) * 100) : 0, hit };
+  }, [active, totals, settings.weekStart, now]);
+
+  const completionDelta = weekSummary.completion - prevWeekSummary.completion;
+  const hitDelta = weekSummary.hit - prevWeekSummary.hit;
 
   const trendPoints = useMemo(() => {
     const counts = new Map<string, number>();
@@ -107,11 +136,13 @@ export default function HomePage() {
           <span className="text-xs uppercase tracking-wide text-muted">This week</span>
           <div className="font-display text-3xl">{weekSummary.completion}%</div>
           <span className="text-sm text-muted">completion across {active.length} goals</span>
+          <DeltaLabel value={completionDelta} unit="%" />
         </Card>
         <Card>
           <span className="text-xs uppercase tracking-wide text-muted">Goals hit</span>
           <div className="font-display text-3xl">{weekSummary.hit}</div>
           <span className="text-sm text-muted">this week</span>
+          <DeltaLabel value={hitDelta} unit="" />
         </Card>
         <Card>
           <span className="text-xs uppercase tracking-wide text-muted">Quick log</span>

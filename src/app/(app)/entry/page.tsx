@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Entry, GoalsPlusEntryData, RunningWorkout } from "@/types/models";
-import { useUserData } from "@/components/data/UserDataProvider";
+import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { entriesRepo } from "@/lib/firebase/repos";
 import { moveEntryToTrash } from "@/lib/firebase/actions/trash";
 import { newEntry } from "@/lib/domain/newEntry";
 import { getDateKey, normalizeDate } from "@/lib/domain/dates";
+import { getWeekRange } from "@/lib/domain/periods";
+import { buildDailyTotals, sumRange } from "@/lib/domain/progress";
+import { getTargetForPeriod } from "@/lib/domain/targets";
 import { isYesNoGoal, formatAmount } from "@/lib/domain/format";
+import { EditEntryModal } from "@/components/entries/EditEntryModal";
 import {
   GOLF_TYPE_LABELS,
   RUNNING_WORKOUT_LABELS,
@@ -37,8 +41,11 @@ interface EntryValue {
 
 export default function EntryPage() {
   const { uid, goals, entries } = useUserData();
+  const settings = useSettings();
   const confirm = useConfirm();
   const active = useMemo(() => goals.filter((g) => !g.archived), [goals]);
+  const totals = useMemo(() => buildDailyTotals(entries), [entries]);
+  const [editing, setEditing] = useState<Entry | null>(null);
 
   const [trackerId, setTrackerId] = useState("");
 
@@ -68,6 +75,11 @@ export default function EntryPage() {
   const isYesNo = selected ? isYesNoGoal(selected.goalType) : false;
   const mode = selected?.goalsPlus.mode ?? "standard";
   const isGoalsPlus = mode !== "standard";
+
+  // current-week context for the selected goal
+  const week = getWeekRange(new Date(), settings.weekStart);
+  const weekProgress = selected ? sumRange(totals, selected.id, week) : 0;
+  const weekTarget = selected ? getTargetForPeriod(selected, "week", week, { weekStart: settings.weekStart }) : 0;
 
   const effectiveWorkout: RunningWorkout =
     workout || (selected?.goalsPlus.mode === "goalsplus-running" ? selected.goalsPlus.runningWorkout : "easy");
@@ -168,6 +180,12 @@ export default function EntryPage() {
                 <option key={g.id} value={g.id}>{g.name}</option>
               ))}
             </Select>
+            {selected ? (
+              <p className="mt-1 text-xs text-muted">
+                This week: {formatAmount(weekProgress)}
+                {weekTarget > 0 ? ` / ${formatAmount(weekTarget)}` : ""} {selected.unit}
+              </p>
+            ) : null}
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Date">
@@ -257,12 +275,32 @@ export default function EntryPage() {
                     {e.notes ? ` — ${e.notes}` : ""}
                   </span>
                 </span>
-                <Button size="sm" variant="ghost" onClick={() => deleteEntry(e)}>Delete</Button>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(e)}>Edit</Button>
+                  <Button size="sm" variant="ghost" onClick={() => deleteEntry(e)}>Delete</Button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </Card>
+
+      {editing ? (
+        <EditEntryModal
+          entry={editing}
+          goal={goals.find((g) => g.id === editing.trackerId)}
+          onClose={() => setEditing(null)}
+          onSave={async (patch) => {
+            try {
+              await entriesRepo.set(uid, { ...editing, ...patch });
+              toast.success("Entry updated");
+              setEditing(null);
+            } catch {
+              toast.error("Could not save changes");
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

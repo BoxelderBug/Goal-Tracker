@@ -21,7 +21,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
     heading: "Track",
     items: [
       { href: "/", label: "Home", hint: "H" },
-      { href: "/entry", label: "Add Entry" },
+      { href: "/entry", label: "Add Entry", hint: "A" },
       { href: "/entry/week", label: "Week Update", hint: "E" },
       { href: "/entry/year", label: "Year Update" },
     ],
