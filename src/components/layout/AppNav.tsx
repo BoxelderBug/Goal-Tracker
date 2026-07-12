@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Settings } from "@/types/models";
@@ -61,38 +62,87 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
   },
 ];
 
+/** Which group contains the current route (prefix match so nested pages count). */
+function activeHeading(pathname: string): string | null {
+  for (const group of GROUPS) {
+    for (const item of group.items) {
+      const match = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+      if (match) return group.heading;
+    }
+  }
+  return null;
+}
+
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const settings = useSettings();
 
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const h = activeHeading(pathname);
+    return new Set(h ? [h] : ["Track"]);
+  });
+
+  // keep the group you navigate into expanded (without collapsing others you opened)
+  useEffect(() => {
+    const h = activeHeading(pathname);
+    if (h) setOpenGroups((prev) => (prev.has(h) ? prev : new Set(prev).add(h)));
+  }, [pathname]);
+
+  function toggle(heading: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(heading)) next.delete(heading);
+      else next.add(heading);
+      return next;
+    });
+  }
+
   return (
-    <nav aria-label="Primary" className="flex flex-col gap-5">
-      {GROUPS.map((group) => (
-        <div key={group.heading} className="flex flex-col gap-1">
-          <span className="px-3 text-xs font-semibold uppercase tracking-wide text-muted">
-            {group.heading}
-          </span>
-          {group.items
-            .filter((item) => !item.show || item.show(settings))
-            .map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onNavigate}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                    active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
-                  )}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-        </div>
-      ))}
+    <nav aria-label="Primary" className="flex flex-col gap-1">
+      {GROUPS.map((group) => {
+        const isOpen = openGroups.has(group.heading);
+        const items = group.items.filter((item) => !item.show || item.show(settings));
+        return (
+          <div key={group.heading} className="flex flex-col">
+            <button
+              type="button"
+              onClick={() => toggle(group.heading)}
+              aria-expanded={isOpen}
+              className="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:bg-accent-soft hover:text-text"
+            >
+              <span>{group.heading}</span>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+                className={cn("transition-transform", isOpen ? "rotate-90" : "")}
+              >
+                <polyline points="9 6 15 12 9 18" />
+              </svg>
+            </button>
+            {isOpen ? (
+              <div className="mt-0.5 mb-1 flex flex-col gap-0.5">
+                {items.map((item) => {
+                  const active = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onNavigate}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                        active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
     </nav>
   );
 }
