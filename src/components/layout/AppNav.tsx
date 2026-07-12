@@ -61,39 +61,69 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
   },
 ];
 
-export function AppNav() {
+function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const settings = useSettings();
 
   return (
-    <nav aria-label="Primary" className="flex flex-wrap gap-x-6 gap-y-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-soft">
+    <nav aria-label="Primary" className="flex flex-col gap-5">
       {GROUPS.map((group) => (
-        <div key={group.heading} className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+        <div key={group.heading} className="flex flex-col gap-1">
+          <span className="px-3 text-xs font-semibold uppercase tracking-wide text-muted">
             {group.heading}
           </span>
-          <div className="flex flex-wrap gap-1">
-            {group.items
-              .filter((item) => !item.show || item.show(settings))
-              .map((item) => {
-                const active = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "rounded-lg px-2.5 py-1 text-sm font-medium transition-colors",
-                      active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-          </div>
+          {group.items
+            .filter((item) => !item.show || item.show(settings))
+            .map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                    active ? "bg-accent text-on-accent" : "text-text hover:bg-accent-soft",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
         </div>
       ))}
     </nav>
+  );
+}
+
+export function AppNav({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <>
+      {/* desktop: sticky sidebar */}
+      <aside className="hidden w-52 shrink-0 self-start rounded-2xl border border-border bg-surface p-3 shadow-soft md:sticky md:top-4 md:block">
+        <NavList />
+      </aside>
+
+      {/* mobile: slide-in drawer */}
+      <div className={cn("md:hidden", open ? "" : "pointer-events-none")}>
+        <div
+          className={cn(
+            "fixed inset-0 z-40 bg-black/40 transition-opacity",
+            open ? "opacity-100" : "opacity-0",
+          )}
+          onClick={onClose}
+          aria-hidden
+        />
+        <aside
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-64 overflow-y-auto border-r border-border bg-surface p-4 shadow-card transition-transform",
+            open ? "translate-x-0" : "-translate-x-full",
+          )}
+        >
+          <NavList onNavigate={onClose} />
+        </aside>
+      </div>
+    </>
   );
 }
