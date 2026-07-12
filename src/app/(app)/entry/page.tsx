@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import type { Entry, GoalsPlusEntryData, RunningWorkout } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { entriesRepo } from "@/lib/firebase/repos";
@@ -166,7 +167,11 @@ export default function EntryPage() {
   }
 
   if (active.length === 0) {
-    return <EmptyState>No active goals yet — create one under Settings → Goals.</EmptyState>;
+    return (
+      <EmptyState action={<Link href="/settings/goals/new"><Button size="sm" variant="primary">Create a goal</Button></Link>}>
+        No active goals yet — create one to start logging.
+      </EmptyState>
+    );
   }
 
   return (

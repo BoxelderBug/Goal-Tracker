@@ -3,19 +3,23 @@ import { cn } from "@/lib/cn";
 
 export function EmptyState({
   children,
+  action,
   className,
 }: {
   children: ReactNode;
+  /** optional primary action rendered under the message */
+  action?: ReactNode;
   className?: string;
 }) {
   return (
-    <p
+    <div
       className={cn(
-        "rounded-xl border border-dashed border-border bg-surface-2 px-4 py-6 text-center text-sm text-muted",
+        "flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 px-4 py-8 text-center",
         className,
       )}
     >
-      {children}
-    </p>
+      <p className="text-sm text-muted">{children}</p>
+      {action}
+    </div>
   );
 }

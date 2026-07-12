@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/cn";
 import type { Goal, PeriodKind, Vacation } from "@/types/models";
 import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
@@ -23,6 +24,13 @@ const TONE_LABEL: Record<"hit" | "onpace" | "behind" | "missed", string> = {
   onpace: "On pace",
   behind: "Behind",
   missed: "Off pace",
+};
+
+const TONE_BORDER: Record<"hit" | "onpace" | "behind" | "missed", string> = {
+  hit: "border-l-tone-hit",
+  onpace: "border-l-tone-onpace",
+  behind: "border-l-tone-behind",
+  missed: "border-l-tone-missed",
 };
 
 export function GoalPeriodCard({
@@ -117,7 +125,7 @@ export function GoalPeriodCard({
   }
 
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className={cn("flex flex-col gap-3 border-l-4", TONE_BORDER[tone])}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="font-medium">{goal.name}</span>

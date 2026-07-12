@@ -169,7 +169,9 @@ export default function HomePage() {
           </div>
         </div>
         {entries.length === 0 ? (
-          <EmptyState>No entries yet — log your first one.</EmptyState>
+          <EmptyState action={<Link href="/entry"><Button size="sm" variant="primary">Add your first entry</Button></Link>}>
+            No entries yet — log your first one.
+          </EmptyState>
         ) : (
           <EChart option={chartOption} height={240} />
         )}
