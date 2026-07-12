@@ -266,7 +266,10 @@ export default function EntryPage() {
       </Card>
 
       <Card>
-        <CardTitle>Today&apos;s entries</CardTitle>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <CardTitle className="mb-0">Today&apos;s entries</CardTitle>
+          <Link href="/entries"><Button size="sm" variant="ghost">All entries →</Button></Link>
+        </div>
         {todaysEntries.length === 0 ? (
           <p className="text-sm text-muted">Nothing logged today yet.</p>
         ) : (

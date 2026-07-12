@@ -44,14 +44,4 @@ describe("deriveNotifications", () => {
     );
     expect(notes).toHaveLength(0);
   });
-
-  it("flags period-close-ready on the last day of the week", () => {
-    const sunday = parseDateKey("2026-07-12");
-    const notes = deriveNotifications(
-      [goal({ id: "g1", weeklyGoal: 100 })],
-      [entry("g1", "2026-07-12", 1)],
-      "monday", 3, sunday,
-    );
-    expect(notes.some((n) => n.kind === "period-close-ready")).toBe(true);
-  });
 });

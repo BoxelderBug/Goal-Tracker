@@ -9,7 +9,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { Toaster } from "@/components/ui/Toaster";
 import { Button } from "@/components/ui/Button";
-import { ThemeControls } from "@/components/layout/ThemeControls";
 import { MigrationGate } from "@/components/data/MigrationGate";
 import { UserDataProvider } from "@/components/data/UserDataProvider";
 import { AppNav } from "@/components/layout/AppNav";
@@ -54,7 +53,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <NotificationsBell />
-                <ThemeControls />
                 <Button size="sm" onClick={() => signOut(getFirebaseAuth())}>
                   Logout
                 </Button>

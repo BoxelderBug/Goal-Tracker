@@ -23,7 +23,6 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
     heading: "Entries",
     items: [
       { href: "/entry", label: "Add Entry", hint: "A" },
-      { href: "/entries", label: "All Entries" },
       { href: "/entry/week", label: "Week Update", hint: "E" },
       { href: "/entry/year", label: "Year Update" },
     ],
@@ -35,7 +34,6 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/month", label: "Month", hint: "M" },
       { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
       { href: "/year", label: "Year", hint: "Y" },
-      { href: "/snapshots", label: "Snapshots" },
       { href: "/trends", label: "Trends" },
       { href: "/goals-plus", label: "Goals+" },
       { href: "/data", label: "Data" },

@@ -126,13 +126,13 @@ export function PeriodView({ period }: { period: PeriodKind }) {
 
   async function handleCloseOut() {
     const ok = await confirm({
-      message: `Close out this ${period} for ${visibleGoals.length} goal${visibleGoals.length === 1 ? "" : "s"}? This saves a snapshot of the current results.`,
-      confirmLabel: "Close out",
+      message: `Lock in reward points for this ${period} across ${visibleGoals.length} goal${visibleGoals.length === 1 ? "" : "s"}? Points are awarded for goals you've hit.`,
+      confirmLabel: "Lock in",
     });
     if (!ok) return;
     setClosing(true);
     try {
-      await closeOutPeriod(uid, {
+      const points = await closeOutPeriod(uid, {
         goals: visibleGoals,
         totals,
         period,
@@ -144,9 +144,9 @@ export function PeriodView({ period }: { period: PeriodKind }) {
         vacations: targetContext.vacations,
         filters: { type: "all", status: statusFilter, tag: tagFilter },
       });
-      toast.success("Snapshot saved");
+      toast.success(points > 0 ? `Locked in ${points} points` : "Points already locked in for this period");
     } catch {
-      toast.error("Could not close out period");
+      toast.error("Could not lock in points");
     } finally {
       setClosing(false);
     }
@@ -161,14 +161,16 @@ export function PeriodView({ period }: { period: PeriodKind }) {
           <Button size="sm" onClick={() => setAnchor(normalizeDate(new Date()))}>Today</Button>
           <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, 1))}>Next →</Button>
           <Button size="sm" onClick={() => setSettingsOpen(true)}>View settings</Button>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={handleCloseOut}
-            disabled={closing || visibleGoals.length === 0}
-          >
-            {closing ? "Saving…" : "Close out"}
-          </Button>
+          {settings.rewardPointsEnabled ? (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleCloseOut}
+              disabled={closing || visibleGoals.length === 0}
+            >
+              {closing ? "Locking…" : "Lock in points"}
+            </Button>
+          ) : null}
         </div>
       </div>
       <p className="text-sm text-muted">

@@ -10,6 +10,7 @@ import { Card, CardTitle } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { ThemeControls } from "@/components/layout/ThemeControls";
 import { toast } from "@/components/ui/Toaster";
 
 const TOGGLES: { key: keyof Settings; label: string }[] = [
@@ -91,6 +92,11 @@ export default function SettingsPage() {
             </Select>
           </Field>
         </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Appearance</CardTitle>
+        <ThemeControls />
       </Card>
 
       <Card>

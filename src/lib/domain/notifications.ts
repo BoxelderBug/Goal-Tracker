@@ -65,16 +65,5 @@ export function deriveNotifications(
     }
   }
 
-  // The week is "ready to close" on its final day.
-  if (getDateKey(now) === getDateKey(week.end) && active.length > 0) {
-    out.push({
-      id: `close:${weekKey}`,
-      kind: "period-close-ready",
-      title: "This week is ready to close",
-      detail: "Save a snapshot of your results before the week rolls over.",
-      href: "/week",
-    });
-  }
-
   return out;
 }
