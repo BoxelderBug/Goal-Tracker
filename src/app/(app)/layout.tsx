@@ -15,6 +15,7 @@ import { UserDataProvider } from "@/components/data/UserDataProvider";
 import { AppNav } from "@/components/layout/AppNav";
 import { KeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
+import { LoadingScreen } from "@/components/ui/Spinner";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -26,11 +27,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }, [loading, user, router]);
 
   if (loading || !user) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center text-muted">
-        Loading…
-      </main>
-    );
+    return <LoadingScreen />;
   }
 
   return (

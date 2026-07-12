@@ -171,7 +171,11 @@ export function PeriodView({ period }: { period: PeriodKind }) {
           </Button>
         </div>
       </div>
-      <p className="text-sm text-muted">{rangeLabel}</p>
+      <p className="text-sm text-muted">
+        <span className="text-text">{periodName}</span>
+        <span className="mx-2 opacity-40">·</span>
+        {rangeLabel}
+      </p>
 
       <Card className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Completion" value={`${summary.completion}%`} />

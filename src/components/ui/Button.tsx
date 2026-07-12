@@ -12,7 +12,7 @@ const variantClasses: Record<Variant, string> = {
   ghost:
     "bg-transparent text-text border-transparent hover:bg-accent-soft",
   danger:
-    "bg-danger-soft text-danger border-danger/30 hover:brightness-97",
+    "bg-danger-soft text-danger border-danger/30 hover:brightness-95",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -36,7 +36,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 border font-medium transition-colors",
+        "inline-flex items-center justify-center gap-1.5 border font-medium transition active:brightness-95",
         "disabled:opacity-50 disabled:pointer-events-none cursor-pointer",
         variantClasses[variant],
         sizeClasses[size],

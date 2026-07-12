@@ -2,7 +2,8 @@ import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes 
 import { cn } from "@/lib/cn";
 
 const fieldClasses =
-  "w-full rounded-xl border border-border bg-surface px-3 py-2 text-text " +
+  "w-full rounded-xl border border-border bg-surface px-3 py-2 text-text transition " +
+  "outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 " +
   "placeholder:text-muted/70 disabled:opacity-50";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
