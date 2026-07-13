@@ -6,6 +6,8 @@ import type { ScheduleBlock } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { schedulesRepo } from "@/lib/firebase/repos";
 import { getDateKey, normalizeDate } from "@/lib/domain/dates";
+import { googleCalendarUrl, scheduleToIcs } from "@/lib/domain/calendar";
+import { downloadFile } from "@/lib/download";
 import { useCollection } from "@/hooks/useCollection";
 import { createId } from "@/lib/id";
 import { Button } from "@/components/ui/Button";
@@ -76,9 +78,24 @@ export default function SchedulePage() {
     toast.success("Deleted");
   }
 
+  function exportIcs() {
+    const upcoming = grouped.flatMap(([, dayBlocks]) => dayBlocks);
+    if (upcoming.length === 0) {
+      toast.info("No upcoming blocks to export");
+      return;
+    }
+    downloadFile(`goal-tracker-schedule-${todayKey()}.ics`, scheduleToIcs(upcoming, nameOf), "text/calendar");
+    toast.success(`Exported ${upcoming.length} blocks — import the file in Google Calendar`);
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-display text-2xl">Schedule</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-2xl">Schedule</h1>
+        <Button size="sm" onClick={exportIcs} title="Download an .ics you can import into Google Calendar">
+          Export to calendar (.ics)
+        </Button>
+      </div>
 
       <Card>
         <form onSubmit={add} className="flex flex-col gap-3">
@@ -114,7 +131,18 @@ export default function SchedulePage() {
                       <span className="font-medium">{b.startTime}–{b.endTime}</span>{" "}
                       <span className="text-muted">{nameOf(b.trackerId)}{b.notes ? ` · ${b.notes}` : ""}</span>
                     </span>
-                    <Button size="sm" variant="ghost" onClick={() => remove(b)}>Delete</Button>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <a
+                        href={googleCalendarUrl(b, nameOf(b.trackerId))}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Add to Google Calendar"
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-accent-strong transition hover:bg-accent-soft"
+                      >
+                        GCal
+                      </a>
+                      <Button size="sm" variant="ghost" onClick={() => remove(b)}>Delete</Button>
+                    </span>
                   </li>
                 ))}
               </ul>
