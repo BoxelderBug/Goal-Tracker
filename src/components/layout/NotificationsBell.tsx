@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 
 const TONE: Record<NotificationKind, string> = {
   "goal-hit": "text-tone-hit",
+  "goal-milestone": "text-tone-onpace",
+  "smart-reminder": "text-tone-behind",
   "needs-attention": "text-tone-missed",
   "period-close-ready": "text-accent-strong",
 };
@@ -20,8 +22,22 @@ export function NotificationsBell() {
   const now = useMemo(() => new Date(), []);
 
   const notifications = useMemo(
-    () => deriveNotifications(goals, entries, settings.weekStart, settings.missedEntryDays, now),
-    [goals, entries, settings.weekStart, settings.missedEntryDays, now],
+    () =>
+      deriveNotifications(goals, entries, settings.weekStart, settings.missedEntryDays, now, {
+        milestonesEnabled: settings.milestoneNotificationsEnabled,
+        milestoneStep: settings.milestoneStep,
+        smartRemindersEnabled: settings.smartRemindersEnabled,
+      }),
+    [
+      goals,
+      entries,
+      settings.weekStart,
+      settings.missedEntryDays,
+      settings.milestoneNotificationsEnabled,
+      settings.milestoneStep,
+      settings.smartRemindersEnabled,
+      now,
+    ],
   );
   const count = notifications.length;
 

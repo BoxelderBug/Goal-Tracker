@@ -44,4 +44,48 @@ describe("deriveNotifications", () => {
     );
     expect(notes).toHaveLength(0);
   });
+
+  it("emits a milestone once past a step boundary but not yet hit", () => {
+    const notes = deriveNotifications(
+      [goal({ id: "g1", name: "Run", weeklyGoal: 10 })],
+      [entry("g1", "2026-07-07", 6)], // 60% of 10, recent
+      "monday", 3, now,
+      { milestonesEnabled: true, milestoneStep: 25 },
+    );
+    const milestone = notes.find((n) => n.kind === "goal-milestone");
+    expect(milestone?.title).toContain("50%"); // floor(60/25)*25 = 50
+  });
+
+  it("omits milestones when the toggle is off (default)", () => {
+    const notes = deriveNotifications(
+      [goal({ id: "g1", weeklyGoal: 10 })],
+      [entry("g1", "2026-07-07", 6)],
+      "monday", 3, now,
+    );
+    expect(notes.some((n) => n.kind === "goal-milestone")).toBe(false);
+  });
+
+  it("emits a smart reminder when off pace late in the week with recent activity", () => {
+    // Sat 2026-07-11: 1 day left to Sun 07-12, only 3 of 20 logged, active yesterday.
+    const sat = parseDateKey("2026-07-11");
+    const notes = deriveNotifications(
+      [goal({ id: "g1", name: "Read", weeklyGoal: 20 })],
+      [entry("g1", "2026-07-10", 3)],
+      "monday", 3, sat,
+      { smartRemindersEnabled: true },
+    );
+    const reminder = notes.find((n) => n.kind === "smart-reminder");
+    expect(reminder).toBeDefined();
+    expect(reminder?.detail).toContain("17"); // 20 - 3 remaining
+  });
+
+  it("does not smart-remind early in the week", () => {
+    const notes = deriveNotifications(
+      [goal({ id: "g1", weeklyGoal: 20 })],
+      [entry("g1", "2026-07-07", 3)],
+      "monday", 3, now, // Wed, 5 days left
+      { smartRemindersEnabled: true },
+    );
+    expect(notes.some((n) => n.kind === "smart-reminder")).toBe(false);
+  });
 });
