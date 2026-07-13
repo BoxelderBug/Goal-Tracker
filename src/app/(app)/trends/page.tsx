@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { computeWeeklyTrends } from "@/lib/domain/trends";
+import { computeGoalRecords } from "@/lib/domain/records";
+import { formatAmount } from "@/lib/domain/format";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -88,8 +90,44 @@ export default function TrendsPage() {
             <CardTitle>{METRICS.find((m) => m.key === metric)?.label} · last {weeks} weeks</CardTitle>
             <EChart option={option} height={260} />
           </Card>
+          <RecordsCard />
         </>
       )}
     </div>
+  );
+}
+
+function RecordsCard() {
+  const { goals, entries } = useUserData();
+  const settings = useSettings();
+  const active = goals.filter((g) => !g.archived);
+  const records = useMemo(
+    () => computeGoalRecords(goals, entries, settings.weekStart),
+    [goals, entries, settings.weekStart],
+  );
+  const rows = records.filter((r) => r.bestDay || r.bestWeek);
+  if (rows.length === 0) return null;
+
+  const byId = new Map(active.map((g) => [g.id, g]));
+  return (
+    <Card>
+      <CardTitle>Personal records <span aria-hidden>🏆</span></CardTitle>
+      <ul className="flex flex-col divide-y divide-border">
+        {rows.map((r) => {
+          const g = byId.get(r.goalId);
+          if (!g) return null;
+          return (
+            <li key={r.goalId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <span className="text-sm font-medium">{g.name}</span>
+              <span className="text-xs text-muted">
+                {r.bestDay ? `best day ${formatAmount(r.bestDay.amount)} ${g.unit} (${r.bestDay.date.slice(5)})` : ""}
+                {r.bestDay && r.bestWeek ? " · " : ""}
+                {r.bestWeek ? `best week ${formatAmount(r.bestWeek.amount)} ${g.unit} (wk of ${r.bestWeek.weekStartKey.slice(5)})` : ""}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
