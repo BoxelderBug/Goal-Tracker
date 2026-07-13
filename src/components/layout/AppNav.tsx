@@ -14,6 +14,8 @@ interface NavItem {
   show?: (settings: Settings) => boolean;
   /** single-key shortcut hint shown as a chip (see KeyboardShortcuts) */
   hint?: string;
+  /** one level of nesting: a collapsible sub-list (href ignored for parents) */
+  children?: NavItem[];
 }
 
 // Standalone top-level links. Week/Year updates + Journal/Ideas live as tabs on
@@ -28,10 +30,16 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "Review",
     items: [
-      { href: "/week", label: "Week", hint: "W" },
-      { href: "/month", label: "Month", hint: "M" },
-      { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
-      { href: "/year", label: "Year", hint: "Y" },
+      {
+        href: "#views",
+        label: "Views",
+        children: [
+          { href: "/week", label: "Week", hint: "W" },
+          { href: "/month", label: "Month", hint: "M" },
+          { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
+          { href: "/year", label: "Year", hint: "Y" },
+        ],
+      },
       { href: "/trends", label: "Trends" },
       { href: "/goals-plus", label: "Goals+" },
       { href: "/momentum", label: "Momentum", show: (s) => s.performanceMode !== "light" },
@@ -65,13 +73,15 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
   },
 ];
 
+function itemMatches(item: NavItem, pathname: string): boolean {
+  if (item.children) return item.children.some((c) => itemMatches(c, pathname));
+  return item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
 /** Which group contains the current route (prefix match so nested pages count). */
 function activeHeading(pathname: string): string | null {
   for (const group of GROUPS) {
-    for (const item of group.items) {
-      const match = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
-      if (match) return group.heading;
-    }
+    if (group.items.some((item) => itemMatches(item, pathname))) return group.heading;
   }
   return null;
 }
@@ -95,6 +105,49 @@ function NavLinkItem({ item, pathname, onNavigate }: { item: NavItem; pathname: 
         </kbd>
       ) : null}
     </Link>
+  );
+}
+
+/** One level of nesting: a collapsible sub-list inside a group (e.g. Views).
+ *  Starts open when the current route lives inside it. */
+function NavSubGroup({
+  item,
+  pathname,
+  settings,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  settings: Settings;
+  onNavigate?: () => void;
+}) {
+  const [open, setOpen] = useState(() => itemMatches(item, pathname));
+  const children = (item.children ?? []).filter((c) => !c.show || c.show(settings));
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium text-text transition-colors hover:bg-accent-soft"
+      >
+        <span>{item.label}</span>
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+          className={cn("transition-transform", open ? "rotate-90" : "")}
+        >
+          <polyline points="9 6 15 12 9 18" />
+        </svg>
+      </button>
+      {open ? (
+        <div className="ml-3 flex flex-col gap-0.5 border-l border-border pl-1">
+          {children.map((c) => (
+            <NavLinkItem key={c.href} item={c} pathname={pathname} onNavigate={onNavigate} />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -154,9 +207,19 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
             </button>
             {isOpen ? (
               <div className="mt-0.5 mb-1 flex flex-col gap-0.5">
-                {items.map((item) => (
-                  <NavLinkItem key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
-                ))}
+                {items.map((item) =>
+                  item.children ? (
+                    <NavSubGroup
+                      key={item.label}
+                      item={item}
+                      pathname={pathname}
+                      settings={settings}
+                      onNavigate={onNavigate}
+                    />
+                  ) : (
+                    <NavLinkItem key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+                  ),
+                )}
               </div>
             ) : null}
           </div>

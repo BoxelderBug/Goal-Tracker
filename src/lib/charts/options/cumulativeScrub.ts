@@ -28,6 +28,8 @@ export function cumulativeScrubOption(
   unit: string,
   colors: ScrubColors,
   pinnedIndex: number | null = null,
+  /** previous period's cumulative values, index-aligned to `points` */
+  overlay?: (number | null)[],
 ): EChartsOption {
   const dates = points.map((p) => p.date);
   const firstProjectedIndex = points.findIndex((p) => p.projected);
@@ -61,7 +63,9 @@ export function cumulativeScrubOption(
         const point = points[idx];
         const value = point.projected ? point.projectedCumulative ?? 0 : point.cumulative;
         const label = point.projected ? "Projected total" : "Total";
-        return `${point.date}<br/><strong>${label}: ${formatAmount(value)}${unitSuffix}</strong>`;
+        const prev = overlay?.[idx];
+        const prevLine = prev !== null && prev !== undefined ? `<br/>Last period: ${formatAmount(prev)}${unitSuffix}` : "";
+        return `${point.date}<br/><strong>${label}: ${formatAmount(value)}${unitSuffix}</strong>${prevLine}`;
       },
     },
     xAxis: {
@@ -127,6 +131,21 @@ export function cumulativeScrubOption(
         // beneath the actual line.
         areaStyle: { color: colors.projectedFill, opacity: 0.08 },
       },
+      ...(overlay
+        ? [
+            {
+              name: "Last period",
+              type: "line" as const,
+              data: overlay,
+              smooth: false,
+              showSymbol: false,
+              emphasis: { disabled: true },
+              lineStyle: { width: 1.5, color: colors.muted, opacity: 0.6 },
+              itemStyle: { color: colors.muted },
+              z: 1,
+            },
+          ]
+        : []),
     ],
   };
 }

@@ -190,9 +190,9 @@ export function PeriodView({ period }: { period: PeriodKind }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl">{TITLES[period]}</h1>
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, -1))}>← Prev</Button>
-          <Button size="sm" onClick={() => setAnchor(normalizeDate(new Date()))}>Today</Button>
-          <Button size="sm" onClick={() => setAnchor((d) => shiftAnchor(d, period, 1))}>Next →</Button>
+          <Button size="sm" aria-label={`Previous ${period}`} title={`Previous ${period}`} className="w-8 justify-center px-0" onClick={() => setAnchor((d) => shiftAnchor(d, period, -1))}>←</Button>
+          <Button size="sm" aria-label={`Current ${period}`} title={`Current ${period}`} className="w-8 justify-center px-0" onClick={() => setAnchor(normalizeDate(new Date()))}>•</Button>
+          <Button size="sm" aria-label={`Next ${period}`} title={`Next ${period}`} className="w-8 justify-center px-0" onClick={() => setAnchor((d) => shiftAnchor(d, period, 1))}>→</Button>
           <Button size="sm" onClick={() => setSettingsOpen(true)}>View settings</Button>
           {settings.rewardPointsEnabled ? (
             <Button

@@ -6,7 +6,8 @@
  * legacy index sums every dated entry's amount regardless of the N/A flag
  * (N/A entries carry amount 0), so we do the same for parity.
  */
-import type { Entry } from "@/types/models";
+import type { Entry, WeekStart } from "@/types/models";
+import { getWeekRange } from "./periods";
 import {
   addDays,
   getDateKey,
@@ -147,6 +148,26 @@ export function computePace(
     onPace: projected >= target,
     goalHit: target > 0 && progress >= target,
   };
+}
+
+export type SeriesGranularity = "day" | "week" | "month";
+
+/**
+ * Thin a daily cumulative series to bucket-end points (week or month) for
+ * coarser chart views. Keeps the last point of each bucket plus the final
+ * point, so the running total stays exact at every kept point.
+ */
+export function aggregateCumulativePoints(
+  points: CumulativePoint[],
+  granularity: SeriesGranularity,
+  weekStart: WeekStart,
+): CumulativePoint[] {
+  if (granularity === "day" || points.length === 0) return points;
+  const bucketOf = (dateKey: string): string => {
+    if (granularity === "month") return dateKey.slice(0, 7);
+    return getDateKey(getWeekRange(parseDateKey(dateKey), weekStart).start);
+  };
+  return points.filter((p, i) => i === points.length - 1 || bucketOf(p.date) !== bucketOf(points[i + 1].date));
 }
 
 /**

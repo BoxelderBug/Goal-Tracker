@@ -3,6 +3,7 @@ import type { Entry } from "@/types/models";
 import { getWeekRange } from "./periods";
 import { parseDateKey } from "./dates";
 import {
+  aggregateCumulativePoints,
   buildDailyTotals,
   computePace,
   getCumulativeSeries,
@@ -77,6 +78,34 @@ describe("getCumulativeSeries", () => {
     expect(thu.projectedCumulative).toBe(8);
     const sun = series[6];
     expect(sun.projectedCumulative).toBe(14); // 6 + 2*4
+  });
+});
+
+describe("aggregateCumulativePoints", () => {
+  const mk = (date: string, cumulative: number) => ({
+    date, cumulative, projected: false, projectedCumulative: null,
+  });
+
+  it("passes day granularity through unchanged", () => {
+    const pts = [mk("2026-07-06", 1), mk("2026-07-07", 2)];
+    expect(aggregateCumulativePoints(pts, "day", "monday")).toBe(pts);
+  });
+
+  it("keeps week-end points plus the final point", () => {
+    // Mon 07-06 .. Sun 07-12 is one week; 07-13 starts the next.
+    const pts = [
+      mk("2026-07-10", 1), mk("2026-07-11", 2), mk("2026-07-12", 3),
+      mk("2026-07-13", 4), mk("2026-07-14", 5),
+    ];
+    const out = aggregateCumulativePoints(pts, "week", "monday");
+    expect(out.map((p) => p.date)).toEqual(["2026-07-12", "2026-07-14"]);
+    expect(out.map((p) => p.cumulative)).toEqual([3, 5]);
+  });
+
+  it("keeps month-end points plus the final point", () => {
+    const pts = [mk("2026-06-29", 1), mk("2026-06-30", 2), mk("2026-07-01", 3), mk("2026-07-15", 4)];
+    const out = aggregateCumulativePoints(pts, "month", "monday");
+    expect(out.map((p) => p.date)).toEqual(["2026-06-30", "2026-07-15"]);
   });
 });
 

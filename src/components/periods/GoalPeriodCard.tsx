@@ -7,7 +7,18 @@ import { cn } from "@/lib/cn";
 import type { Goal, PeriodKind, Vacation } from "@/types/models";
 import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
-import { computePace, getCumulativeSeries, neededPerDay, paceTone, sumRange } from "@/lib/domain/progress";
+import {
+  aggregateCumulativePoints,
+  computePace,
+  getCumulativeSeries,
+  neededPerDay,
+  paceTone,
+  sumRange,
+  type SeriesGranularity,
+} from "@/lib/domain/progress";
+import { getPeriodRange } from "@/lib/domain/periods";
+import { addDays, getDateKey } from "@/lib/domain/dates";
+import { useUserData } from "@/components/data/UserDataProvider";
 import { getTargetForPeriod, type PeriodGoalOverrides } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { cumulativeSeriesToCsv } from "@/lib/domain/csv";
@@ -18,7 +29,7 @@ import { STRETCH_GOALS, deleteMetaValue, setMetaValue } from "@/lib/firebase/rep
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Input, Select } from "@/components/ui/Input";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { toast } from "@/components/ui/Toaster";
 import { EChart, themeColor } from "@/components/charts/EChart";
@@ -73,6 +84,10 @@ export function GoalPeriodCard({
   const [stretchSaving, setStretchSaving] = useState(false);
   // Index of the frozen scrub point (click-to-pin), or null when live.
   const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
+  // year graphs can be viewed daily / weekly / monthly
+  const [granularity, setGranularity] = useState<SeriesGranularity>(period === "year" ? "week" : "day");
+  const [showOverlay, setShowOverlay] = useState(false);
+  const { windowStartKey } = useUserData();
 
   const { progress, target, pace, tone } = useMemo(() => {
     const progress = sumRange(totals, goal.id, range);
@@ -82,9 +97,29 @@ export function GoalPeriodCard({
   }, [totals, goal, period, range, weekStart, overrides, vacations, now]);
 
   const points = useMemo<CumulativePoint[]>(
-    () => (open ? getCumulativeSeries(totals, goal.id, range, now) : []),
-    [open, totals, goal.id, range, now],
+    () =>
+      open
+        ? aggregateCumulativePoints(getCumulativeSeries(totals, goal.id, range, now), granularity, weekStart)
+        : [],
+    [open, totals, goal.id, range, now, granularity, weekStart],
   );
+
+  // Previous calendar period, offered only when it's inside the live window.
+  const prevRange = useMemo(
+    () => getPeriodRange(period, addDays(range.start, -1), weekStart),
+    [period, range.start, weekStart],
+  );
+  const overlayAvailable = getDateKey(prevRange.start) >= windowStartKey;
+  const overlayData = useMemo<(number | null)[] | undefined>(() => {
+    if (!open || !showOverlay || !overlayAvailable) return undefined;
+    const prev = aggregateCumulativePoints(
+      getCumulativeSeries(totals, goal.id, prevRange, now),
+      granularity,
+      weekStart,
+    );
+    // index-aligned to the current period's points (periods can differ in length)
+    return points.map((_, i) => (i < prev.length ? prev[i].cumulative : null));
+  }, [open, showOverlay, overlayAvailable, totals, goal.id, prevRange, now, granularity, weekStart, points]);
   // Keep the latest points reachable from the once-attached click handler.
   const pointsRef = useRef(points);
   useEffect(() => {
@@ -110,8 +145,9 @@ export function GoalPeriodCard({
         border: themeColor("--border", "#ddd"),
       },
       pinnedIndex,
+      overlayData,
     );
-  }, [open, points, goal.unit, target, pinnedIndex]);
+  }, [open, points, goal.unit, target, pinnedIndex, overlayData]);
 
   // Clicking anywhere in the plot pins the nearest date; the readout freezes.
   const handleChartReady = useCallback((chart: EChartsType) => {
@@ -200,15 +236,7 @@ export function GoalPeriodCard({
         projectedPercent={target > 0 ? (pace.projected / target) * 100 : undefined}
       />
       <div className="flex items-center justify-between text-xs text-muted">
-        <span>
-          {target > 0 ? `${pace.completion}% · ` : ""}
-          projected {formatAmount(pace.projected)} {goal.unit}
-          {(() => {
-            const need = neededPerDay(progress, target, range, now);
-            return need > 0 ? ` · need ${formatAmount(need)}/day` : "";
-          })()}
-        </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {stretchKey ? (
             <Button
               size="sm"
@@ -222,18 +250,26 @@ export function GoalPeriodCard({
               S
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant={open ? "primary" : "ghost"}
-            className="w-7 justify-center px-0 font-semibold"
-            onClick={() => { setOpen((v) => !v); setPinnedIndex(null); }}
-            aria-expanded={open}
-            aria-label={open ? "Hide graph" : "Show graph"}
-            title={open ? "Hide graph" : "Show graph"}
-          >
-            G
-          </Button>
+          <span>
+            {target > 0 ? `${pace.completion}% · ` : ""}
+            projected {formatAmount(pace.projected)} {goal.unit}
+            {(() => {
+              const need = neededPerDay(progress, target, range, now);
+              return need > 0 ? ` · need ${formatAmount(need)}/day` : "";
+            })()}
+          </span>
         </div>
+        <Button
+          size="sm"
+          variant={open ? "primary" : "ghost"}
+          className="w-7 justify-center px-0 font-semibold"
+          onClick={() => { setOpen((v) => !v); setPinnedIndex(null); }}
+          aria-expanded={open}
+          aria-label={open ? "Hide graph" : "Show graph"}
+          title={open ? "Hide graph" : "Show graph"}
+        >
+          G
+        </Button>
       </div>
 
       {stretchTarget !== undefined && !stretchEditing ? (
@@ -269,6 +305,32 @@ export function GoalPeriodCard({
 
       {open && chartOption ? (
         <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+            {period === "year" ? (
+              <label className="flex items-center gap-1.5">
+                View
+                <Select
+                  className="w-auto py-0.5 text-xs"
+                  value={granularity}
+                  onChange={(e) => { setGranularity(e.target.value as SeriesGranularity); setPinnedIndex(null); }}
+                >
+                  <option value="day">Daily</option>
+                  <option value="week">By week</option>
+                  <option value="month">By month</option>
+                </Select>
+              </label>
+            ) : null}
+            {overlayAvailable ? (
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={showOverlay}
+                  onChange={(e) => setShowOverlay(e.target.checked)}
+                />
+                Overlay last {period}
+              </label>
+            ) : null}
+          </div>
           <EChart option={chartOption} height={220} onReady={handleChartReady} />
           {pinnedPoint ? (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-soft px-3 py-2 text-xs">
