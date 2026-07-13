@@ -196,12 +196,28 @@ export function GoalPeriodCard({
         </span>
         <div className="flex items-center gap-1">
           {stretchKey ? (
-            <Button size="sm" variant="ghost" onClick={stretchEditing ? () => setStretchEditing(false) : openStretchEditor} aria-expanded={stretchEditing}>
-              {stretchTarget !== undefined ? "Edit stretch" : "Stretch"}
+            <Button
+              size="sm"
+              variant={stretchEditing ? "primary" : "ghost"}
+              className="w-7 justify-center px-0 font-semibold"
+              onClick={stretchEditing ? () => setStretchEditing(false) : openStretchEditor}
+              aria-expanded={stretchEditing}
+              aria-label={stretchTarget !== undefined ? "Edit stretch goal" : "Set stretch goal"}
+              title={stretchTarget !== undefined ? "Edit stretch goal" : "Set stretch goal"}
+            >
+              S
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" onClick={() => { setOpen((v) => !v); setPinnedIndex(null); }} aria-expanded={open}>
-            {open ? "Hide graph" : "Graph"}
+          <Button
+            size="sm"
+            variant={open ? "primary" : "ghost"}
+            className="w-7 justify-center px-0 font-semibold"
+            onClick={() => { setOpen((v) => !v); setPinnedIndex(null); }}
+            aria-expanded={open}
+            aria-label={open ? "Hide graph" : "Show graph"}
+            title={open ? "Hide graph" : "Show graph"}
+          >
+            G
           </Button>
         </div>
       </div>
