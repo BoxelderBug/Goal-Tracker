@@ -4,6 +4,8 @@ import type {
   Entry,
   Friend,
   Goal,
+  GradeCriterion,
+  GradeEntry,
   IdeaEntry,
   JournalEntry,
   PeriodSnapshot,
@@ -38,3 +40,5 @@ export const rewardPurchasesRepo = new CollectionRepo<RewardPurchase>("rewardPur
 export const pointTransactionsRepo = new CollectionRepo<PointTransaction>("pointTransactions");
 export const vacationsRepo = new CollectionRepo<Vacation>("vacations");
 export const tempPeriodGoalsRepo = new CollectionRepo<TempPeriodGoal>("tempPeriodGoals");
+export const gradeCriteriaRepo = new CollectionRepo<GradeCriterion>("gradeCriteria");
+export const gradeEntriesRepo = new CollectionRepo<GradeEntry>("gradeEntries");

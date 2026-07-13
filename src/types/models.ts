@@ -211,6 +211,27 @@ export interface Entry {
 }
 
 // ---------------------------------------------------------------------------
+// Self-grading
+// ---------------------------------------------------------------------------
+
+/** A user-defined criterion to grade themself on (e.g. "Discipline"). */
+export interface GradeCriterion {
+  id: string;
+  name: string;
+  createdAt: IsoTimestamp;
+}
+
+/** One letter grade for one criterion on one day (doc id = `${date}_${criterionId}`). */
+export interface GradeEntry {
+  id: string;
+  date: DateKey;
+  criterionId: string;
+  grade: string; // GradeLetter, validated by lib/domain/grades
+  score: number; // GPA-style numeric mirror for stats
+  createdAt: IsoTimestamp;
+}
+
+// ---------------------------------------------------------------------------
 // Check-ins
 // ---------------------------------------------------------------------------
 
