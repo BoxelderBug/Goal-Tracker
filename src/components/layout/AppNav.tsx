@@ -49,6 +49,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/ideas", label: "Ideas" },
       { href: "/schedule", label: "Schedule" },
       { href: "/social", label: "Social" },
+      { href: "/partners", label: "Partners" },
     ],
   },
   {
