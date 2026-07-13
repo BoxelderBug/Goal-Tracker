@@ -79,6 +79,20 @@ describe("deriveNotifications", () => {
     expect(reminder?.detail).toContain("17"); // 20 - 3 remaining
   });
 
+  it("suppresses the milestone when a smart reminder covers the same goal", () => {
+    // Sat 07-11, 12 of 20 (60% → would be a 50% milestone), but off pace late
+    // in the week with a recent entry → only the smart reminder should fire.
+    const sat = parseDateKey("2026-07-11");
+    const notes = deriveNotifications(
+      [goal({ id: "g1", name: "Read", weeklyGoal: 20 })],
+      [entry("g1", "2026-07-10", 12)],
+      "monday", 3, sat,
+      { smartRemindersEnabled: true, milestonesEnabled: true, milestoneStep: 25 },
+    );
+    expect(notes.some((n) => n.kind === "smart-reminder")).toBe(true);
+    expect(notes.some((n) => n.kind === "goal-milestone")).toBe(false);
+  });
+
   it("does not smart-remind early in the week", () => {
     const notes = deriveNotifications(
       [goal({ id: "g1", weeklyGoal: 20 })],

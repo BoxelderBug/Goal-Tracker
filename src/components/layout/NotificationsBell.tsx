@@ -8,7 +8,7 @@ import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { useCollection } from "@/hooks/useCollection";
 import { idConverter } from "@/lib/firebase/converters";
 import { NOTIFICATION_COLLECTION, getDb } from "@/lib/firebase/client";
-import { markNotificationsRead } from "@/lib/firebase/actions/notifications";
+import { deleteNotification, markNotificationsRead } from "@/lib/firebase/actions/notifications";
 import { deriveNotifications, type NotificationKind } from "@/lib/domain/notifications";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -31,6 +31,9 @@ const TONE: Record<BellKind, string> = {
   "period-close-ready": "text-accent-strong",
   share: "text-accent-strong",
 };
+
+/** Keep each user's stored notifications bounded; oldest beyond this are pruned. */
+const NOTIF_CAP = 40;
 
 const SHARE_TYPES = new Set([
   "goal-share-invite",
@@ -98,9 +101,12 @@ export function NotificationsBell() {
   );
   const unreadIds = useMemo(() => shareNotifs.filter((n) => !n.read).map((n) => n.id), [shareNotifs]);
 
-  // Mark share notifications read once the panel is opened.
+  // Mark share notifications read once the panel is opened, and prune the
+  // oldest beyond the cap so the collection can't grow without bound.
   useEffect(() => {
-    if (open && unreadIds.length > 0) markNotificationsRead(unreadIds).catch(() => {});
+    if (!open) return;
+    if (unreadIds.length > 0) markNotificationsRead(unreadIds).catch(() => {});
+    shareNotifs.slice(NOTIF_CAP).forEach((n) => deleteNotification(n.id).catch(() => {}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

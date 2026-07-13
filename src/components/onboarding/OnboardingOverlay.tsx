@@ -62,8 +62,10 @@ export function OnboardingOverlay() {
     }
   }
 
-  async function persistAndClose() {
-    // Persist chosen preferences alongside the completion marker in one write.
+  // Persist chosen preferences + completion marker and close the overlay. Does
+  // NOT navigate, so it's safe to call from a Link's onClick (the Link owns the
+  // navigation).
+  async function persist() {
     try {
       await updateSettings(uid, {
         ...settings,
@@ -75,10 +77,14 @@ export function OnboardingOverlay() {
       // Non-fatal: the tour still closes; settings can be set later.
     }
     setOpen(false);
-    // Drop ?tour=1 (replay) and land on the dashboard.
-    if (new URLSearchParams(window.location.search).get("tour") === "1") {
-      router.replace("/");
-    }
+  }
+
+  // Close via a control that isn't itself navigating (Skip/Finish/backdrop):
+  // also drop ?tour=1 (replay) by returning to the dashboard.
+  async function persistAndClose() {
+    const isReplay = new URLSearchParams(window.location.search).get("tour") === "1";
+    await persist();
+    if (isReplay) router.replace("/");
   }
 
   async function createFirstGoal(): Promise<boolean> {
@@ -194,7 +200,7 @@ export function OnboardingOverlay() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    onClick={persistAndClose}
+                    onClick={persist}
                     className="flex flex-col rounded-xl border border-border bg-surface px-3 py-2 transition hover:bg-accent-soft"
                   >
                     <span className="text-sm font-medium text-text">{item.label}</span>

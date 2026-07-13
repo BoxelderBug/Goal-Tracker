@@ -82,8 +82,27 @@ export function deriveNotifications(
       });
     }
 
+    // Smart reminder: recently active but running out of week and off pace to hit.
+    let remindedThisGoal = false;
+    if (smartRemindersEnabled && !needsAttention && target > 0) {
+      const remaining = target - progress;
+      const daysLeft = daysBetween(nowKey, week.end);
+      if (remaining > 0 && daysLeft <= 2 && pace.projected < target) {
+        remindedThisGoal = true;
+        out.push({
+          id: `remind:${goal.id}:${weekKey}`,
+          kind: "smart-reminder",
+          title: `${goal.name} — finish the week strong`,
+          detail: `${daysLeft <= 0 ? "Last day" : `${daysLeft} days left`} · ${formatAmount(remaining)} ${goal.unit} to go.`.trim(),
+          href: "/entry",
+        });
+      }
+    }
+
     // Milestone: currently past a step boundary (e.g. 25/50/75%) but not yet hit.
-    if (milestonesEnabled && target > 0) {
+    // Skipped when a smart reminder already covers this goal, to avoid two
+    // overlapping nudges for the same goal in the same week.
+    if (milestonesEnabled && !remindedThisGoal && target > 0) {
       const reached = Math.floor(pace.completion / milestoneStep) * milestoneStep;
       if (reached >= milestoneStep && reached < 100) {
         out.push({
@@ -92,21 +111,6 @@ export function deriveNotifications(
           title: `${goal.name} — ${reached}% there`,
           detail: `${formatAmount(progress)} of ${formatAmount(target)} ${goal.unit} this week.`.trim(),
           href: "/week",
-        });
-      }
-    }
-
-    // Smart reminder: recently active but running out of week and off pace to hit.
-    if (smartRemindersEnabled && !needsAttention && target > 0) {
-      const remaining = target - progress;
-      const daysLeft = daysBetween(nowKey, week.end);
-      if (remaining > 0 && daysLeft <= 2 && pace.projected < target) {
-        out.push({
-          id: `remind:${goal.id}:${weekKey}`,
-          kind: "smart-reminder",
-          title: `${goal.name} — finish the week strong`,
-          detail: `${daysLeft <= 0 ? "Last day" : `${daysLeft} days left`} · ${formatAmount(remaining)} ${goal.unit} to go.`.trim(),
-          href: "/entry",
         });
       }
     }

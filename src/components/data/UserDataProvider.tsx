@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { orderBy, query, where } from "firebase/firestore";
 import type { Entry, Goal, Settings } from "@/types/models";
 import { addDays, getDateKey } from "@/lib/domain/dates";
+import { ensureProfileEmailKey } from "@/lib/firebase/actions/profile";
 import { entriesRepo, goalsRepo } from "@/lib/firebase/repos";
 import { userDocRef, type UserDocData } from "@/lib/firebase/repos/userDoc";
 import { normalizeSettings } from "@/lib/migration/normalize";
@@ -32,6 +33,12 @@ function computeWindowStartKey(now: Date): string {
 
 export function UserDataProvider({ uid, children }: { uid: string; children: ReactNode }) {
   const windowStartKey = useMemo(() => computeWindowStartKey(new Date()), []);
+
+  // Keep the profile directory's email lowercased so partner lookup can find
+  // this user (self-heals legacy/migrated profiles). Fire-and-forget, once/uid.
+  useEffect(() => {
+    ensureProfileEmailKey(uid).catch(() => {});
+  }, [uid]);
 
   const userDoc = useDoc<UserDocData>(() => userDocRef(uid), [uid]);
   const goals = useCollection<Goal>(() => goalsRepo.query(uid, orderBy("priority", "desc")), [uid]);
