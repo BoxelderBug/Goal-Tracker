@@ -16,6 +16,7 @@ import { ShareAutoSync } from "@/components/partners/ShareAutoSync";
 import { AppNav } from "@/components/layout/AppNav";
 import { KeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
+import { PointsChip } from "@/components/layout/PointsChip";
 import { LoadingScreen } from "@/components/ui/Spinner";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -56,6 +57,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 <span className="font-display text-lg text-accent-strong">Goal Tracker</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <PointsChip />
                 <NotificationsBell />
                 <Button size="sm" onClick={() => signOut(getFirebaseAuth())}>
                   Logout

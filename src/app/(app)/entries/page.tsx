@@ -9,7 +9,7 @@ import { moveEntryToTrash } from "@/lib/firebase/actions/trash";
 import { formatAmount } from "@/lib/domain/format";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Select } from "@/components/ui/Input";
+import { Input, Select } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EditEntryModal } from "@/components/entries/EditEntryModal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -20,6 +20,7 @@ export default function EntriesPage() {
   const confirm = useConfirm();
 
   const [goalFilter, setGoalFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [older, setOlder] = useState<Entry[] | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
@@ -29,10 +30,12 @@ export default function EntriesPage() {
 
   const rows = useMemo(() => {
     const merged = older ? [...entries, ...older] : entries;
+    const q = search.trim().toLowerCase();
     return merged
       .filter((e) => goalFilter === "all" || e.trackerId === goalFilter)
+      .filter((e) => !q || e.notes.toLowerCase().includes(q) || e.date.includes(q))
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  }, [entries, older, goalFilter]);
+  }, [entries, older, goalFilter, search]);
 
   async function loadOlder() {
     setLoadingOlder(true);
@@ -72,23 +75,35 @@ export default function EntriesPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl">All entries</h1>
-        <label className="flex items-center gap-2 text-sm text-muted">
-          Goal
-          <Select
-            className="w-auto py-1"
-            value={goalFilter}
-            onChange={(e) => setGoalFilter(e.target.value)}
-          >
-            <option value="all">All</option>
-            {goals.map((g) => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </Select>
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            type="search"
+            placeholder="Search notes or date…"
+            className="w-48 py-1"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search entries"
+          />
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Goal
+            <Select
+              className="w-auto py-1"
+              value={goalFilter}
+              onChange={(e) => setGoalFilter(e.target.value)}
+            >
+              <option value="all">All</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </Select>
+          </label>
+        </div>
       </div>
 
       {rows.length === 0 ? (
-        <EmptyState>No entries logged yet.</EmptyState>
+        <EmptyState>
+          {search.trim() || goalFilter !== "all" ? "No entries match these filters." : "No entries logged yet."}
+        </EmptyState>
       ) : (
         <Card className="p-0">
           <ul className="flex flex-col divide-y divide-border">
