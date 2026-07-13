@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EChart, themeColor } from "@/components/charts/EChart";
+import { FollowingCard } from "@/components/partners/FollowingCard";
 import { activityTrendOption } from "@/lib/charts/options/activityTrend";
 import { volumeByGoalOption } from "@/lib/charts/options/volumeByGoal";
 import { weeklyTrendOption } from "@/lib/charts/options/weeklyTrend";
@@ -176,6 +177,8 @@ export default function HomePage() {
           <EChart option={chartOption} height={240} />
         )}
       </Card>
+
+      <FollowingCard />
 
       <Card>
         <CardTitle>Needs attention</CardTitle>
