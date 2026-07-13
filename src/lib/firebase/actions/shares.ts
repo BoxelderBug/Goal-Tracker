@@ -22,6 +22,7 @@ import {
 import type { Goal, GoalShare } from "@/types/models";
 import type { GoalSummary } from "@/lib/domain/share";
 import { GOAL_SHARE_COLLECTION, PROFILE_COLLECTION, getDb } from "@/lib/firebase/client";
+import { createNotification } from "@/lib/firebase/actions/notifications";
 import { createId } from "@/lib/id";
 
 export interface OwnerIdentity {
@@ -84,6 +85,17 @@ export async function invitePartner(owner: OwnerIdentity, goal: Goal, partnerEma
   };
   // `goalId` mirrors ownerGoalId for the entries partner-write rule (forward-compat).
   await setDoc(shareRef(share.id), { ...share, goalId: goal.id });
+  // Best-effort: surface the invite in the partner's bell.
+  await createNotification({
+    recipientId: partner.uid,
+    type: "goal-share-invite",
+    actorId: owner.uid,
+    actorUsername: owner.username,
+    actorEmail: owner.email,
+    goalName: goal.name,
+    goalUnit: goal.unit,
+    shareId: share.id,
+  }).catch(() => {});
   return share;
 }
 
@@ -95,6 +107,17 @@ export async function respondToShare(share: GoalShare, accept: boolean): Promise
     approvedAt: accept ? nowIso : null,
     updatedAt: nowIso,
   });
+  // Best-effort: tell the owner how the partner responded.
+  await createNotification({
+    recipientId: share.ownerUid,
+    type: accept ? "goal-share-approved" : "goal-share-rejected",
+    actorId: share.partnerUid,
+    actorUsername: share.partnerName,
+    actorEmail: share.partnerEmail,
+    goalName: share.goalName,
+    goalUnit: share.goalUnit,
+    shareId: share.id,
+  }).catch(() => {});
 }
 
 /** Owner pushes the latest goal summary so the partner sees current progress. */
