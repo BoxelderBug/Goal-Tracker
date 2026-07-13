@@ -16,17 +16,15 @@ interface NavItem {
   hint?: string;
 }
 
-const HOME: NavItem = { href: "/", label: "Home", hint: "H" };
+// Standalone top-level links. Week/Year updates + Journal/Ideas live as tabs on
+// the entry page; Schedule is promoted to its own top-level link.
+const TOP_ITEMS: NavItem[] = [
+  { href: "/", label: "Home", hint: "H" },
+  { href: "/entry", label: "Add Entry", hint: "A" },
+  { href: "/schedule", label: "Schedule" },
+];
 
 const GROUPS: { heading: string; items: NavItem[] }[] = [
-  {
-    heading: "Entries",
-    items: [
-      { href: "/entry", label: "Add Entry", hint: "A" },
-      { href: "/entry/week", label: "Week Update", hint: "E" },
-      { href: "/entry/year", label: "Year Update" },
-    ],
-  },
   {
     heading: "Review",
     items: [
@@ -40,16 +38,18 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
     ],
   },
   {
+    heading: "Social",
+    items: [
+      { href: "/social", label: "Social" },
+      { href: "/partners", label: "Partners" },
+    ],
+  },
+  {
     heading: "More",
     items: [
       { href: "/points", label: "Points", show: (s) => s.rewardPointsEnabled },
-      { href: "/data", label: "Data" },
       { href: "/bucket-list", label: "Bucket List", show: (s) => s.bucketListEnabled },
-      { href: "/journal", label: "Journal" },
-      { href: "/ideas", label: "Ideas" },
-      { href: "/schedule", label: "Schedule" },
-      { href: "/social", label: "Social" },
-      { href: "/partners", label: "Partners" },
+      { href: "/data", label: "Data" },
     ],
   },
   {
@@ -104,7 +104,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const h = activeHeading(pathname);
-    return new Set(h ? [h] : ["Entries"]);
+    return new Set(h ? [h] : ["Review"]);
   });
 
   // keep the group you navigate into expanded (without collapsing others you
@@ -127,8 +127,10 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="Primary" className="flex flex-col gap-1">
-      <div className="mb-1">
-        <NavLinkItem item={HOME} pathname={pathname} onNavigate={onNavigate} />
+      <div className="mb-1 flex flex-col gap-0.5">
+        {TOP_ITEMS.map((item) => (
+          <NavLinkItem key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+        ))}
       </div>
       {GROUPS.map((group) => {
         const isOpen = openGroups.has(group.heading);

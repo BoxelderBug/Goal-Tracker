@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Goal } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { goalsRepo } from "@/lib/firebase/repos";
+import { moveToTrash } from "@/lib/firebase/actions/trash";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -28,13 +29,13 @@ export default function GoalsSettingsPage() {
   async function remove(goal: Goal) {
     const ok = await confirm({
       title: "Delete goal",
-      message: `Delete "${goal.name}" permanently? Its entries stay but will no longer be shown.`,
+      message: `Delete "${goal.name}"? You can restore it from Trash. Its entries are kept and reattach if you restore it.`,
       confirmLabel: "Delete",
       danger: true,
     });
     if (!ok) return;
-    await goalsRepo.remove(uid, goal.id);
-    toast.success("Goal deleted");
+    await moveToTrash(uid, "goal", goal, goal.name);
+    toast.success("Goal moved to Trash");
   }
 
   return (

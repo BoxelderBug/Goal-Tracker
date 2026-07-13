@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { EntryModeTabs } from "@/components/entries/EntryModeTabs";
 import { toast } from "@/components/ui/Toaster";
 
 type Granularity = "month" | "week";
@@ -64,6 +65,7 @@ export default function EntryYearPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <EntryModeTabs />
       <h1 className="font-display text-2xl">Year update</h1>
       <p className="text-sm text-muted">
         Log one goal across a whole year. Each amount you add creates an entry dated at that period&apos;s

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import type { Entry, GoalsPlusEntryData, RunningWorkout } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
@@ -27,6 +27,7 @@ import { Card, CardTitle } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { EntryModeTabs } from "@/components/entries/EntryModeTabs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/ui/Toaster";
 
@@ -50,14 +51,15 @@ export default function EntryPage() {
 
   const [trackerId, setTrackerId] = useState("");
 
-  // preselect the goal from ?goal=<id> (e.g. dashboard "Log" deep-links), once
-  const didPreselect = useRef(false);
-  useEffect(() => {
-    if (didPreselect.current || active.length === 0) return;
-    const g = new URLSearchParams(window.location.search).get("goal");
+  // Preselect the goal from ?goal=<id> (dashboard "Log" deep-links), once active
+  // goals have loaded. Reconciled during render (not in an effect) to satisfy the
+  // no-setState-in-effect rule.
+  const [preselected, setPreselected] = useState(false);
+  if (!preselected && active.length > 0) {
+    setPreselected(true);
+    const g = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("goal") : null;
     if (g && active.some((x) => x.id === g)) setTrackerId(g);
-    didPreselect.current = true;
-  }, [active]);
+  }
   const [date, setDate] = useState(todayKey());
   const [amount, setAmount] = useState("");
   const [yesNo, setYesNo] = useState("1");
@@ -176,6 +178,7 @@ export default function EntryPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <EntryModeTabs />
       <h1 className="font-display text-2xl">Add entry</h1>
       <Card>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

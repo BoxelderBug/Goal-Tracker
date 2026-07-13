@@ -11,6 +11,7 @@ import { formatAmount, isYesNoGoal } from "@/lib/domain/format";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { EntryModeTabs } from "@/components/entries/EntryModeTabs";
 import { toast } from "@/components/ui/Toaster";
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -78,6 +79,7 @@ export default function WeekUpdatePage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <EntryModeTabs />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl">Week update</h1>
         <div className="flex items-center gap-2">

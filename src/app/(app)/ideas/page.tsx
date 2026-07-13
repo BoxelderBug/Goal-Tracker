@@ -14,6 +14,7 @@ import { Field } from "@/components/ui/Field";
 import { Select, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { EntryModeTabs } from "@/components/entries/EntryModeTabs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/ui/Toaster";
 
@@ -59,6 +60,7 @@ export default function IdeasPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <EntryModeTabs />
       <h1 className="font-display text-2xl">Ideas &amp; questions</h1>
 
       <Card>
