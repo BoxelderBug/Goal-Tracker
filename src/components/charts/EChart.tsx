@@ -32,15 +32,22 @@ export function EChart({
     let observer: ResizeObserver | undefined;
 
     (async () => {
-      const echarts = await import("echarts");
-      if (gl) await import("echarts-gl");
-      if (disposed || !containerRef.current) return;
-      const chart = echarts.init(containerRef.current, undefined, { renderer: "canvas" });
-      chartRef.current = chart;
-      chart.setOption(option);
-      onReady?.(chart);
-      observer = new ResizeObserver(() => chart.resize());
-      observer.observe(containerRef.current);
+      try {
+        const echarts = await import("echarts");
+        // echarts-gl (3D) registers onto the echarts singleton at import; keep
+        // it here so a load/registration failure degrades to an empty chart
+        // rather than an unhandled rejection.
+        if (gl) await import("echarts-gl");
+        if (disposed || !containerRef.current) return;
+        const chart = echarts.init(containerRef.current, undefined, { renderer: "canvas" });
+        chartRef.current = chart;
+        chart.setOption(option);
+        onReady?.(chart);
+        observer = new ResizeObserver(() => chart.resize());
+        observer.observe(containerRef.current);
+      } catch (err) {
+        if (!disposed) console.error("Chart failed to initialize", err);
+      }
     })();
 
     return () => {
