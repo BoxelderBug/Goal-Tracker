@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import type { EChartsType } from "echarts";
 import { cn } from "@/lib/cn";
 import type { Goal, PeriodKind, Vacation } from "@/types/models";
@@ -179,7 +180,7 @@ export function GoalPeriodCard({
     <Card className={cn("flex flex-col gap-3 border-l-4", TONE_BORDER[tone])}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="font-medium">{goal.name}</span>
+          <Link href={`/goal/${goal.id}`} className="font-medium hover:underline">{goal.name}</Link>
           <Badge tone={tone}>{TONE_LABEL[tone]}</Badge>
           {streak >= 2 ? (
             <Badge tone="accent" className="gap-0.5">

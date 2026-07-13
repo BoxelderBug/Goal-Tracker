@@ -67,7 +67,7 @@ export default function GoalsSettingsPage() {
             <Card key={goal.id} className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{goal.name}</span>
+                  <Link href={`/goal/${goal.id}`} className="font-medium hover:underline">{goal.name}</Link>
                   <Badge tone="neutral">{GOAL_TYPE_LABELS[goal.goalType]}</Badge>
                   {goal.goalsPlus.mode !== "standard" ? (
                     <Badge tone="accent">{GOALS_PLUS_LABELS[goal.goalsPlus.mode]}</Badge>
