@@ -133,9 +133,10 @@ function PeriodEntryRow({
   const [saving, setSaving] = useState(false);
 
   async function add() {
-    const value = Number(amount);
-    if (!(value > 0)) {
-      toast.error("Enter an amount above 0");
+    const raw = amount.trim();
+    const value = Number(raw);
+    if (raw === "" || !Number.isFinite(value) || value < 0) {
+      toast.error("Enter an amount (0 or more)");
       return;
     }
     setSaving(true);

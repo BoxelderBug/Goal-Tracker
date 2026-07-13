@@ -73,6 +73,9 @@ export function cumulativeScrubOption(
     },
     yAxis: {
       type: "value",
+      // Keep the target line on-screen even when actual + projection stay below
+      // it (i.e. when behind pace), so the goal you're aiming for is always shown.
+      max: target > 0 ? (value: { max: number }) => Math.max(value.max, target) : undefined,
       axisLabel: { color: colors.muted },
       splitLine: { lineStyle: { color: colors.grid } },
     },
