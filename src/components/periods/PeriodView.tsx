@@ -6,6 +6,7 @@ import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { addDays, addMonths, addYears, getDateKey, normalizeDate } from "@/lib/domain/dates";
 import { getPeriodKey, getPeriodRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange } from "@/lib/domain/progress";
+import { computeStreaks } from "@/lib/domain/streaks";
 import { getTargetForPeriod, overrideKey, overridesFromFlatMap } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { closeOutPeriod } from "@/lib/firebase/actions/snapshot";
@@ -122,6 +123,35 @@ export function PeriodView({ period }: { period: PeriodKind }) {
     return { totalProgress, totalTarget, hitCount, completion };
   }, [visibleGoals, totals, range, period, targetContext, now]);
 
+  // Previous-period comparison (legacy compareToLastDefault, finally wired).
+  // Skipped for year: last year's entries sit outside the live subscription
+  // window, so the comparison would be silently wrong.
+  const prevSummary = useMemo(() => {
+    if (!settings.compareToLastDefault || period === "year") return null;
+    const prevRange = getPeriodRange(period, shiftAnchor(anchor, period, -1), settings.weekStart);
+    let totalProgress = 0;
+    let totalTarget = 0;
+    let hitCount = 0;
+    for (const goal of visibleGoals) {
+      const progress = sumRange(totals, goal.id, prevRange);
+      const target = getTargetForPeriod(goal, period, prevRange, targetContext);
+      totalProgress += progress;
+      totalTarget += target;
+      if (target > 0 && progress >= target) hitCount += 1;
+    }
+    const completion = totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
+    return { totalProgress, hitCount, completion };
+  }, [settings.compareToLastDefault, settings.weekStart, period, anchor, visibleGoals, totals, targetContext]);
+
+  // Per-goal current logging streaks for the card badges.
+  const streakByGoal = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const goal of visibleGoals) {
+      map.set(goal.id, computeStreaks(entries, now, goal.id).current);
+    }
+    return map;
+  }, [visibleGoals, entries, now]);
+
   const rangeLabel = `${getDateKey(range.start)} → ${getDateKey(range.end)}`;
 
   async function handleCloseOut() {
@@ -179,11 +209,25 @@ export function PeriodView({ period }: { period: PeriodKind }) {
         {rangeLabel}
       </p>
 
-      <Card className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Completion" value={`${summary.completion}%`} />
-        <Stat label="Progress" value={formatAmount(summary.totalProgress)} />
-        <Stat label="Target" value={formatAmount(summary.totalTarget)} />
-        <Stat label="Goals hit" value={`${summary.hitCount}/${visibleGoals.length}`} />
+      <Card className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Stat label="Completion" value={`${summary.completion}%`} />
+          <Stat label="Progress" value={formatAmount(summary.totalProgress)} />
+          <Stat label="Target" value={formatAmount(summary.totalTarget)} />
+          <Stat label="Goals hit" value={`${summary.hitCount}/${visibleGoals.length}`} />
+        </div>
+        {prevSummary ? (
+          <p className="border-t border-border pt-2 text-xs text-muted">
+            Last {period}: {prevSummary.completion}% completion · {formatAmount(prevSummary.totalProgress)} progress ·{" "}
+            {prevSummary.hitCount} hit
+            {summary.completion !== prevSummary.completion ? (
+              <span className={summary.completion > prevSummary.completion ? "text-success" : "text-danger"}>
+                {" "}({summary.completion > prevSummary.completion ? "▲" : "▼"}
+                {Math.abs(summary.completion - prevSummary.completion)}%)
+              </span>
+            ) : null}
+          </p>
+        ) : null}
       </Card>
 
       <div className="flex flex-wrap gap-3">
@@ -224,6 +268,7 @@ export function PeriodView({ period }: { period: PeriodKind }) {
               uid={uid}
               stretchKey={periodKey ? overrideKey(periodKey, goal.id) : null}
               stretchTarget={periodKey ? stretchFlat[overrideKey(periodKey, goal.id)] : undefined}
+              streak={streakByGoal.get(goal.id) ?? 0}
               now={now}
             />
           ))}

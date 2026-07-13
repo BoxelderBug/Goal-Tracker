@@ -48,6 +48,7 @@ export function GoalPeriodCard({
   uid,
   stretchKey,
   stretchTarget,
+  streak = 0,
   now,
 }: {
   goal: Goal;
@@ -61,6 +62,8 @@ export function GoalPeriodCard({
   /** meta/stretchGoals key for this goal+period, or null when unavailable (quarter) */
   stretchKey: string | null;
   stretchTarget?: number;
+  /** current consecutive-day logging streak for this goal (badge when ≥ 2) */
+  streak?: number;
   now: Date;
 }) {
   const [open, setOpen] = useState(false);
@@ -178,6 +181,12 @@ export function GoalPeriodCard({
         <div className="flex items-center gap-2">
           <span className="font-medium">{goal.name}</span>
           <Badge tone={tone}>{TONE_LABEL[tone]}</Badge>
+          {streak >= 2 ? (
+            <Badge tone="accent" className="gap-0.5">
+              <span aria-hidden>🔥</span>
+              {streak}
+            </Badge>
+          ) : null}
         </div>
         <span className="text-sm text-muted">
           {formatAmount(progress)}
