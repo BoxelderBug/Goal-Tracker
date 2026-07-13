@@ -73,3 +73,20 @@ export function themeColor(name: string, fallback = "#888"): string {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
 }
+
+/**
+ * Resolve any CSS color expression (e.g. the dark theme's color-mix tokens) to
+ * a concrete rgb()/hex string via a probe element. Needed wherever ECharts must
+ * numerically interpolate colors (visualMap ramps) — zrender can't parse
+ * color-mix, even though canvas fillStyle can.
+ */
+export function resolveThemeColor(name: string, fallback = "#888"): string {
+  const raw = themeColor(name, fallback);
+  if (typeof window === "undefined" || raw.startsWith("#") || raw.startsWith("rgb")) return raw;
+  const probe = document.createElement("span");
+  probe.style.color = raw;
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color;
+  probe.remove();
+  return resolved || fallback;
+}

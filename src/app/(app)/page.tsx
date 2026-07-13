@@ -13,13 +13,14 @@ import { Card, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { EChart, themeColor } from "@/components/charts/EChart";
+import { EChart, resolveThemeColor, themeColor } from "@/components/charts/EChart";
 import { FollowingCard } from "@/components/partners/FollowingCard";
+import { activityHeatmapOption } from "@/lib/charts/options/activityHeatmap";
 import { activityTrendOption } from "@/lib/charts/options/activityTrend";
 import { volumeByGoalOption } from "@/lib/charts/options/volumeByGoal";
 import { weeklyTrendOption } from "@/lib/charts/options/weeklyTrend";
 
-type ChartView = "activity" | "volume" | "hitRate";
+type ChartView = "activity" | "volume" | "hitRate" | "heatmap";
 
 function DeltaLabel({ value, unit }: { value: number; unit: string }) {
   if (value === 0) return <span className="text-xs text-muted">no change vs last week</span>;
@@ -112,11 +113,37 @@ export default function HomePage() {
     [goals, entries, settings.weekStart, now],
   );
 
+  const heatmap = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of entries) counts.set(e.date, (counts.get(e.date) ?? 0) + 1);
+    const days = 181; // ~26 weeks
+    const start = addDays(normalizeDate(now), -days);
+    const data: [string, number][] = [];
+    let max = 0;
+    for (let i = 0; i <= days; i += 1) {
+      const key = getDateKey(addDays(start, i));
+      const n = counts.get(key) ?? 0;
+      if (n > max) max = n;
+      data.push([key, n]);
+    }
+    return { data, range: [getDateKey(start), getDateKey(normalizeDate(now))] as [string, string], max };
+  }, [entries, now]);
+
   const chartOption = useMemo(() => {
     if (chartView === "volume") return volumeByGoalOption(volumeRows, colors());
     if (chartView === "hitRate") return weeklyTrendOption(hitRatePoints, "hitRate", colors());
+    if (chartView === "heatmap") {
+      // visualMap interpolates numerically → needs concrete rgb, not color-mix
+      return activityHeatmapOption(heatmap.data, heatmap.range, heatmap.max, {
+        accent: resolveThemeColor("--accent", "#009f94"),
+        text: themeColor("--text", "#222"),
+        muted: themeColor("--muted", "#888"),
+        surface: resolveThemeColor("--surface", "#fff"),
+        border: themeColor("--border", "#ddd"),
+      });
+    }
     return activityTrendOption(trendPoints, colors());
-  }, [chartView, volumeRows, hitRatePoints, trendPoints]);
+  }, [chartView, volumeRows, hitRatePoints, trendPoints, heatmap]);
 
   const missed = useMemo(() => {
     const threshold = settings.missedEntryDays;
@@ -176,6 +203,7 @@ export default function HomePage() {
           <div className="flex gap-1">
             {([
               ["activity", "Activity"],
+              ["heatmap", "Heatmap"],
               ["volume", "This week"],
               ["hitRate", "Hit rate"],
             ] as [ChartView, string][]).map(([v, label]) => (
