@@ -7,6 +7,7 @@ import { addDays, getDateKey, normalizeDate } from "@/lib/domain/dates";
 import { getWeekRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange, latestEntryDateInRange } from "@/lib/domain/progress";
 import { getTargetForPeriod } from "@/lib/domain/targets";
+import { computeStreaks } from "@/lib/domain/streaks";
 import { computeWeeklyTrends } from "@/lib/domain/trends";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -72,6 +73,8 @@ export default function HomePage() {
   const completionDelta = weekSummary.completion - prevWeekSummary.completion;
   const hitDelta = weekSummary.hit - prevWeekSummary.hit;
 
+  const streak = useMemo(() => computeStreaks(entries, now), [entries, now]);
+
   const trendPoints = useMemo(() => {
     const counts = new Map<string, number>();
     for (const e of entries) counts.set(e.date, (counts.get(e.date) ?? 0) + 1);
@@ -132,7 +135,7 @@ export default function HomePage() {
     <div className="flex flex-col gap-4">
       <h1 className="font-display text-2xl">Dashboard</h1>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <span className="text-xs uppercase tracking-wide text-muted">This week</span>
           <div className="font-display text-3xl">{weekSummary.completion}%</div>
@@ -144,6 +147,19 @@ export default function HomePage() {
           <div className="font-display text-3xl">{weekSummary.hit}</div>
           <span className="text-sm text-muted">this week</span>
           <DeltaLabel value={hitDelta} unit="" />
+        </Card>
+        <Card>
+          <span className="text-xs uppercase tracking-wide text-muted">Streak</span>
+          <div className="font-display text-3xl">
+            {streak.current > 0 ? <span aria-hidden>🔥 </span> : null}
+            {streak.current}
+            <span className="text-base text-muted"> {streak.current === 1 ? "day" : "days"}</span>
+          </div>
+          <span className="text-sm text-muted">
+            {streak.current > 0 && !streak.countedToday
+              ? "log today to keep it going"
+              : `best this year: ${streak.longest}`}
+          </span>
         </Card>
         <Card>
           <span className="text-xs uppercase tracking-wide text-muted">Quick log</span>
