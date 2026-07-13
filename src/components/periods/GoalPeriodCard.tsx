@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EChartsType } from "echarts";
 import { cn } from "@/lib/cn";
 import type { Goal, PeriodKind, Vacation } from "@/types/models";
 import type { DailyTotals } from "@/lib/domain/progress";
@@ -8,6 +9,9 @@ import type { DateRange } from "@/lib/domain/dates";
 import { computePace, getCumulativeSeries, paceTone, sumRange } from "@/lib/domain/progress";
 import { getTargetForPeriod, type PeriodGoalOverrides } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
+import { cumulativeSeriesToCsv } from "@/lib/domain/csv";
+import { downloadDataUrl, downloadFile } from "@/lib/download";
+import type { CumulativePoint } from "@/lib/domain/progress";
 import type { WeekStart } from "@/types/models";
 import { STRETCH_GOALS, deleteMetaValue, setMetaValue } from "@/lib/firebase/repos/meta";
 import { Card } from "@/components/ui/Card";
@@ -63,6 +67,8 @@ export function GoalPeriodCard({
   const [stretchEditing, setStretchEditing] = useState(false);
   const [stretchInput, setStretchInput] = useState("");
   const [stretchSaving, setStretchSaving] = useState(false);
+  // Index of the frozen scrub point (click-to-pin), or null when live.
+  const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
 
   const { progress, target, pace, tone } = useMemo(() => {
     const progress = sumRange(totals, goal.id, range);
@@ -71,20 +77,62 @@ export function GoalPeriodCard({
     return { progress, target, pace, tone: paceTone(pace) };
   }, [totals, goal, period, range, weekStart, overrides, vacations, now]);
 
+  const points = useMemo<CumulativePoint[]>(
+    () => (open ? getCumulativeSeries(totals, goal.id, range, now) : []),
+    [open, totals, goal.id, range, now],
+  );
+  // Keep the latest points reachable from the once-attached click handler.
+  const pointsRef = useRef(points);
+  useEffect(() => {
+    pointsRef.current = points;
+  }, [points]);
+  const chartRef = useRef<EChartsType | null>(null);
+
   const chartOption = useMemo(() => {
     if (!open) return null;
-    const points = getCumulativeSeries(totals, goal.id, range, now);
-    return cumulativeScrubOption(points, target, goal.unit, {
-      accent: themeColor("--accent", "#009f94"),
-      projected: themeColor("--muted", "#888"),
-      target: themeColor("--tone-behind", "#be7f24"),
-      text: themeColor("--text", "#222"),
-      muted: themeColor("--muted", "#888"),
-      grid: themeColor("--border", "#ddd"),
-      surface: themeColor("--surface", "#fff"),
-      border: themeColor("--border", "#ddd"),
+    return cumulativeScrubOption(
+      points,
+      target,
+      goal.unit,
+      {
+        accent: themeColor("--accent", "#009f94"),
+        projected: themeColor("--muted", "#888"),
+        projectedFill: "#ffffff",
+        target: themeColor("--tone-behind", "#be7f24"),
+        text: themeColor("--text", "#222"),
+        muted: themeColor("--muted", "#888"),
+        grid: themeColor("--border", "#ddd"),
+        surface: themeColor("--surface", "#fff"),
+        border: themeColor("--border", "#ddd"),
+      },
+      pinnedIndex,
+    );
+  }, [open, points, goal.unit, target, pinnedIndex]);
+
+  // Clicking anywhere in the plot pins the nearest date; the readout freezes.
+  const handleChartReady = useCallback((chart: EChartsType) => {
+    chartRef.current = chart;
+    chart.getZr().on("click", (event) => {
+      const pixel = [event.offsetX, event.offsetY];
+      if (!chart.containPixel("grid", pixel)) return;
+      const axisValue = chart.convertFromPixel({ xAxisIndex: 0 }, event.offsetX);
+      const idx = Math.round(Number(axisValue));
+      if (idx >= 0 && idx < pointsRef.current.length) setPinnedIndex(idx);
     });
-  }, [open, totals, goal.id, goal.unit, range, now, target]);
+  }, []);
+
+  const pinnedPoint = pinnedIndex !== null ? points[pinnedIndex] : undefined;
+
+  function exportPng() {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const url = chart.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: themeColor("--surface", "#fff") });
+    downloadDataUrl(`${goal.name || "goal"}-${period}.png`, url);
+  }
+
+  function exportCsv() {
+    downloadFile(`${goal.name || "goal"}-${period}.csv`, cumulativeSeriesToCsv(points), "text/csv");
+  }
 
   const stretchHit = stretchTarget !== undefined && stretchTarget > 0 && progress >= stretchTarget;
 
@@ -152,7 +200,7 @@ export function GoalPeriodCard({
               {stretchTarget !== undefined ? "Edit stretch" : "Stretch"}
             </Button>
           ) : null}
-          <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          <Button size="sm" variant="ghost" onClick={() => { setOpen((v) => !v); setPinnedIndex(null); }} aria-expanded={open}>
             {open ? "Hide graph" : "Graph"}
           </Button>
         </div>
@@ -189,7 +237,30 @@ export function GoalPeriodCard({
         </div>
       ) : null}
 
-      {open && chartOption ? <EChart option={chartOption} height={220} /> : null}
+      {open && chartOption ? (
+        <div className="flex flex-col gap-2">
+          <EChart option={chartOption} height={220} onReady={handleChartReady} />
+          {pinnedPoint ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-soft px-3 py-2 text-xs">
+              <span className="text-muted">
+                <span className="font-medium text-text">{pinnedPoint.date}</span>
+                {" · "}
+                {pinnedPoint.projected ? "Projected" : "Total"}{" "}
+                <span className="font-medium text-text">
+                  {formatAmount(pinnedPoint.projected ? pinnedPoint.projectedCumulative ?? 0 : pinnedPoint.cumulative)} {goal.unit}
+                </span>
+              </span>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" onClick={exportPng}>Export PNG</Button>
+                <Button size="sm" variant="ghost" onClick={exportCsv}>Export CSV</Button>
+                <Button size="sm" variant="ghost" onClick={() => setPinnedIndex(null)}>Unpin</Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-center text-xs text-muted">Click the graph to freeze a point and export it.</p>
+          )}
+        </div>
+      ) : null}
     </Card>
   );
 }

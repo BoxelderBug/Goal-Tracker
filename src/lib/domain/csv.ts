@@ -3,6 +3,7 @@
  * comma, quote, or newline are wrapped in double quotes with quotes doubled.
  */
 import type { Entry } from "@/types/models";
+import type { CumulativePoint } from "./progress";
 import { formatAmount } from "./format";
 
 export const ENTRY_CSV_HEADER = ["date", "goal", "amount", "notApplicable", "notes"] as const;
@@ -32,4 +33,21 @@ export function entriesToCsv(entries: Entry[], goalNameById: Map<string, string>
       ]),
     );
   return [csvRow([...ENTRY_CSV_HEADER]), ...rows].join("\r\n");
+}
+
+export const SCRUB_CSV_HEADER = ["date", "total", "projected"] as const;
+
+/**
+ * Serialize a cumulative scrub series to CSV: the actual running total per date,
+ * then the projected total for future dates. Backs the per-goal chart export.
+ */
+export function cumulativeSeriesToCsv(points: CumulativePoint[]): string {
+  const rows = points.map((p) =>
+    csvRow([
+      p.date,
+      p.projected ? "" : formatAmount(p.cumulative),
+      p.projected ? formatAmount(p.projectedCumulative ?? 0) : "",
+    ]),
+  );
+  return [csvRow([...SCRUB_CSV_HEADER]), ...rows].join("\r\n");
 }

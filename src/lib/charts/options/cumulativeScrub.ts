@@ -5,6 +5,8 @@ import { formatAmount } from "@/lib/domain/format";
 export interface ScrubColors {
   accent: string;
   projected: string;
+  /** area fill under the dashed projection segment (transparent white) */
+  projectedFill: string;
   target: string;
   text: string;
   muted: string;
@@ -25,10 +27,15 @@ export function cumulativeScrubOption(
   target: number,
   unit: string,
   colors: ScrubColors,
+  pinnedIndex: number | null = null,
 ): EChartsOption {
   const dates = points.map((p) => p.date);
   const firstProjectedIndex = points.findIndex((p) => p.projected);
   const boundaryIndex = firstProjectedIndex === -1 ? points.length - 1 : firstProjectedIndex - 1;
+
+  const pinned =
+    pinnedIndex !== null && pinnedIndex >= 0 && pinnedIndex < points.length ? points[pinnedIndex] : null;
+  const pinnedValue = pinned ? (pinned.projected ? pinned.projectedCumulative ?? 0 : pinned.cumulative) : 0;
 
   const actualData = points.map((p) => (p.projected ? null : p.cumulative));
   const projectedData = points.map((p, i) => {
@@ -92,6 +99,16 @@ export function cumulativeScrubOption(
                 label: { formatter: `Target ${formatAmount(target)}`, color: colors.muted, position: "insideEndTop" },
               }
             : undefined,
+        // Frozen marker at the clicked point (see GoalPeriodCard pin).
+        markPoint: pinned
+          ? {
+              symbol: "circle",
+              symbolSize: 9,
+              data: [{ name: pinned.date, coord: [dates[pinnedIndex as number], pinnedValue] as [string, number] }],
+              itemStyle: { color: pinned.projected ? colors.projected : colors.accent, borderColor: colors.surface, borderWidth: 2 },
+              label: { show: false },
+            }
+          : undefined,
       },
       {
         name: "Projected",
@@ -103,6 +120,9 @@ export function cumulativeScrubOption(
         emphasis: { disabled: true },
         lineStyle: { width: 2, color: colors.projected, type: "dashed" },
         itemStyle: { color: colors.projected },
+        // Transparent-white fill under the projection, mirroring the teal fill
+        // beneath the actual line.
+        areaStyle: { color: colors.projectedFill, opacity: 0.08 },
       },
     ],
   };
