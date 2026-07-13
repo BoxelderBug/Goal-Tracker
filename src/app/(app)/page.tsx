@@ -232,7 +232,7 @@ export default function HomePage() {
           <ul className="flex flex-col divide-y divide-border">
             {missed.map(({ goal, latest }) => (
               <li key={goal.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="text-sm font-medium">{goal.name}</span>
+                <Link href={`/goal/${goal.id}`} className="text-sm font-medium hover:underline">{goal.name}</Link>
                 <div className="flex items-center gap-2">
                   <Badge tone="missed">{latest ? `last ${latest.slice(5)}` : "no entries"}</Badge>
                   <Link href={`/entry?goal=${goal.id}`}><Button size="sm" variant="ghost">Log</Button></Link>
