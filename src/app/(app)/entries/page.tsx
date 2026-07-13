@@ -21,6 +21,7 @@ export default function EntriesPage() {
 
   const [goalFilter, setGoalFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(200);
   const [older, setOlder] = useState<Entry[] | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
@@ -107,7 +108,7 @@ export default function EntriesPage() {
       ) : (
         <Card className="p-0">
           <ul className="flex flex-col divide-y divide-border">
-            {rows.map((entry) => (
+            {rows.slice(0, visibleCount).map((entry) => (
               <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
@@ -129,7 +130,13 @@ export default function EntriesPage() {
         </Card>
       )}
 
-      {older === null ? (
+      {rows.length > visibleCount ? (
+        <div className="flex justify-center">
+          <Button size="sm" onClick={() => setVisibleCount((n) => n + 200)}>
+            Show more ({rows.length - visibleCount} hidden)
+          </Button>
+        </div>
+      ) : older === null ? (
         <div className="flex justify-center">
           <Button size="sm" onClick={loadOlder} disabled={loadingOlder}>
             {loadingOlder ? "Loading…" : "Load earlier entries"}

@@ -78,7 +78,7 @@ export function deriveNotifications(
         kind: "needs-attention",
         title: `${goal.name} needs an entry`,
         detail: latest === null ? "No entries in the last 60 days." : `${since} days since your last entry.`,
-        href: "/entry",
+        href: `/entry?goal=${goal.id}`,
       });
     }
 
@@ -94,7 +94,7 @@ export function deriveNotifications(
           kind: "smart-reminder",
           title: `${goal.name} — finish the week strong`,
           detail: `${daysLeft <= 0 ? "Last day" : `${daysLeft} days left`} · ${formatAmount(remaining)} ${goal.unit} to go.`.trim(),
-          href: "/entry",
+          href: `/entry?goal=${goal.id}`,
         });
       }
     }
