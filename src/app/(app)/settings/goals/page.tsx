@@ -6,6 +6,7 @@ import type { Goal } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { goalsRepo } from "@/lib/firebase/repos";
 import { moveToTrash } from "@/lib/firebase/actions/trash";
+import { removeSharesForGoal } from "@/lib/firebase/actions/shares";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -35,6 +36,8 @@ export default function GoalsSettingsPage() {
     });
     if (!ok) return;
     await moveToTrash(uid, "goal", goal, goal.name);
+    // Best-effort: don't leave partners following a frozen summary.
+    removeSharesForGoal(uid, goal.id).catch(() => {});
     toast.success("Goal moved to Trash");
   }
 

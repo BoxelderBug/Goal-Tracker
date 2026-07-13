@@ -33,7 +33,7 @@ export default function EntriesPage() {
     const q = search.trim().toLowerCase();
     return merged
       .filter((e) => goalFilter === "all" || e.trackerId === goalFilter)
-      .filter((e) => !q || e.notes.toLowerCase().includes(q) || e.date.includes(q))
+      .filter((e) => !q || (e.notes ?? "").toLowerCase().includes(q) || e.date.includes(q))
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   }, [entries, older, goalFilter, search]);
 

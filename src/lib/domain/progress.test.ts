@@ -102,4 +102,9 @@ describe("neededPerDay", () => {
   it("demands the full remainder on the last day", () => {
     expect(neededPerDay(5, 20, week, parseDateKey("2026-07-12"))).toBe(15);
   });
+
+  it("still works mid-day on the last day (unnormalized now)", () => {
+    // regression: a 2pm `now` on Sunday must not read as past the week's end
+    expect(neededPerDay(5, 20, week, new Date(2026, 6, 12, 14, 30))).toBe(15);
+  });
 });

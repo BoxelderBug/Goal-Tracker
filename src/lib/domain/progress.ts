@@ -12,6 +12,7 @@ import {
   getDateKey,
   getElapsedDays,
   getRangeDays,
+  normalizeDate,
   parseDateKey,
   type DateRange,
 } from "./dates";
@@ -153,8 +154,10 @@ export function computePace(
  * target. 0 when already hit, no target, or the range is over.
  */
 export function neededPerDay(progress: number, target: number, range: DateRange, now: Date): number {
-  if (target <= 0 || progress >= target || now > range.end) return 0;
-  const daysLeft = getRangeDays(range) - getElapsedDays(range, now) + 1;
+  // normalize: a mid-day `now` on the last day must not read as past the end
+  const today = normalizeDate(now);
+  if (target <= 0 || progress >= target || today > range.end) return 0;
+  const daysLeft = getRangeDays(range) - getElapsedDays(range, today) + 1;
   return Math.round(((target - progress) / daysLeft) * 100) / 100;
 }
 

@@ -185,7 +185,7 @@ export default function HomePage() {
           <span className="text-sm text-muted">
             {streak.current > 0 && !streak.countedToday
               ? "log today to keep it going"
-              : `best this year: ${streak.longest}`}
+              : `longest: ${streak.longest}`}
           </span>
         </Card>
         <Card>

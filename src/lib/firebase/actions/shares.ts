@@ -132,6 +132,22 @@ export async function removeShare(share: GoalShare): Promise<void> {
 }
 
 /**
+ * Delete every share the owner created for a goal — called when the goal is
+ * deleted so partners don't keep "following" a frozen summary forever.
+ * Equality-only query: no composite index needed.
+ */
+export async function removeSharesForGoal(ownerUid: string, goalId: string): Promise<void> {
+  const snap = await getDocs(
+    query(
+      collection(getDb(), GOAL_SHARE_COLLECTION),
+      where("ownerUid", "==", ownerUid),
+      where("ownerGoalId", "==", goalId),
+    ),
+  );
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+}
+
+/**
  * Approved partner logs progress toward the shared goal. Writes an entry into
  * the owner's entries subcollection tagged with shareId + createdBy (the exact
  * shape the entries rule requires), and notifies the owner. The owner's client

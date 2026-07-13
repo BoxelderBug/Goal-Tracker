@@ -50,7 +50,7 @@ function periodDisplayName(period: PeriodKind, start: Date): string {
 }
 
 export function PeriodView({ period }: { period: PeriodKind }) {
-  const { uid, goals, entries } = useUserData();
+  const { uid, goals, entries, windowStartKey } = useUserData();
   const settings = useSettings();
   const confirm = useConfirm();
   const now = useMemo(() => new Date(), []);
@@ -129,6 +129,9 @@ export function PeriodView({ period }: { period: PeriodKind }) {
   const prevSummary = useMemo(() => {
     if (!settings.compareToLastDefault || period === "year") return null;
     const prevRange = getPeriodRange(period, shiftAnchor(anchor, period, -1), settings.weekStart);
+    // Only compare when the previous period is fully inside the live entries
+    // window — otherwise we'd assert a confidently wrong "last period" number.
+    if (getDateKey(prevRange.start) < windowStartKey) return null;
     let totalProgress = 0;
     let totalTarget = 0;
     let hitCount = 0;
@@ -141,7 +144,7 @@ export function PeriodView({ period }: { period: PeriodKind }) {
     }
     const completion = totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
     return { totalProgress, hitCount, completion };
-  }, [settings.compareToLastDefault, settings.weekStart, period, anchor, visibleGoals, totals, targetContext]);
+  }, [settings.compareToLastDefault, settings.weekStart, period, anchor, visibleGoals, totals, targetContext, windowStartKey]);
 
   // Per-goal current logging streaks for the card badges.
   const streakByGoal = useMemo(() => {
