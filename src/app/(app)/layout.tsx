@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { MigrationGate } from "@/components/data/MigrationGate";
 import { UserDataProvider } from "@/components/data/UserDataProvider";
 import { OnboardingOverlay } from "@/components/onboarding/OnboardingOverlay";
+import { ShareAutoSync } from "@/components/partners/ShareAutoSync";
 import { AppNav } from "@/components/layout/AppNav";
 import { KeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
@@ -35,6 +36,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <MigrationGate uid={user.uid}>
         <UserDataProvider uid={user.uid}>
           <OnboardingOverlay />
+          <ShareAutoSync />
           <KeyboardShortcuts onEscape={() => setNavOpen(false)} />
           <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4">
             <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-soft">
