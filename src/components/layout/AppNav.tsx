@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Settings } from "@/types/models";
@@ -36,13 +36,14 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/year", label: "Year", hint: "Y" },
       { href: "/trends", label: "Trends" },
       { href: "/goals-plus", label: "Goals+" },
-      { href: "/data", label: "Data" },
+      { href: "/momentum", label: "Momentum", show: (s) => s.performanceMode !== "light" },
     ],
   },
   {
     heading: "More",
     items: [
       { href: "/points", label: "Points", show: (s) => s.rewardPointsEnabled },
+      { href: "/data", label: "Data" },
       { href: "/bucket-list", label: "Bucket List", show: (s) => s.bucketListEnabled },
       { href: "/journal", label: "Journal" },
       { href: "/ideas", label: "Ideas" },
@@ -105,11 +106,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
     return new Set(h ? [h] : ["Entries"]);
   });
 
-  // keep the group you navigate into expanded (without collapsing others you opened)
-  useEffect(() => {
+  // keep the group you navigate into expanded (without collapsing others you
+  // opened) — reconciled during render as the path changes, not in an effect
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
     const h = activeHeading(pathname);
     if (h) setOpenGroups((prev) => (prev.has(h) ? prev : new Set(prev).add(h)));
-  }, [pathname]);
+  }
 
   function toggle(heading: string) {
     setOpenGroups((prev) => {
