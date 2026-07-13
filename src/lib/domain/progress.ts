@@ -148,6 +148,16 @@ export function computePace(
   };
 }
 
+/**
+ * Average amount per remaining day (today included) needed to still hit the
+ * target. 0 when already hit, no target, or the range is over.
+ */
+export function neededPerDay(progress: number, target: number, range: DateRange, now: Date): number {
+  if (target <= 0 || progress >= target || now > range.end) return 0;
+  const daysLeft = getRangeDays(range) - getElapsedDays(range, now) + 1;
+  return Math.round(((target - progress) / daysLeft) * 100) / 100;
+}
+
 /** Tone token key for a goal's current status (drives Badge/progress color). */
 export function paceTone(pace: PaceResult): "hit" | "onpace" | "behind" | "missed" {
   if (pace.goalHit) return "hit";

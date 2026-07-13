@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import type { Goal, PeriodKind, Vacation } from "@/types/models";
 import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
-import { computePace, getCumulativeSeries, paceTone, sumRange } from "@/lib/domain/progress";
+import { computePace, getCumulativeSeries, neededPerDay, paceTone, sumRange } from "@/lib/domain/progress";
 import { getTargetForPeriod, type PeriodGoalOverrides } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { cumulativeSeriesToCsv } from "@/lib/domain/csv";
@@ -193,6 +193,10 @@ export function GoalPeriodCard({
         <span>
           {target > 0 ? `${pace.completion}% · ` : ""}
           projected {formatAmount(pace.projected)} {goal.unit}
+          {(() => {
+            const need = neededPerDay(progress, target, range, now);
+            return need > 0 ? ` · need ${formatAmount(need)}/day` : "";
+          })()}
         </span>
         <div className="flex items-center gap-1">
           {stretchKey ? (

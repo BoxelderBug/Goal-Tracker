@@ -6,6 +6,7 @@ import {
   buildDailyTotals,
   computePace,
   getCumulativeSeries,
+  neededPerDay,
   paceTone,
   sumRange,
 } from "./progress";
@@ -76,5 +77,29 @@ describe("getCumulativeSeries", () => {
     expect(thu.projectedCumulative).toBe(8);
     const sun = series[6];
     expect(sun.projectedCumulative).toBe(14); // 6 + 2*4
+  });
+});
+
+describe("neededPerDay", () => {
+  // week = Mon 07-06 .. Sun 07-12; Wed 07-08 → 5 days left incl today
+  const now = parseDateKey("2026-07-08");
+
+  it("splits the remaining amount across remaining days incl today", () => {
+    expect(neededPerDay(5, 20, week, now)).toBe(3); // 15 / 5
+  });
+
+  it("rounds to 2 decimals", () => {
+    expect(neededPerDay(0, 10, week, now)).toBe(2); // 10 / 5
+    expect(neededPerDay(3, 10, week, now)).toBe(1.4); // 7 / 5
+  });
+
+  it("returns 0 when hit, no target, or the range is over", () => {
+    expect(neededPerDay(20, 20, week, now)).toBe(0);
+    expect(neededPerDay(5, 0, week, now)).toBe(0);
+    expect(neededPerDay(5, 20, week, parseDateKey("2026-07-20"))).toBe(0);
+  });
+
+  it("demands the full remainder on the last day", () => {
+    expect(neededPerDay(5, 20, week, parseDateKey("2026-07-12"))).toBe(15);
   });
 });

@@ -126,6 +126,17 @@ export default function EntryPage() {
 
   const goalName = (id: string) => goals.find((g) => g.id === id)?.name ?? "Unknown goal";
 
+  // Most recent positive amount logged for the selected goal — one-tap repeat.
+  const lastAmount = useMemo(() => {
+    if (!trackerId) return null;
+    let best: Entry | null = null;
+    for (const e of entries) {
+      if (e.trackerId !== trackerId || e.notApplicable || !(e.amount > 0)) continue;
+      if (!best || e.date > best.date || (e.date === best.date && e.createdAt > best.createdAt)) best = e;
+    }
+    return best ? best.amount : null;
+  }, [entries, trackerId]);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!selected) return;
@@ -248,6 +259,15 @@ export default function EntryPage() {
                   disabled={notApplicable}
                   required={!notApplicable}
                 />
+                {lastAmount !== null && !notApplicable ? (
+                  <button
+                    type="button"
+                    onClick={() => setAmount(String(lastAmount))}
+                    className="w-fit rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-strong transition hover:brightness-95"
+                  >
+                    Same as last · {formatAmount(lastAmount)}
+                  </button>
+                ) : null}
               </Field>
             )}
           </div>
