@@ -254,6 +254,8 @@ export interface Settings {
   milestoneStep: MilestoneStep;
   mobileQuickActionsEnabled: boolean;
   onboardingEnabled: boolean;
+  /** set once the first-run welcome tour has been finished or dismissed */
+  onboardingCompleted: boolean;
   performanceMode: PerformanceMode;
   ideasWeeklyGoal: number;
   theme: string;

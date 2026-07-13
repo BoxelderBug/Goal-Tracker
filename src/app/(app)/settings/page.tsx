@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
 import type { MilestoneStep, Settings } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
@@ -112,6 +113,12 @@ export default function SettingsPage() {
               {toggle.label}
             </label>
           ))}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <span className="text-sm text-muted">Take the first-run welcome tour again.</span>
+          <Link href="/?tour=1">
+            <Button size="sm">Replay welcome tour</Button>
+          </Link>
         </div>
       </Card>
 

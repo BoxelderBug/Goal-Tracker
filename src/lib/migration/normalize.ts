@@ -650,6 +650,7 @@ export function normalizeSettings(raw: unknown): Settings {
     milestoneStep: milestoneStep === 10 || milestoneStep === 25 ? milestoneStep : 20,
     mobileQuickActionsEnabled: asBool(value.mobileQuickActionsEnabled, true),
     onboardingEnabled: asBool(value.onboardingEnabled, true),
+    onboardingCompleted: asBool(value.onboardingCompleted, false),
     performanceMode: value.performanceMode === "light" ? "light" : "standard",
     ideasWeeklyGoal: normalizeGoalTargetInt(value.ideasWeeklyGoal, 0),
     theme: themes.includes(String(value.theme)) ? String(value.theme) : "teal",
