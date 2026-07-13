@@ -38,7 +38,8 @@ export default function WeekUpdatePage() {
     const key = `${goalId}|${date}`;
     if (key in edits) return edits[key];
     const total = totals.get(key);
-    return total ? formatAmount(total) : "";
+    // total !== undefined: an explicitly-logged 0 must render as "0", not blank
+    return total !== undefined ? formatAmount(total) : "";
   };
 
   async function save() {

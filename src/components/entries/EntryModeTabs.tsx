@@ -9,7 +9,7 @@ const TABS = [
   { href: "/entry/week", label: "Week" },
   { href: "/entry/year", label: "Year" },
   { href: "/journal", label: "Journal" },
-  { href: "/ideas", label: "Ideas" },
+  { href: "/ideas", label: "Q/I" },
 ];
 
 /** Segmented links across the capture surfaces (single/week/year entry, journal,

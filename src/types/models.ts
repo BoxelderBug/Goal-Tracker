@@ -304,6 +304,9 @@ export interface IdeaEntry {
   id: string;
   date: DateKey;
   type: IdeaType;
+  /** question / title line (absent on entries created before Q/I split) */
+  title?: string;
+  /** answer / details body; may contain "- " bullet lines */
   content: string;
   createdAt: IsoTimestamp;
 }
