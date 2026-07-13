@@ -76,6 +76,7 @@ export default function WeekUpdatePage() {
   }
 
   const rangeLabel = `${getDateKey(range.start)} → ${getDateKey(range.end)}`;
+  const todaysKey = getDateKey(normalizeDate(new Date()));
 
   return (
     <div className="flex flex-col gap-4">
@@ -96,7 +97,7 @@ export default function WeekUpdatePage() {
             <tr className="border-b border-border">
               <th className="sticky left-0 bg-surface p-3 text-left font-medium">Goal</th>
               {days.map((d, i) => (
-                <th key={d} className="p-2 text-center font-medium">
+                <th key={d} className={`p-2 text-center font-medium ${d === todaysKey ? "bg-accent-soft text-accent-strong" : ""}`}>
                   <div>{dowLabels[i]}</div>
                   <div className="text-xs font-normal text-muted">{d.slice(5)}</div>
                 </th>
@@ -110,7 +111,7 @@ export default function WeekUpdatePage() {
                 <tr key={goal.id} className="border-b border-border last:border-0">
                   <td className="sticky left-0 bg-surface p-3 font-medium">{goal.name}</td>
                   {days.map((date) => (
-                    <td key={date} className="p-1.5">
+                    <td key={date} className={`p-1.5 ${date === todaysKey ? "bg-accent-soft/50" : ""}`}>
                       {yesNo ? (
                         <select
                           className="w-16 rounded-lg border border-border bg-surface px-1 py-1 text-center"
