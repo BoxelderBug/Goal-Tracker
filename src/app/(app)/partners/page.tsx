@@ -10,12 +10,14 @@ import { GOAL_SHARE_COLLECTION, PROFILE_COLLECTION, getDb, getFirebaseAuth } fro
 import { buildGoalSummary } from "@/lib/domain/share";
 import { formatAmount } from "@/lib/domain/format";
 import {
+  addPartnerEntry,
   invitePartner,
   pushGoalSummary,
   removeShare,
   respondToShare,
   type OwnerIdentity,
 } from "@/lib/firebase/actions/shares";
+import { getDateKey } from "@/lib/domain/dates";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -222,6 +224,7 @@ export default function PartnersPage() {
                   ) : (
                     <div className="mt-1 text-xs text-muted">Waiting for their first progress update.</div>
                   )}
+                  <PartnerLogForm share={s} />
                 </li>
               );
             })}
@@ -229,13 +232,67 @@ export default function PartnersPage() {
         )}
       </Card>
 
+      <SharingCard outgoing={outgoing.data} busyId={busyId} onPush={pushUpdate} onRemove={remove} />
+    </div>
+  );
+}
+
+function PartnerLogForm({ share }: { share: GoalShare }) {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function log() {
+    const value = Number(amount);
+    if (!(value > 0)) {
+      toast.error("Enter an amount above 0");
+      return;
+    }
+    setBusy(true);
+    try {
+      await addPartnerEntry(share, { amount: value, date: getDateKey(new Date()), notes: "Logged by partner" });
+      toast.success("Progress logged");
+      setAmount("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not log progress");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <Input
+        type="number" min={0} step="any" inputMode="decimal"
+        placeholder={`Add ${share.goalUnit || "progress"}`}
+        className="w-32 py-1"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") log(); }}
+        aria-label={`Log progress for ${share.goalName}`}
+      />
+      <Button size="sm" disabled={busy} onClick={log}>{busy ? "Logging…" : "Log"}</Button>
+    </div>
+  );
+}
+
+function SharingCard({
+  outgoing,
+  busyId,
+  onPush,
+  onRemove,
+}: {
+  outgoing: GoalShare[];
+  busyId: string | null;
+  onPush: (s: GoalShare) => void;
+  onRemove: (s: GoalShare) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
       <Card>
         <CardTitle>Goals you&apos;re sharing</CardTitle>
-        {outgoing.data.length === 0 ? (
+        {outgoing.length === 0 ? (
           <EmptyState>You haven&apos;t shared any goals yet.</EmptyState>
         ) : (
           <ul className="flex flex-col divide-y divide-border">
-            {outgoing.data.map((s) => (
+            {outgoing.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">{s.goalName}</span>
@@ -244,9 +301,9 @@ export default function PartnersPage() {
                 <div className="flex items-center gap-2">
                   <Badge tone={STATUS_TONE[s.status]}>{s.status}</Badge>
                   {s.status === "approved" ? (
-                    <Button size="sm" disabled={busyId === s.id} onClick={() => pushUpdate(s)}>Push update</Button>
+                    <Button size="sm" disabled={busyId === s.id} onClick={() => onPush(s)}>Push update</Button>
                   ) : null}
-                  <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => remove(s)}>Remove</Button>
+                  <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => onRemove(s)}>Remove</Button>
                 </div>
               </li>
             ))}

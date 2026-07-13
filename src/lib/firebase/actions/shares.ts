@@ -19,10 +19,11 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import type { Goal, GoalShare } from "@/types/models";
+import type { Entry, Goal, GoalShare } from "@/types/models";
 import type { GoalSummary } from "@/lib/domain/share";
-import { GOAL_SHARE_COLLECTION, PROFILE_COLLECTION, getDb } from "@/lib/firebase/client";
+import { GOAL_SHARE_COLLECTION, PROFILE_COLLECTION, getDb, getFirebaseAuth } from "@/lib/firebase/client";
 import { createNotification } from "@/lib/firebase/actions/notifications";
+import { entriesRepo } from "@/lib/firebase/repos";
 import { createId } from "@/lib/id";
 
 export interface OwnerIdentity {
@@ -128,4 +129,44 @@ export async function pushGoalSummary(share: GoalShare, summary: GoalSummary): P
 /** Owner removes a share entirely. */
 export async function removeShare(share: GoalShare): Promise<void> {
   await deleteDoc(shareRef(share.id));
+}
+
+/**
+ * Approved partner logs progress toward the shared goal. Writes an entry into
+ * the owner's entries subcollection tagged with shareId + createdBy (the exact
+ * shape the entries rule requires), and notifies the owner. The owner's client
+ * recomputes/pushes the summary on its next visit.
+ */
+export async function addPartnerEntry(
+  share: GoalShare,
+  input: { amount: number; date: string; notes?: string },
+): Promise<void> {
+  const uid = getFirebaseAuth().currentUser?.uid;
+  if (!uid) throw new Error("You must be signed in.");
+  const entry: Entry = {
+    id: createId(),
+    trackerId: share.ownerGoalId,
+    date: input.date,
+    amount: input.amount,
+    notApplicable: false,
+    goalsPlus: null,
+    metricValues: {},
+    notes: input.notes ?? "",
+    createdAt: new Date().toISOString(),
+    createdBy: uid,
+    shareId: share.id,
+  };
+  await entriesRepo.set(share.ownerUid, entry);
+  await createNotification({
+    recipientId: share.ownerUid,
+    type: "goal-share-entry-update",
+    actorId: uid,
+    actorUsername: share.partnerName,
+    actorEmail: share.partnerEmail,
+    goalName: share.goalName,
+    goalUnit: share.goalUnit,
+    shareId: share.id,
+    entryAmount: input.amount,
+    entryDate: input.date,
+  }).catch(() => {});
 }

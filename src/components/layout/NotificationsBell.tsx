@@ -32,7 +32,12 @@ const TONE: Record<BellKind, string> = {
   share: "text-accent-strong",
 };
 
-const SHARE_TYPES = new Set(["goal-share-invite", "goal-share-approved", "goal-share-rejected"]);
+const SHARE_TYPES = new Set([
+  "goal-share-invite",
+  "goal-share-approved",
+  "goal-share-rejected",
+  "goal-share-entry-update",
+]);
 
 function describeShare(n: StoredNotification): { title: string; detail: string } {
   const who = n.actorUsername || n.actorEmail || "Someone";
@@ -43,6 +48,8 @@ function describeShare(n: StoredNotification): { title: string; detail: string }
       return { title: `${who} accepted your share`, detail: `${n.goalName} — they're now following.` };
     case "goal-share-rejected":
       return { title: `${who} declined your share`, detail: n.goalName };
+    case "goal-share-entry-update":
+      return { title: `${who} logged progress`, detail: `${n.entryAmount} ${n.goalUnit} on ${n.goalName}.`.trim() };
     default:
       return { title: n.goalName || "Notification", detail: "" };
   }
