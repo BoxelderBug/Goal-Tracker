@@ -4,6 +4,7 @@ import { getWeekRange } from "./periods";
 import { parseDateKey } from "./dates";
 import {
   aggregateCumulativePoints,
+  bucketRangeTotals,
   buildDailyTotals,
   computePace,
   getCumulativeSeries,
@@ -135,5 +136,40 @@ describe("neededPerDay", () => {
   it("still works mid-day on the last day (unnormalized now)", () => {
     // regression: a 2pm `now` on Sunday must not read as past the week's end
     expect(neededPerDay(5, 20, week, new Date(2026, 6, 12, 14, 30))).toBe(15);
+  });
+});
+
+describe("bucketRangeTotals", () => {
+  // Jan 2026: Thu Jan 1; weeks (monday-start) of 2025-12-29, 01-05, 01-12, ...
+  const jan = { start: parseDateKey("2026-01-01"), end: parseDateKey("2026-01-31") };
+  const totals = buildDailyTotals([
+    entry("a", "g1", "2026-01-01", 2),
+    entry("b", "g1", "2026-01-02", 3), // same week as Jan 1
+    entry("c", "g1", "2026-01-05", 5), // next week
+    entry("d", "g2", "2026-01-05", 9), // other goal
+  ]);
+
+  it("buckets totals by week with full calendar week ranges", () => {
+    const out = bucketRangeTotals(totals, "g1", jan, "week", "monday", parseDateKey("2026-02-15"));
+    expect(out[0].startKey).toBe("2025-12-29"); // week straddling the year edge
+    expect(out[0].total).toBe(5);
+    expect(out[1].startKey).toBe("2026-01-05");
+    expect(out[1].total).toBe(5);
+    // full calendar week even though the range starts Jan 1
+    expect(out[0].range.start.getDate()).toBe(29);
+    // covers every week through range.end (Jan 31 falls in week of Jan 26)
+    expect(out[out.length - 1].startKey).toBe("2026-01-26");
+  });
+
+  it("buckets by month and omits buckets after the one containing now", () => {
+    const year = { start: parseDateKey("2026-01-01"), end: parseDateKey("2026-12-31") };
+    const out = bucketRangeTotals(totals, "g1", year, "month", "monday", parseDateKey("2026-03-10"));
+    expect(out.map((b) => b.startKey)).toEqual(["2026-01-01", "2026-02-01", "2026-03-01"]);
+    expect(out[0].total).toBe(10);
+    expect(out[1].total).toBe(0); // zero buckets kept, not skipped
+  });
+
+  it("returns nothing for a range entirely in the future", () => {
+    expect(bucketRangeTotals(totals, "g1", jan, "week", "monday", parseDateKey("2025-06-01"))).toEqual([]);
   });
 });

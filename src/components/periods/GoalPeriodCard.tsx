@@ -9,6 +9,7 @@ import type { DailyTotals } from "@/lib/domain/progress";
 import type { DateRange } from "@/lib/domain/dates";
 import {
   aggregateCumulativePoints,
+  bucketRangeTotals,
   computePace,
   getCumulativeSeries,
   neededPerDay,
@@ -34,6 +35,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { toast } from "@/components/ui/Toaster";
 import { EChart, themeColor } from "@/components/charts/EChart";
 import { cumulativeScrubOption } from "@/lib/charts/options/cumulativeScrub";
+import { periodBarsOption } from "@/lib/charts/options/periodBars";
 
 const TONE_LABEL: Record<"hit" | "onpace" | "behind" | "missed", string> = {
   hit: "Goal hit",
@@ -96,13 +98,26 @@ export function GoalPeriodCard({
     return { progress, target, pace, tone: paceTone(pace) };
   }, [totals, goal, period, range, weekStart, overrides, vacations, now]);
 
+  // Year "By week" / "By month" are bar-chart views; "Daily" is the cumulative line.
+  const barsMode = period === "year" && granularity !== "day";
+
   const points = useMemo<CumulativePoint[]>(
     () =>
-      open
+      open && !barsMode
         ? aggregateCumulativePoints(getCumulativeSeries(totals, goal.id, range, now), granularity, weekStart)
         : [],
-    [open, totals, goal.id, range, now, granularity, weekStart],
+    [open, barsMode, totals, goal.id, range, now, granularity, weekStart],
   );
+
+  const barPoints = useMemo(() => {
+    if (!open || !barsMode) return [];
+    const g = granularity as "week" | "month";
+    return bucketRangeTotals(totals, goal.id, range, g, weekStart, now).map((b) => ({
+      startKey: b.startKey,
+      total: b.total,
+      target: getTargetForPeriod(goal, g, b.range, { weekStart, overrides, vacations }),
+    }));
+  }, [open, barsMode, totals, goal, range, granularity, weekStart, overrides, vacations, now]);
 
   // Previous calendar period, offered only when it's inside the live window.
   const prevRange = useMemo(
@@ -129,6 +144,17 @@ export function GoalPeriodCard({
 
   const chartOption = useMemo(() => {
     if (!open) return null;
+    if (barsMode) {
+      return periodBarsOption(barPoints, granularity as "week" | "month", goal.unit, {
+        accent: themeColor("--accent", "#009f94"),
+        target: themeColor("--tone-behind", "#be7f24"),
+        text: themeColor("--text", "#222"),
+        muted: themeColor("--muted", "#888"),
+        grid: themeColor("--border", "#ddd"),
+        surface: themeColor("--surface", "#fff"),
+        border: themeColor("--border", "#ddd"),
+      });
+    }
     return cumulativeScrubOption(
       points,
       target,
@@ -147,7 +173,7 @@ export function GoalPeriodCard({
       pinnedIndex,
       overlayData,
     );
-  }, [open, points, goal.unit, target, pinnedIndex, overlayData]);
+  }, [open, barsMode, barPoints, granularity, points, goal.unit, target, pinnedIndex, overlayData]);
 
   // Clicking anywhere in the plot pins the nearest date; the readout freezes.
   const handleChartReady = useCallback((chart: EChartsType) => {
@@ -320,7 +346,7 @@ export function GoalPeriodCard({
                 </Select>
               </label>
             ) : null}
-            {overlayAvailable ? (
+            {overlayAvailable && !barsMode ? (
               <label className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
@@ -332,7 +358,14 @@ export function GoalPeriodCard({
             ) : null}
           </div>
           <EChart option={chartOption} height={220} onReady={handleChartReady} />
-          {pinnedPoint ? (
+          {barsMode ? (
+            <div className="flex items-center justify-between text-xs text-muted">
+              <span>
+                {granularity === "week" ? "Weekly" : "Monthly"} totals — solid bars hit their target.
+              </span>
+              <Button size="sm" variant="ghost" onClick={exportPng}>Export PNG</Button>
+            </div>
+          ) : pinnedPoint ? (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-bg-soft px-3 py-2 text-xs">
               <span className="text-muted">
                 <span className="font-medium text-text">{pinnedPoint.date}</span>

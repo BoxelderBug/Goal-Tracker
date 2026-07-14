@@ -7,7 +7,7 @@
  * (N/A entries carry amount 0), so we do the same for parity.
  */
 import type { Entry, WeekStart } from "@/types/models";
-import { getWeekRange } from "./periods";
+import { getMonthRange, getWeekRange } from "./periods";
 import {
   addDays,
   getDateKey,
@@ -168,6 +168,46 @@ export function aggregateCumulativePoints(
     return getDateKey(getWeekRange(parseDateKey(dateKey), weekStart).start);
   };
   return points.filter((p, i) => i === points.length - 1 || bucketOf(p.date) !== bucketOf(points[i + 1].date));
+}
+
+export interface PeriodBucketTotal {
+  /** bucket identity: week-start dateKey, or first-of-month dateKey */
+  startKey: string;
+  /** the bucket's FULL calendar week/month (may extend past the outer range),
+   *  so callers can resolve the real per-period target for it */
+  range: DateRange;
+  /** summed amount over the bucket's days that fall inside the outer range */
+  total: number;
+}
+
+/**
+ * Per-week / per-month totals across a range, for the year view's bar charts.
+ * Buckets after the one containing `now` are omitted — no empty future bars —
+ * while a range entirely in the past keeps every bucket.
+ */
+export function bucketRangeTotals(
+  totals: DailyTotals,
+  trackerId: string,
+  range: DateRange,
+  granularity: Exclude<SeriesGranularity, "day">,
+  weekStart: WeekStart,
+  now: Date,
+): PeriodBucketTotal[] {
+  const today = normalizeDate(now);
+  const end = range.end <= today ? range.end : today;
+  const out: PeriodBucketTotal[] = [];
+  let current = range.start;
+  while (current <= end) {
+    const bucketRange =
+      granularity === "month" ? getMonthRange(current) : getWeekRange(current, weekStart);
+    const startKey = getDateKey(bucketRange.start);
+    const amount = totals.get(`${trackerId}|${getDateKey(current)}`) ?? 0;
+    const last = out[out.length - 1];
+    if (last && last.startKey === startKey) last.total = addAmount(last.total, amount);
+    else out.push({ startKey, range: bucketRange, total: amount });
+    current = addDays(current, 1);
+  }
+  return out;
 }
 
 /**
