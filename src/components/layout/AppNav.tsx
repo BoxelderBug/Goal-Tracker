@@ -38,6 +38,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
           { href: "/month", label: "Month", hint: "M" },
           { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
           { href: "/year", label: "Year", hint: "Y" },
+          { href: "/grades/review", label: "Grades" },
         ],
       },
       { href: "/trends", label: "Trends" },
@@ -125,15 +126,16 @@ function NavSubGroup({
   const children = (item.children ?? []).filter((c) => !c.show || c.show(settings));
   return (
     <div className="flex flex-col">
+      {/* visually a SUBheader: smaller, muted, indented — not a group header */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium text-text transition-colors hover:bg-accent-soft"
+        className="flex items-center justify-between rounded-lg py-1 pl-4 pr-3 text-xs font-medium text-muted transition-colors hover:bg-accent-soft hover:text-text"
       >
         <span>{item.label}</span>
         <svg
-          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden
           className={cn("transition-transform", open ? "rotate-90" : "")}
         >
