@@ -27,6 +27,7 @@ const TONE: Record<BellKind, string> = {
   "goal-hit": "text-tone-hit",
   "goal-milestone": "text-tone-onpace",
   "smart-reminder": "text-tone-behind",
+  "midweek-check": "text-tone-behind",
   "needs-attention": "text-tone-missed",
   "period-close-ready": "text-accent-strong",
   share: "text-accent-strong",

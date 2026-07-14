@@ -14,6 +14,7 @@ export type NotificationKind =
   | "goal-hit"
   | "goal-milestone"
   | "smart-reminder"
+  | "midweek-check"
   | "needs-attention"
   | "period-close-ready";
 
@@ -53,6 +54,7 @@ export function deriveNotifications(
   const totals = buildDailyTotals(entries);
   const lookback = { start: addDays(normalizeDate(now), -60), end: normalizeDate(now) };
   const out: AppNotification[] = [];
+  const behindGoals: string[] = [];
 
   for (const goal of active) {
     const progress = sumRange(totals, goal.id, week);
@@ -68,6 +70,9 @@ export function deriveNotifications(
       });
       continue;
     }
+
+    // Track behind-pace goals for the Thursday midweek check-in.
+    if (target > 0 && pace.projected < target) behindGoals.push(goal.name);
 
     const latest = latestEntryDateInRange(entries, goal.id, lookback);
     const since = latest === null ? Infinity : daysBetween(latest, now);
@@ -114,6 +119,20 @@ export function deriveNotifications(
         });
       }
     }
+  }
+
+  // Thursday midweek check-in: one summary item when goals are behind pace
+  // while the week is still saveable (fires all day Thursday).
+  if (now.getDay() === 4 && behindGoals.length > 0) {
+    const named = behindGoals.slice(0, 3).join(", ");
+    const extra = behindGoals.length > 3 ? ` and ${behindGoals.length - 3} more` : "";
+    out.unshift({
+      id: `midweek:${weekKey}`,
+      kind: "midweek-check",
+      title: `Midweek check: ${behindGoals.length} goal${behindGoals.length === 1 ? "" : "s"} behind pace`,
+      detail: `${named}${extra} — there's still time to turn the week around.`,
+      href: "/week",
+    });
   }
 
   return out;

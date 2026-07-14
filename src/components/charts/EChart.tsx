@@ -14,15 +14,11 @@ export function EChart({
   height = 280,
   className,
   onReady,
-  gl = false,
 }: {
   option: EChartsOption;
   height?: number;
   className?: string;
   onReady?: (chart: EChartsType) => void;
-  /** also load echarts-gl so 3D series (bar3D/surface) register. Off by default
-   *  so the heavy WebGL bundle only loads on pages that opt in. */
-  gl?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<EChartsType | null>(null);
@@ -34,10 +30,6 @@ export function EChart({
     (async () => {
       try {
         const echarts = await import("echarts");
-        // echarts-gl (3D) registers onto the echarts singleton at import; keep
-        // it here so a load/registration failure degrades to an empty chart
-        // rather than an unhandled rejection.
-        if (gl) await import("echarts-gl");
         if (disposed || !containerRef.current) return;
         const chart = echarts.init(containerRef.current, undefined, { renderer: "canvas" });
         chartRef.current = chart;

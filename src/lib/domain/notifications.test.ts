@@ -93,6 +93,34 @@ describe("deriveNotifications", () => {
     expect(notes.some((n) => n.kind === "goal-milestone")).toBe(false);
   });
 
+  it("fires a midweek check on Thursday when goals are behind pace", () => {
+    // Thu 2026-07-09; 1 of 20 logged → projection misses badly.
+    const thu = parseDateKey("2026-07-09");
+    const notes = deriveNotifications(
+      [goal({ id: "g1", name: "Read", weeklyGoal: 20 })],
+      [entry("g1", "2026-07-08", 1)],
+      "monday", 3, thu,
+    );
+    const check = notes.find((n) => n.kind === "midweek-check");
+    expect(check).toBeDefined();
+    expect(check?.title).toContain("1 goal behind pace");
+    expect(check?.detail).toContain("Read");
+  });
+
+  it("does not fire the midweek check on other days or when on pace", () => {
+    const wed = parseDateKey("2026-07-08");
+    const behindOnWed = deriveNotifications(
+      [goal({ id: "g1", weeklyGoal: 20 })], [entry("g1", "2026-07-07", 1)], "monday", 3, wed,
+    );
+    expect(behindOnWed.some((n) => n.kind === "midweek-check")).toBe(false);
+
+    const thu = parseDateKey("2026-07-09");
+    const onPace = deriveNotifications(
+      [goal({ id: "g1", weeklyGoal: 7 })], [entry("g1", "2026-07-08", 6)], "monday", 3, thu,
+    );
+    expect(onPace.some((n) => n.kind === "midweek-check")).toBe(false);
+  });
+
   it("does not smart-remind early in the week", () => {
     const notes = deriveNotifications(
       [goal({ id: "g1", weeklyGoal: 20 })],
