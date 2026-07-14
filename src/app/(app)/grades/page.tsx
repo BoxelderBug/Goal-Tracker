@@ -36,18 +36,22 @@ export default function GradesPage() {
 
   const [newName, setNewName] = useState("");
   const [date, setDate] = useState(() => getDateKey(normalizeDate(new Date())));
-  const [draft, setDraft] = useState<Record<string, string>>({}); // criterionId -> letter ("" = unset)
+  // keyed `${date}|${criterionId}` — letter and comment drafts override saved values
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  // Grades already stored for the selected date (draft overrides them).
+  // Grades already stored for the selected date (drafts override them).
   const savedForDate = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const e of entries.data) if (e.date === date) map.set(e.criterionId, e.grade);
+    const map = new Map<string, GradeEntry>();
+    for (const e of entries.data) if (e.date === date) map.set(e.criterionId, e);
     return map;
   }, [entries.data, date]);
 
   const gradeFor = (criterionId: string): string =>
-    draft[`${date}|${criterionId}`] ?? savedForDate.get(criterionId) ?? "";
+    draft[`${date}|${criterionId}`] ?? savedForDate.get(criterionId)?.grade ?? "";
+  const noteFor = (criterionId: string): string =>
+    noteDraft[`${date}|${criterionId}`] ?? savedForDate.get(criterionId)?.notes ?? "";
 
   async function addCriterion(event: FormEvent) {
     event.preventDefault();
@@ -73,8 +77,12 @@ export default function GradesPage() {
 
   async function save() {
     const changes = criteria.data
-      .map((c) => ({ criterionId: c.id, letter: gradeFor(c.id) }))
-      .filter((c) => isGradeLetter(c.letter) && c.letter !== (savedForDate.get(c.criterionId) ?? ""));
+      .map((c) => ({ criterionId: c.id, letter: gradeFor(c.id), note: noteFor(c.id).trim() }))
+      .filter((c) => {
+        if (!isGradeLetter(c.letter)) return false;
+        const saved = savedForDate.get(c.criterionId);
+        return c.letter !== (saved?.grade ?? "") || c.note !== (saved?.notes ?? "");
+      });
     if (changes.length === 0) {
       toast.info("Nothing new to save");
       return;
@@ -83,17 +91,19 @@ export default function GradesPage() {
     try {
       await gradeEntriesRepo.setMany(
         uid,
-        changes.map(({ criterionId, letter }) => ({
+        changes.map(({ criterionId, letter, note }) => ({
           // deterministic id → re-grading a day overwrites instead of duplicating
           id: `${date}_${criterionId}`,
           date,
           criterionId,
           grade: letter,
           score: gradeScore(letter as GradeLetter),
+          notes: note,
           createdAt: new Date().toISOString(),
         })),
       );
       setDraft({});
+      setNoteDraft({});
       toast.success("Grades saved");
     } catch {
       toast.error("Could not save grades");
@@ -163,25 +173,34 @@ export default function GradesPage() {
               type="date"
               className="w-auto py-1"
               value={date}
-              onChange={(e) => { setDate(e.target.value); setDraft({}); }}
+              onChange={(e) => { setDate(e.target.value); setDraft({}); setNoteDraft({}); }}
               aria-label="Grading date"
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {criteria.data.map((c) => (
-              <label key={c.id} className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2 text-sm">
-                <span className="font-medium">{c.name}</span>
-                <Select
-                  className="w-20 py-1"
-                  value={gradeFor(c.id)}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, [`${date}|${c.id}`]: e.target.value }))}
-                >
-                  <option value="">–</option>
-                  {GRADE_OPTIONS.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </Select>
-              </label>
+              <div key={c.id} className="flex flex-col gap-2 rounded-xl border border-border px-3 py-2 text-sm">
+                <label className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{c.name}</span>
+                  <Select
+                    className="w-20 py-1"
+                    value={gradeFor(c.id)}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, [`${date}|${c.id}`]: e.target.value }))}
+                  >
+                    <option value="">–</option>
+                    {GRADE_OPTIONS.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </Select>
+                </label>
+                <Input
+                  className="py-1 text-xs"
+                  placeholder="Comment (optional)"
+                  value={noteFor(c.id)}
+                  onChange={(e) => setNoteDraft((prev) => ({ ...prev, [`${date}|${c.id}`]: e.target.value }))}
+                  aria-label={`Comment for ${c.name}`}
+                />
+              </div>
             ))}
           </div>
           <div className="mt-3 flex justify-end">
@@ -201,17 +220,29 @@ export default function GradesPage() {
             {recentByDate.map(([d, list]) => {
               const letters = list.map((e) => e.grade).filter(isGradeLetter);
               const avg = averageGrade(letters);
+              const notes = list.filter((e) => e.notes);
               return (
-                <li key={d} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="w-24 text-sm text-muted">{d}</span>
-                    {list.map((e) => (
-                      <Badge key={e.id} tone="neutral">
-                        {criterionName(e.criterionId)}: <span className="font-semibold">{e.grade}</span>
-                      </Badge>
-                    ))}
+                <li key={d} className="flex flex-col gap-1 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="w-24 text-sm text-muted">{d}</span>
+                      {list.map((e) => (
+                        <Badge key={e.id} tone="neutral">
+                          {criterionName(e.criterionId)}: <span className="font-semibold">{e.grade}</span>
+                        </Badge>
+                      ))}
+                    </div>
+                    {avg ? <Badge tone="accent">avg {avg}</Badge> : null}
                   </div>
-                  {avg ? <Badge tone="accent">avg {avg}</Badge> : null}
+                  {notes.length > 0 ? (
+                    <div className="flex flex-col gap-0.5 pl-24 text-xs text-muted">
+                      {notes.map((e) => (
+                        <span key={e.id}>
+                          <span className="font-medium">{criterionName(e.criterionId)}:</span> {e.notes}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

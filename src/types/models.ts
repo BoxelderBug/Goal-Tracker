@@ -228,6 +228,8 @@ export interface GradeEntry {
   criterionId: string;
   grade: string; // GradeLetter, validated by lib/domain/grades
   score: number; // GPA-style numeric mirror for stats
+  /** optional comment alongside the grade (absent on early entries) */
+  notes?: string;
   createdAt: IsoTimestamp;
 }
 
