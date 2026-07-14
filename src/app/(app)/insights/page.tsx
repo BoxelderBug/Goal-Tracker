@@ -6,8 +6,8 @@ import { orderBy } from "firebase/firestore";
 import type { Entry, Goal, ScheduleBlock, WeekStart } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { schedulesRepo } from "@/lib/firebase/repos";
-import { computeScheduleInsights } from "@/lib/domain/insights";
-import { computeWeekdayFingerprint } from "@/lib/domain/fingerprint";
+import { computeLoggingWindow, computeScheduleInsights } from "@/lib/domain/insights";
+import { computeWeekdayFingerprint, computeWinningWeekFingerprint } from "@/lib/domain/fingerprint";
 import { formatAmount } from "@/lib/domain/format";
 import { Select } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
@@ -96,8 +96,131 @@ function FingerprintCard({
   );
 }
 
+const fmtHour = (h: number): string => {
+  const wrapped = h % 24;
+  if (wrapped === 0) return "12 AM";
+  if (wrapped === 12) return "12 PM";
+  return wrapped < 12 ? `${wrapped} AM` : `${wrapped - 12} PM`;
+};
+
+/** The modal 2-hour logging band, crossed with schedule follow-through. */
+function LoggingWindowCard({
+  entries,
+  blocks,
+  now,
+}: {
+  entries: Entry[];
+  blocks: ScheduleBlock[];
+  now: Date;
+}) {
+  const w = useMemo(() => computeLoggingWindow(entries, blocks, now), [entries, blocks, now]);
+  if (!w) return null;
+
+  const bandLabel = `${fmtHour(w.bandStartHour)}–${fmtHour(w.bandStartHour + 2)}`;
+  const split = w.split;
+  const edge = split ? split.inWindowKeptPct - split.outWindowKeptPct : 0;
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <CardTitle>Proven logging window</CardTitle>
+        <Link href="/schedule"><Button size="sm" variant="ghost">Open schedule</Button></Link>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="font-display text-3xl">{bandLabel}</div>
+          <p className="text-sm text-muted">
+            is when you actually log — {w.bandSharePct}% of your last {w.entryCount} entries
+            ({w.bandEntryCount}) landed in this window.
+          </p>
+        </div>
+        {split ? (
+          <div>
+            <div className="font-display text-3xl">
+              {split.inWindowKeptPct}%
+              <span className="text-lg text-muted"> vs {split.outWindowKeptPct}%</span>
+            </div>
+            <p className="text-sm text-muted">
+              of blocks scheduled in this window get kept, vs outside it
+              ({split.inWindowBlocks} in / {split.outWindowBlocks} out).
+            </p>
+          </div>
+        ) : (
+          <p className="self-center text-sm text-muted">
+            Schedule a few blocks inside this window — once 5 in-window and 5 out-of-window
+            blocks have passed, you&apos;ll see which placement you actually keep.
+          </p>
+        )}
+      </div>
+      {split ? (
+        <p className="mt-3 border-t border-border pt-3 text-sm">
+          {edge >= 10
+            ? <>Move blocks into <span className="font-medium">{bandLabel}</span> — you keep them {edge} points more often there.</>
+            : edge <= -10
+              ? <>Surprise: blocks outside {bandLabel} get kept more often — your logging time and your doing time differ. Schedule for the doing time.</>
+              : <>Placement barely matters for you so far — pick the time you can protect.</>}
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+/** Front-load signal: % of weekly target banked by day 3, hit vs miss weeks. */
+function WinningWeeksCard({
+  goals,
+  entries,
+  weekStart,
+  windowStartKey,
+  now,
+}: {
+  goals: Goal[];
+  entries: Entry[];
+  weekStart: WeekStart;
+  windowStartKey: string;
+  now: Date;
+}) {
+  const rows = useMemo(
+    () =>
+      goals
+        .filter((g) => !g.archived)
+        .map((g) => ({
+          goal: g,
+          fp: computeWinningWeekFingerprint(g, entries, weekStart, now, windowStartKey),
+        }))
+        .filter((r) => r.fp !== null),
+    [goals, entries, weekStart, windowStartKey, now],
+  );
+  if (rows.length === 0) return null;
+
+  const day3 = weekStart === "sunday" ? "Tuesday" : "Wednesday";
+
+  return (
+    <Card>
+      <CardTitle>Winning weeks start early</CardTitle>
+      <p className="mb-2 text-sm text-muted">
+        How much of the weekly target you&apos;d banked by {day3} night, in weeks you hit vs missed.
+      </p>
+      <ul className="flex flex-col divide-y divide-border">
+        {rows.map(({ goal: g, fp }) => (
+          <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+            <Link href={`/goal/${g.id}`} className="font-medium hover:underline">{g.name}</Link>
+            <span className="text-xs text-muted">
+              hit weeks <span className="font-medium text-text">{fp!.hitDay3Pct}%</span>
+              {" · "}miss weeks <span className="font-medium text-text">{fp!.missDay3Pct}%</span>
+              {" "}({fp!.hitWeeks} hit / {fp!.missWeeks} miss)
+            </span>
+            {fp!.hitDay3Pct - fp!.missDay3Pct >= 10 ? (
+              <Badge tone="accent">bank ~{fp!.hitDay3Pct}% by {day3}</Badge>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export default function InsightsPage() {
-  const { uid, goals, entries } = useUserData();
+  const { uid, goals, entries, windowStartKey } = useUserData();
   const settings = useSettings();
   const now = useMemo(() => new Date(), []);
   const { data: blocks } = useCollection<ScheduleBlock>(
@@ -175,6 +298,16 @@ export default function InsightsPage() {
               </div>
             ) : null}
           </Card>
+
+          <LoggingWindowCard entries={entries} blocks={blocks} now={now} />
+
+          <WinningWeeksCard
+            goals={goals}
+            entries={entries}
+            weekStart={settings.weekStart}
+            windowStartKey={windowStartKey}
+            now={now}
+          />
 
           <FingerprintCard goals={goals} entries={entries} weekStart={settings.weekStart} now={now} />
 
