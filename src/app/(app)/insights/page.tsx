@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { orderBy } from "firebase/firestore";
-import type { Entry, Goal, ScheduleBlock, Vacation, WeekStart } from "@/types/models";
+import type { Entry, Goal, PeriodSnapshot, ScheduleBlock, Vacation, WeekStart } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
-import { schedulesRepo, vacationsRepo } from "@/lib/firebase/repos";
+import { schedulesRepo, snapshotsRepo, vacationsRepo } from "@/lib/firebase/repos";
+import { computeTargetReality } from "@/lib/domain/snapshot";
 import {
   computePriorityEffort,
   computeScheduleInsights,
@@ -433,6 +434,9 @@ export default function InsightsPage() {
     [uid],
   );
   const { data: vacations } = useCollection<Vacation>(() => vacationsRepo.query(uid), [uid]);
+  const { data: snapshots } = useCollection<PeriodSnapshot>(() => snapshotsRepo.query(uid), [uid]);
+
+  const targetReality = useMemo(() => computeTargetReality(goals, snapshots), [goals, snapshots]);
 
   const schedule = useMemo(
     () => computeScheduleInsights(goals, blocks, entries, now),
@@ -515,6 +519,35 @@ export default function InsightsPage() {
               </div>
             ) : null}
           </Card>
+
+          {targetReality.length > 0 ? (
+            <Card>
+              <CardTitle>Target reality check</CardTitle>
+              <p className="mb-2 text-sm text-muted">
+                From your closed-out weeks. Targets you hit 30–90% of the time are calibrated —
+                these have drifted out of that band.
+              </p>
+              <ul className="flex flex-col divide-y divide-border">
+                {targetReality.map((r) => (
+                  <li key={r.goalId} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <Link href={`/goal/${r.goalId}`} className="font-medium hover:underline">{r.name}</Link>
+                    <span className="text-xs text-muted">
+                      hit {r.hits} of {r.weeks} closed weeks ({r.hitPct}%)
+                      {" — "}
+                      {r.verdict === "lower"
+                        ? `at ${r.recommendedTarget} ${r.unit}/week (your 70%-clear level) you'd be in the game`
+                        : `that's a floor, not a target — your median week is ${r.recommendedTarget} ${r.unit}`}
+                    </span>
+                    <Link href={`/settings/goals/${r.goalId}`}>
+                      <Button size="sm" variant="ghost">
+                        {r.verdict === "lower" ? `Lower to ~${r.recommendedTarget}` : `Raise toward ${r.recommendedTarget}`}
+                      </Button>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
           {zeroDays ? <ZeroDayCard data={zeroDays} /> : null}
 

@@ -4,7 +4,8 @@ import { newGoal } from "./newGoal";
 import { getPeriodRange, getWeekRange } from "./periods";
 import { parseDateKey } from "./dates";
 import { buildDailyTotals } from "./progress";
-import { computeSnapshot } from "./snapshot";
+import { computeSnapshot, computeTargetReality } from "./snapshot";
+import type { PeriodSnapshot } from "@/types/models";
 
 const goal = (over: Partial<Goal>): Goal => ({ ...newGoal(), ...over });
 
@@ -84,5 +85,62 @@ describe("computeSnapshot", () => {
     });
     expect(goals[0].hit).toBe(true);
     expect(summary.goalPointsEarned).toBe(0);
+  });
+});
+
+describe("computeTargetReality", () => {
+  const mkSnap = (rangeStart: string, rows: Array<{ id: string; progress: number; target: number }>, closedAt = "2026-07-01T00:00:00.000Z"): PeriodSnapshot => ({
+    id: `week_${rangeStart}_${closedAt}`,
+    period: "week",
+    rangeStart,
+    rangeEnd: rangeStart, // unused here
+    closedAt,
+    filters: { friendGroup: "", scope: "all" } as PeriodSnapshot["filters"],
+    summary: {} as PeriodSnapshot["summary"],
+    goals: rows.map((r) => ({
+      trackerId: r.id, name: r.id, unit: "u",
+      progress: r.progress, target: r.target, hit: r.progress >= r.target, pointsEarned: 0,
+    })),
+    checkIns: [],
+  });
+  const weekKeys = Array.from({ length: 10 }, (_, i) => `2026-0${i < 5 ? 5 : 6}-${String((i % 5) * 7 + 1).padStart(2, "0")}`);
+
+  it("recommends lowering a sub-30% target to the 30th-percentile week", () => {
+    // progress 1..10 vs target 20 → 0 hits; p30 of [1..10] = 3rd value = 3
+    const snaps = weekKeys.map((k, i) => mkSnap(k, [{ id: "g1", progress: i + 1, target: 20 }]));
+    const out = computeTargetReality([goal({ id: "g1", name: "Run", unit: "mi" })], snaps);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      goalId: "g1", verdict: "lower", weeks: 10, hits: 0, hitPct: 0,
+      currentTarget: 20, recommendedTarget: 3,
+    });
+  });
+
+  it("recommends raising a >90% target to the median week", () => {
+    // progress 11..20 vs target 5 → 10/10 hits; median = sorted[5] = 16
+    const snaps = weekKeys.map((k, i) => mkSnap(k, [{ id: "g1", progress: i + 11, target: 5 }]));
+    const out = computeTargetReality([goal({ id: "g1" })], snaps);
+    expect(out[0]).toMatchObject({ verdict: "raise", hitPct: 100, currentTarget: 5, recommendedTarget: 16 });
+  });
+
+  it("stays silent in the calibrated 30-90% band, under 8 weeks, and for archived goals", () => {
+    // 6 of 10 hit → 60%
+    const snaps = weekKeys.map((k, i) => mkSnap(k, [{ id: "g1", progress: i < 6 ? 10 : 2, target: 10 }]));
+    expect(computeTargetReality([goal({ id: "g1" })], snaps)).toHaveLength(0);
+    const few = snaps.slice(0, 7).map((s) => mkSnap(s.rangeStart, [{ id: "g1", progress: 1, target: 20 }]));
+    expect(computeTargetReality([goal({ id: "g1" })], few)).toHaveLength(0);
+    expect(computeTargetReality([goal({ id: "g1", archived: true })], snaps)).toHaveLength(0);
+  });
+
+  it("counts a re-closed week once, latest close-out wins", () => {
+    const snaps = [
+      ...weekKeys.map((k) => mkSnap(k, [{ id: "g1", progress: 1, target: 20 }])),
+      // re-close the first week later with a different progress
+      mkSnap(weekKeys[0], [{ id: "g1", progress: 9, target: 20 }], "2026-07-02T00:00:00.000Z"),
+    ];
+    const out = computeTargetReality([goal({ id: "g1" })], snaps);
+    expect(out[0].weeks).toBe(10);
+    // progresses: nine 1s + one 9 → p30 = ceil(3)-1 = idx 2 → 1
+    expect(out[0].recommendedTarget).toBe(1);
   });
 });
