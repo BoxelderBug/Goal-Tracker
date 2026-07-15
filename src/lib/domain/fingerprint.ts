@@ -129,6 +129,63 @@ export function computeWinningWeekFingerprint(
 }
 
 // ---------------------------------------------------------------------------
+// Comeback odds: P(week ended hit | behind pace at end of day 4)
+// ---------------------------------------------------------------------------
+
+/** minimum behind-at-day-4 weeks before the rescue rate is claimed */
+const MIN_BEHIND_WEEKS = 6;
+
+export interface ComebackOdds {
+  /** trailing full weeks that were behind pace at the end of day 4 */
+  behindWeeks: number;
+  /** …of which ended with the weekly target hit */
+  rescuedWeeks: number;
+  /** rescuedWeeks / behindWeeks, 0–100 */
+  rescuePct: number;
+}
+
+/**
+ * When this goal is behind pace midweek, how often does the week still end in
+ * a hit? "Behind at day 4" uses the same straight-line projection as the
+ * Thursday midweek check: (day-4 total / 4) × 7 < target. A low rescue rate
+ * means a midweek warning is really a deadline. Same lookback guards as the
+ * other week stats; hidden under MIN_BEHIND_WEEKS behind-weeks.
+ */
+export function computeComebackOdds(
+  goal: TargetGoalLike & { createdAt?: string },
+  entries: Entry[],
+  weekStart: WeekStart,
+  now: Date,
+  /** first dateKey of the loaded entries window; weeks before it read falsely as zero */
+  windowStartKey?: string,
+): ComebackOdds | null {
+  const totals = buildDailyTotals(entries);
+  const currentWeek = getWeekRange(now, weekStart);
+  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+
+  let behindWeeks = 0;
+  let rescuedWeeks = 0;
+  for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
+    const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
+    if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
+    if (createdKey && createdKey > getDateKey(week.end)) break;
+    const target = getTargetForPeriod(goal, "week", week, { weekStart });
+    if (target <= 0) continue;
+    const day4 = sumRange(totals, goal.id, { start: week.start, end: addDays(week.start, 3) });
+    if ((day4 / 4) * 7 >= target) continue;
+    behindWeeks += 1;
+    if (sumRange(totals, goal.id, week) >= target) rescuedWeeks += 1;
+  }
+  if (behindWeeks < MIN_BEHIND_WEEKS) return null;
+
+  return {
+    behindWeeks,
+    rescuedWeeks,
+    rescuePct: Math.round((rescuedWeeks / behindWeeks) * 100),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Percent complete by day: the average shape of a week
 // ---------------------------------------------------------------------------
 

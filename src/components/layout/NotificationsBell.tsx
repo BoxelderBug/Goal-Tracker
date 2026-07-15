@@ -60,7 +60,7 @@ function describeShare(n: StoredNotification): { title: string; detail: string }
 }
 
 export function NotificationsBell() {
-  const { uid, goals, entries } = useUserData();
+  const { uid, goals, entries, windowStartKey } = useUserData();
   const settings = useSettings();
   const [open, setOpen] = useState(false);
   const now = useMemo(() => new Date(), []);
@@ -71,10 +71,12 @@ export function NotificationsBell() {
         milestonesEnabled: settings.milestoneNotificationsEnabled,
         milestoneStep: settings.milestoneStep,
         smartRemindersEnabled: settings.smartRemindersEnabled,
+        windowStartKey,
       }),
     [
       goals,
       entries,
+      windowStartKey,
       settings.weekStart,
       settings.missedEntryDays,
       settings.milestoneNotificationsEnabled,

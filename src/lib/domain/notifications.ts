@@ -5,6 +5,7 @@
  */
 import type { Entry, Goal, MilestoneStep, WeekStart } from "@/types/models";
 import { addDays, getDateKey, normalizeDate, parseDateKey } from "./dates";
+import { computeComebackOdds } from "./fingerprint";
 import { formatAmount } from "./format";
 import { getWeekRange } from "./periods";
 import { buildDailyTotals, computePace, latestEntryDateInRange, sumRange } from "./progress";
@@ -31,6 +32,9 @@ export interface NotificationOptions {
   milestonesEnabled?: boolean;
   milestoneStep?: MilestoneStep;
   smartRemindersEnabled?: boolean;
+  /** first dateKey of the loaded entries window; enables historical stats
+   *  (comeback odds in the midweek check) that need bounded lookback */
+  windowStartKey?: string;
 }
 
 function daysBetween(fromKey: string, to: Date): number {
@@ -46,7 +50,12 @@ export function deriveNotifications(
   now: Date,
   options: NotificationOptions = {},
 ): AppNotification[] {
-  const { milestonesEnabled = false, milestoneStep = 20, smartRemindersEnabled = false } = options;
+  const {
+    milestonesEnabled = false,
+    milestoneStep = 20,
+    smartRemindersEnabled = false,
+    windowStartKey,
+  } = options;
   const active = goals.filter((g) => !g.archived);
   const week = getWeekRange(now, weekStart);
   const weekKey = getDateKey(week.start);
@@ -54,7 +63,7 @@ export function deriveNotifications(
   const totals = buildDailyTotals(entries);
   const lookback = { start: addDays(normalizeDate(now), -60), end: normalizeDate(now) };
   const out: AppNotification[] = [];
-  const behindGoals: string[] = [];
+  const behindGoals: Goal[] = [];
 
   for (const goal of active) {
     const progress = sumRange(totals, goal.id, week);
@@ -72,7 +81,7 @@ export function deriveNotifications(
     }
 
     // Track behind-pace goals for the Thursday midweek check-in.
-    if (target > 0 && pace.projected < target) behindGoals.push(goal.name);
+    if (target > 0 && pace.projected < target) behindGoals.push(goal);
 
     const latest = latestEntryDateInRange(entries, goal.id, lookback);
     const since = latest === null ? Infinity : daysBetween(latest, now);
@@ -124,7 +133,15 @@ export function deriveNotifications(
   // Thursday midweek check-in: one summary item when goals are behind pace
   // while the week is still saveable (fires all day Thursday).
   if (now.getDay() === 4 && behindGoals.length > 0) {
-    const named = behindGoals.slice(0, 3).join(", ");
+    // Attach each goal's historical rescue rate when there's enough sample —
+    // "22% of weeks like this get saved" turns a nag into a deadline.
+    const named = behindGoals
+      .slice(0, 3)
+      .map((g) => {
+        const odds = computeComebackOdds(g, entries, weekStart, now, windowStartKey);
+        return odds ? `${g.name} (you rescue ${odds.rescuePct}% of weeks like this)` : g.name;
+      })
+      .join(", ");
     const extra = behindGoals.length > 3 ? ` and ${behindGoals.length - 3} more` : "";
     out.unshift({
       id: `midweek:${weekKey}`,

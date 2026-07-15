@@ -3,11 +3,18 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { orderBy } from "firebase/firestore";
-import type { Entry, Goal, ScheduleBlock, WeekStart } from "@/types/models";
+import type { Entry, Goal, ScheduleBlock, Vacation, WeekStart } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
-import { schedulesRepo } from "@/lib/firebase/repos";
-import { computeScheduleInsights } from "@/lib/domain/insights";
+import { schedulesRepo, vacationsRepo } from "@/lib/firebase/repos";
 import {
+  computePriorityEffort,
+  computeScheduleInsights,
+  computeZeroDayDefense,
+  type PriorityEffort,
+  type ZeroDayDefense,
+} from "@/lib/domain/insights";
+import {
+  computeComebackOdds,
   computeShowUpOdds,
   computeWeekCompletionCurve,
   computeWeekdayFingerprint,
@@ -314,6 +321,109 @@ function WinningWeeksCard({
   );
 }
 
+const ZERO_DOW_NAMES = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+
+/** Where the all-goals zero days land, and whether scheduled blocks stop them. */
+function ZeroDayCard({ data }: { data: ZeroDayDefense }) {
+  const split = data.split;
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <CardTitle>Zero-day defense</CardTitle>
+        <Link href="/schedule"><Button size="sm" variant="ghost">Open schedule</Button></Link>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="font-display text-3xl">{data.zeroDays}</div>
+          <p className="text-sm text-muted">
+            {data.zeroDays === 1 ? "day" : "days"} with nothing logged on any goal in the
+            last {data.daysConsidered} days{data.zeroDays <= 2 ? " — that's a defended calendar." : "."}
+          </p>
+        </div>
+        {data.dangerDow !== null ? (
+          <div>
+            <div className="font-display text-3xl">{ZERO_DOW_NAMES[data.dangerDow]}</div>
+            <p className="text-sm text-muted">
+              are your danger day — {data.dangerZeroDays} of {data.zeroDays} zero days
+              ({data.dangerSharePct}%) land there.
+            </p>
+          </div>
+        ) : null}
+      </div>
+      {split ? (
+        <p className="mt-3 border-t border-border pt-3 text-sm">
+          Days with a scheduled block go to zero{" "}
+          <span className="font-medium">{split.blockedZeroPct}%</span> of the time; unblocked days{" "}
+          <span className="font-medium">{split.unblockedZeroPct}%</span>{" "}
+          ({split.blockedDays} blocked / {split.unblockedDays} unblocked).
+          {data.dangerDow !== null && split.unblockedZeroPct > split.blockedZeroPct
+            ? ` One block on ${ZERO_DOW_NAMES[data.dangerDow]} is the cheapest fix on this page.`
+            : ""}
+        </p>
+      ) : data.dangerDow !== null ? (
+        <p className="mt-3 border-t border-border pt-3 text-sm">
+          Put one scheduled block on {ZERO_DOW_NAMES[data.dangerDow]} and watch this number.
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+/** Priority order vs where the last 4 weeks of effort actually went. */
+function PriorityEffortCard({ data }: { data: PriorityEffort }) {
+  if (data.needsPriorities) {
+    return (
+      <Card>
+        <CardTitle>Priority vs effort</CardTitle>
+        <p className="text-sm text-muted">
+          Give your goals distinct priorities to unlock this — then the app can tell you
+          whether your calendar agrees with them.
+        </p>
+        <div className="mt-2">
+          <Link href="/settings/active-goals"><Button size="sm" variant="ghost">Set priorities</Button></Link>
+        </div>
+      </Card>
+    );
+  }
+  const maxPct = Math.max(1, ...data.rows.map((r) => r.effortPct));
+  return (
+    <Card>
+      <CardTitle>Priority vs effort</CardTitle>
+      <p className="mb-2 text-sm text-muted">
+        Share of the last 4 weeks&apos; effort (entries + scheduled time), in your priority order.
+      </p>
+      <ul className="flex flex-col gap-1.5">
+        {data.rows.map((r) => (
+          <li key={r.id} className="flex items-center gap-2 text-sm">
+            <span className="w-8 shrink-0 text-xs text-muted">P{r.priority}</span>
+            <Link href={`/goal/${r.id}`} className="w-32 shrink-0 truncate font-medium hover:underline">
+              {r.name}
+            </Link>
+            <span className="h-2 rounded-full bg-accent/70" style={{ width: `${(r.effortPct / maxPct) * 60}%` }} />
+            <span className="text-xs text-muted">{r.effortPct}%</span>
+            {data.starving?.id === r.id ? <Badge tone="behind">starving</Badge> : null}
+            {data.soaker?.id === r.id ? <Badge tone="onpace">soaking</Badge> : null}
+          </li>
+        ))}
+      </ul>
+      {data.starving || data.soaker ? (
+        <p className="mt-3 border-t border-border pt-3 text-sm">
+          {data.starving
+            ? `${data.starving.name} is your top priority but got ${data.starving.effortPct}% of the effort — schedule it first, not last. `
+            : ""}
+          {data.soaker
+            ? `${data.soaker.name} (P${data.soaker.priority}) is soaking up ${data.soaker.effortPct}% — fine, but then it isn't low priority. Rebalance one of the two.`
+            : ""}
+        </p>
+      ) : (
+        <p className="mt-3 border-t border-border pt-3 text-sm text-muted">
+          Effort tracks priority — the calendar and the plan agree.
+        </p>
+      )}
+    </Card>
+  );
+}
+
 export default function InsightsPage() {
   const { uid, goals, entries, windowStartKey } = useUserData();
   const settings = useSettings();
@@ -322,13 +432,25 @@ export default function InsightsPage() {
     () => schedulesRepo.query(uid, orderBy("date", "asc")),
     [uid],
   );
+  const { data: vacations } = useCollection<Vacation>(() => vacationsRepo.query(uid), [uid]);
 
   const schedule = useMemo(
     () => computeScheduleInsights(goals, blocks, entries, now),
     [goals, blocks, entries, now],
   );
 
-  // This week's behind-pace goals — the same lens as the Thursday check-in.
+  const zeroDays = useMemo(
+    () => computeZeroDayDefense(goals, entries, blocks, vacations, settings.weekStart, now, windowStartKey),
+    [goals, entries, blocks, vacations, settings.weekStart, now, windowStartKey],
+  );
+
+  const priorityEffort = useMemo(
+    () => computePriorityEffort(goals, entries, blocks, now),
+    [goals, entries, blocks, now],
+  );
+
+  // This week's behind-pace goals — the same lens as the Thursday check-in —
+  // each with its historical rescue rate when there's enough sample.
   const behind = useMemo(() => {
     const week = getWeekRange(now, settings.weekStart);
     const totals = buildDailyTotals(entries);
@@ -338,10 +460,10 @@ export default function InsightsPage() {
         const progress = sumRange(totals, g.id, week);
         const target = getTargetForPeriod(g, "week", week, { weekStart: settings.weekStart });
         const pace = computePace(progress, target, week, now);
-        return { goal: g, target, pace };
+        return { goal: g, target, pace, odds: computeComebackOdds(g, entries, settings.weekStart, now, windowStartKey) };
       })
       .filter((r) => r.target > 0 && !r.pace.goalHit && r.pace.projected < r.target);
-  }, [goals, entries, settings.weekStart, now]);
+  }, [goals, entries, settings.weekStart, windowStartKey, now]);
 
   const hasGoals = goals.some((g) => !g.archived);
 
@@ -394,6 +516,10 @@ export default function InsightsPage() {
             ) : null}
           </Card>
 
+          {zeroDays ? <ZeroDayCard data={zeroDays} /> : null}
+
+          {priorityEffort ? <PriorityEffortCard data={priorityEffort} /> : null}
+
           <CompletionByDayCard
             goals={goals}
             entries={entries}
@@ -426,9 +552,14 @@ export default function InsightsPage() {
               <p className="text-sm text-muted">Every goal with a weekly target is on pace. Keep it rolling.</p>
             ) : (
               <ul className="flex flex-col divide-y divide-border">
-                {behind.map(({ goal: g, target, pace }) => (
+                {behind.map(({ goal: g, target, pace, odds }) => (
                   <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                     <Link href={`/goal/${g.id}`} className="font-medium hover:underline">{g.name}</Link>
+                    {odds ? (
+                      <Badge tone={odds.rescuePct >= 50 ? "onpace" : "behind"}>
+                        you rescue {odds.rescuePct}% of weeks like this ({odds.rescuedWeeks}/{odds.behindWeeks})
+                      </Badge>
+                    ) : null}
                     <span className="text-xs text-muted">
                       projected {Math.round(pace.projected * 100) / 100} of {target} {g.unit}
                     </span>

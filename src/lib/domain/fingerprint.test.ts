@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "@/types/models";
 import { parseDateKey } from "./dates";
-import { computeShowUpOdds, computeWeekCompletionCurve, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
+import { computeComebackOdds, computeShowUpOdds, computeWeekCompletionCurve, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
 
 const entry = (date: string, amount: number, over: Partial<Entry> = {}): Entry => ({
   id: `g1-${date}-${amount}`, trackerId: "g1", date, amount,
@@ -173,5 +173,37 @@ describe("computeWeekCompletionCurve", () => {
   it("returns null under 4 weeks or without a weekly target", () => {
     expect(computeWeekCompletionCurve(goal, entries, "monday", now, "2026-06-22")).toBeNull();
     expect(computeWeekCompletionCurve({ id: "g1" }, entries, "monday", now, "2026-06-15")).toBeNull();
+  });
+});
+
+describe("computeComebackOdds", () => {
+  // 8 full monday-start weeks, target 10. Weeks 1-6: nothing by Thursday
+  // (behind at day 4); two of them are rescued with 10 on Friday. Weeks 7-8:
+  // 10 on Monday (never behind).
+  const goal = { id: "g1", weeklyGoal: 10, createdAt: "2026-01-01T00:00:00.000Z" };
+  const weekStarts = ["2026-05-18", "2026-05-25", "2026-06-01", "2026-06-08",
+    "2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06"];
+  const shiftDate = (key: string, days: number) => {
+    const d = parseDateKey(key);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const entries = weekStarts.flatMap((ws, i) => {
+    if (i >= 6) return [entry(ws, 10)];
+    return i < 2 ? [entry(shiftDate(ws, 4), 10)] : [];
+  });
+
+  it("computes the rescue rate over behind-at-day-4 weeks", () => {
+    const odds = computeComebackOdds(goal, entries, "monday", now, "2026-05-18");
+    expect(odds).toEqual({ behindWeeks: 6, rescuedWeeks: 2, rescuePct: 33 });
+  });
+
+  it("hides under 6 behind weeks", () => {
+    // window starts a week later → only 5 behind weeks
+    expect(computeComebackOdds(goal, entries, "monday", now, "2026-05-25")).toBeNull();
+  });
+
+  it("ignores goals without a weekly target", () => {
+    expect(computeComebackOdds({ id: "g1" }, entries, "monday", now, "2026-05-18")).toBeNull();
   });
 });
