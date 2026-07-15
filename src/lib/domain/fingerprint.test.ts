@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "@/types/models";
 import { parseDateKey } from "./dates";
-import { computeShowUpOdds, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
+import { computeShowUpOdds, computeWeekCompletionCurve, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
 
 const entry = (date: string, amount: number, over: Partial<Entry> = {}): Entry => ({
   id: `g1-${date}-${amount}`, trackerId: "g1", date, amount,
@@ -146,5 +146,32 @@ describe("computeShowUpOdds", () => {
     ];
     const odds = computeShowUpOdds(goal, withNa, "monday", now, "2026-05-18");
     expect(odds!.days[0].loggedWeeks).toBe(4); // still only the 4 real Mondays
+  });
+});
+
+describe("computeWeekCompletionCurve", () => {
+  // 4 full monday-start weeks before Tue 2026-07-14, weekly target 10.
+  // Every week: 5 on Monday, 5 on Friday → 50% by Mon–Thu, 100% Fri–Sun.
+  const goal = { id: "g1", weeklyGoal: 10, createdAt: "2026-01-01T00:00:00.000Z" };
+  const weekStarts = ["2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06"];
+  const shiftD = (key: string, days: number) => {
+    const d = parseDateKey(key);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const entries = weekStarts.flatMap((ws) => [entry(ws, 5), entry(shiftD(ws, 4), 5)]);
+
+  it("averages the cumulative % of target by end of each day", () => {
+    const c = computeWeekCompletionCurve(goal, entries, "monday", now, "2026-06-15");
+    expect(c).not.toBeNull();
+    expect(c!.weeks).toBe(4);
+    expect(c!.days.map((d) => d.avgPct)).toEqual([50, 50, 50, 50, 100, 100, 100]);
+    expect(c!.days[0]).toMatchObject({ dow: 1, pacePct: 14 });
+    expect(c!.days[6]).toMatchObject({ dow: 0, pacePct: 100 });
+  });
+
+  it("returns null under 4 weeks or without a weekly target", () => {
+    expect(computeWeekCompletionCurve(goal, entries, "monday", now, "2026-06-22")).toBeNull();
+    expect(computeWeekCompletionCurve({ id: "g1" }, entries, "monday", now, "2026-06-15")).toBeNull();
   });
 });

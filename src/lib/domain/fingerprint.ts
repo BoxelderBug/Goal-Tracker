@@ -129,6 +129,75 @@ export function computeWinningWeekFingerprint(
 }
 
 // ---------------------------------------------------------------------------
+// Percent complete by day: the average shape of a week
+// ---------------------------------------------------------------------------
+
+/** minimum full weeks with a target before the curve is claimed */
+const MIN_CURVE_WEEKS = 4;
+
+export interface DayCompletion {
+  /** JS getDay() index 0–6 (Sun=0) */
+  dow: number;
+  /** average cumulative % of the weekly target banked by the END of this day */
+  avgPct: number;
+  /** the even-split benchmark for this position in the week (14, 29, … 100) */
+  pacePct: number;
+}
+
+export interface WeekCompletionCurve {
+  /** ordered from the user's week start */
+  days: DayCompletion[];
+  weeks: number;
+}
+
+/**
+ * The average shape of a week: cumulative % of the weekly target reached by
+ * the end of each weekday, averaged over the trailing full weeks (current
+ * partial week excluded; same lookback guards as the other week stats).
+ * Read it against the even-split pace to see where weeks stall.
+ */
+export function computeWeekCompletionCurve(
+  goal: TargetGoalLike & { createdAt?: string },
+  entries: Entry[],
+  weekStart: WeekStart,
+  now: Date,
+  /** first dateKey of the loaded entries window; weeks before it read falsely as zero */
+  windowStartKey?: string,
+): WeekCompletionCurve | null {
+  const totals = buildDailyTotals(entries);
+  const currentWeek = getWeekRange(now, weekStart);
+  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+
+  const sums = new Array<number>(7).fill(0);
+  let weeks = 0;
+  for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
+    const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
+    if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
+    if (createdKey && createdKey > getDateKey(week.end)) break;
+    const target = getTargetForPeriod(goal, "week", week, { weekStart });
+    if (target <= 0) continue;
+    let cumulative = 0;
+    for (let d = 0; d < 7; d += 1) {
+      const day = addDays(week.start, d);
+      cumulative = addAmount(cumulative, totals.get(`${goal.id}|${getDateKey(day)}`) ?? 0);
+      sums[d] += (cumulative / target) * 100;
+    }
+    weeks += 1;
+  }
+  if (weeks < MIN_CURVE_WEEKS) return null;
+
+  const firstDow = weekStart === "sunday" ? 0 : 1;
+  return {
+    days: Array.from({ length: 7 }, (_, d) => ({
+      dow: (firstDow + d) % 7,
+      avgPct: Math.round(sums[d] / weeks),
+      pacePct: Math.round(((d + 1) / 7) * 100),
+    })),
+    weeks,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Show-up odds: P(week hit | logged anything on a given weekday)
 // ---------------------------------------------------------------------------
 

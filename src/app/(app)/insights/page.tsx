@@ -6,8 +6,13 @@ import { orderBy } from "firebase/firestore";
 import type { Entry, Goal, ScheduleBlock, WeekStart } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { schedulesRepo } from "@/lib/firebase/repos";
-import { computeLoggingWindow, computeScheduleInsights } from "@/lib/domain/insights";
-import { computeShowUpOdds, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "@/lib/domain/fingerprint";
+import { computeScheduleInsights } from "@/lib/domain/insights";
+import {
+  computeShowUpOdds,
+  computeWeekCompletionCurve,
+  computeWeekdayFingerprint,
+  computeWinningWeekFingerprint,
+} from "@/lib/domain/fingerprint";
 import { formatAmount } from "@/lib/domain/format";
 import { Select } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
@@ -178,71 +183,79 @@ function ShowUpOddsCard({
   );
 }
 
-const fmtHour = (h: number): string => {
-  const wrapped = h % 24;
-  if (wrapped === 0) return "12 AM";
-  if (wrapped === 12) return "12 PM";
-  return wrapped < 12 ? `${wrapped} AM` : `${wrapped - 12} PM`;
-};
-
-/** The modal 2-hour logging band, crossed with schedule follow-through. */
-function LoggingWindowCard({
+/** The average shape of a week: cumulative % of target banked by each day's end. */
+function CompletionByDayCard({
+  goals,
   entries,
-  blocks,
+  weekStart,
+  windowStartKey,
   now,
 }: {
+  goals: Goal[];
   entries: Entry[];
-  blocks: ScheduleBlock[];
+  weekStart: WeekStart;
+  windowStartKey: string;
   now: Date;
 }) {
-  const w = useMemo(() => computeLoggingWindow(entries, blocks, now), [entries, blocks, now]);
-  if (!w) return null;
+  const active = useMemo(() => goals.filter((g) => !g.archived), [goals]);
+  const [goalId, setGoalId] = useState("");
+  const selected = active.find((g) => g.id === goalId) ?? active[0];
 
-  const bandLabel = `${fmtHour(w.bandStartHour)}–${fmtHour(w.bandStartHour + 2)}`;
-  const split = w.split;
-  const edge = split ? split.inWindowKeptPct - split.outWindowKeptPct : 0;
+  const curve = useMemo(
+    () => (selected ? computeWeekCompletionCurve(selected, entries, weekStart, now, windowStartKey) : null),
+    [selected, entries, weekStart, now, windowStartKey],
+  );
+  if (!selected) return null;
+
+  const stallDay = curve
+    ? curve.days.find((d, i) => i > 0 && d.avgPct - curve.days[i - 1].avgPct <= 2 && d.avgPct < 100)
+    : undefined;
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle>Proven logging window</CardTitle>
-        <Link href="/schedule"><Button size="sm" variant="ghost">Open schedule</Button></Link>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <CardTitle>Percent complete by day</CardTitle>
+        <Select className="w-auto py-1" value={selected.id} onChange={(e) => setGoalId(e.target.value)}>
+          {active.map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </Select>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <div className="font-display text-3xl">{bandLabel}</div>
-          <p className="text-sm text-muted">
-            is when you actually log — {w.bandSharePct}% of your last {w.entryCount} entries
-            ({w.bandEntryCount}) landed in this window.
-          </p>
-        </div>
-        {split ? (
-          <div>
-            <div className="font-display text-3xl">
-              {split.inWindowKeptPct}%
-              <span className="text-lg text-muted"> vs {split.outWindowKeptPct}%</span>
-            </div>
-            <p className="text-sm text-muted">
-              of blocks scheduled in this window get kept, vs outside it
-              ({split.inWindowBlocks} in / {split.outWindowBlocks} out).
-            </p>
-          </div>
-        ) : (
-          <p className="self-center text-sm text-muted">
-            Schedule a few blocks inside this window — once 5 in-window and 5 out-of-window
-            blocks have passed, you&apos;ll see which placement you actually keep.
-          </p>
-        )}
-      </div>
-      {split ? (
-        <p className="mt-3 border-t border-border pt-3 text-sm">
-          {edge >= 10
-            ? <>Move blocks into <span className="font-medium">{bandLabel}</span> — you keep them {edge} points more often there.</>
-            : edge <= -10
-              ? <>Surprise: blocks outside {bandLabel} get kept more often — your logging time and your doing time differ. Schedule for the doing time.</>
-              : <>Placement barely matters for you so far — pick the time you can protect.</>}
+      {!curve ? (
+        <p className="text-sm text-muted">
+          Unlocks after 4 full weeks with a weekly target for {selected.name}.
         </p>
-      ) : null}
+      ) : (
+        <>
+          <div className="grid grid-cols-7 gap-1.5">
+            {curve.days.map((d) => {
+              const ahead = d.avgPct >= d.pacePct;
+              return (
+                <div
+                  key={d.dow}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-center",
+                    ahead ? "border-accent bg-accent-soft" : "border-border",
+                  )}
+                >
+                  <span className="text-xs text-muted">{DOW_LABELS[d.dow]}</span>
+                  <span className={cn("font-display text-lg", ahead ? "text-accent-strong" : "")}>
+                    {d.avgPct}%
+                  </span>
+                  <span className="text-[10px] text-muted">pace {d.pacePct}%</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Average share of the weekly target banked by the end of each day
+            (last {curve.weeks} full weeks · highlighted = at or ahead of an even split).
+            {stallDay
+              ? ` Your week stalls around ${DOW_LABELS[stallDay.dow]} — that's the day to defend.`
+              : ""}
+          </p>
+        </>
+      )}
     </Card>
   );
 }
@@ -381,7 +394,13 @@ export default function InsightsPage() {
             ) : null}
           </Card>
 
-          <LoggingWindowCard entries={entries} blocks={blocks} now={now} />
+          <CompletionByDayCard
+            goals={goals}
+            entries={entries}
+            weekStart={settings.weekStart}
+            windowStartKey={windowStartKey}
+            now={now}
+          />
 
           <WinningWeeksCard
             goals={goals}
