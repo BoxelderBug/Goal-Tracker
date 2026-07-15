@@ -86,8 +86,8 @@ export function GoalPeriodCard({
   const [stretchSaving, setStretchSaving] = useState(false);
   // Index of the frozen scrub point (click-to-pin), or null when live.
   const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
-  // year graphs can be viewed daily / weekly / monthly
-  const [granularity, setGranularity] = useState<SeriesGranularity>(period === "year" ? "week" : "day");
+  // year graphs can be viewed daily / weekly / monthly; daily (line) is the default
+  const [granularity, setGranularity] = useState<SeriesGranularity>("day");
   const [showOverlay, setShowOverlay] = useState(false);
   const { windowStartKey } = useUserData();
 

@@ -40,6 +40,7 @@ export default function GradesPage() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [sortBy, setSortBy] = useState<"day" | "grade">("day");
 
   // Grades already stored for the selected date (drafts override them).
   const savedForDate = useMemo(() => {
@@ -112,15 +113,26 @@ export default function GradesPage() {
     }
   }
 
-  // Recent grades grouped by date, newest first.
+  // Recent grades grouped by date, ordered by day (newest first) or by
+  // average grade (best first, ties newest first).
   const recentByDate = useMemo(() => {
     const byDate = new Map<string, GradeEntry[]>();
     for (const e of entries.data) {
       if (!byDate.has(e.date)) byDate.set(e.date, []);
       byDate.get(e.date)!.push(e);
     }
-    return [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [entries.data]);
+    const days = [...byDate.entries()];
+    if (sortBy === "grade") {
+      const avgScore = (list: GradeEntry[]) => {
+        const letters = list.map((e) => e.grade).filter(isGradeLetter);
+        return letters.length > 0
+          ? letters.reduce((sum, l) => sum + gradeScore(l), 0) / letters.length
+          : -1;
+      };
+      return days.sort((a, b) => avgScore(b[1]) - avgScore(a[1]) || b[0].localeCompare(a[0]));
+    }
+    return days.sort((a, b) => b[0].localeCompare(a[0]));
+  }, [entries.data, sortBy]);
 
   const criterionName = (id: string) => criteria.data.find((c) => c.id === id)?.name ?? "Removed";
 
@@ -212,7 +224,20 @@ export default function GradesPage() {
       ) : null}
 
       <Card>
-        <CardTitle>Recent grades</CardTitle>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <CardTitle>Recent grades</CardTitle>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Sort
+            <Select
+              className="w-auto py-1"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "day" | "grade")}
+            >
+              <option value="day">By day</option>
+              <option value="grade">By grade</option>
+            </Select>
+          </label>
+        </div>
         {recentByDate.length === 0 ? (
           <EmptyState>No grades in the last {RECENT_DAYS} days.</EmptyState>
         ) : (
