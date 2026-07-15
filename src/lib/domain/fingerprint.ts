@@ -212,11 +212,22 @@ export interface HitSignal {
   liftPct: number;
 }
 
+export interface HitSignalDay {
+  /** JS getDay() index 0–6 (Sun=0) */
+  dow: number;
+  /** weeks where this weekday had a >0 total for the TARGET goal */
+  loggedWeeks: number;
+  /** % of those weeks that hit the weekly target; null under the sample gate */
+  hitRatePct: number | null;
+}
+
 export interface HitSignals {
   /** full weeks considered (had a weekly target) */
   weeks: number;
   /** hit rate across all considered weeks, for the baseline */
   overallHitRatePct: number;
+  /** the target goal's own per-weekday odds, ordered from the user's week start */
+  days: HitSignalDay[];
   /** gated goal×weekday combos, strongest |lift| first */
   signals: HitSignal[];
 }
@@ -224,11 +235,11 @@ export interface HitSignals {
 /**
  * For each (predictor goal, weekday) combo: of the trailing full weeks where
  * that goal was logged (>0) on that weekday, how often did the TARGET goal's
- * week end in a hit — versus its overall hit rate. The predictor set usually
- * includes the target itself, so same-goal show-up effects surface alongside
- * cross-goal ones. Same lookback guards as
- * {@link computeWinningWeekFingerprint}; N/A entries carry amount 0 so they
- * don't count as showing up. Combos are only claimed with
+ * week end in a hit — versus its overall hit rate. `days` always carries the
+ * target's own full weekday grid (whether or not it's in the predictor set);
+ * `signals` ranks the goal×day combos that shift the odds. Same lookback
+ * guards as {@link computeWinningWeekFingerprint}; N/A entries carry amount 0
+ * so they don't count as showing up. Combos are only claimed with
  * ≥ MIN_SIGNAL_COMBO_WEEKS logged weeks, ≥ MIN_SIGNAL_CONTRAST_WEEKS weeks
  * without the combo, and a lift of at least MIN_SIGNAL_LIFT points.
  */
@@ -245,6 +256,11 @@ export function computeHitSignals(
   const currentWeek = getWeekRange(now, weekStart);
   const createdKey = target.createdAt ? getDateKey(normalizeDate(new Date(target.createdAt))) : null;
 
+  // The target is always scanned so `days` fills in, but only requested
+  // predictors may surface in `signals`.
+  const predictorSet = new Set(predictorGoalIds);
+  const scanIds = predictorSet.has(target.id) ? predictorGoalIds : [...predictorGoalIds, target.id];
+
   const weeks: { hit: boolean; logged: Set<string> }[] = [];
   for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
     const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
@@ -258,7 +274,7 @@ export function computeHitSignals(
       const day = addDays(week.start, d);
       const dayKey = getDateKey(day);
       total = addAmount(total, totals.get(`${target.id}|${dayKey}`) ?? 0);
-      for (const goalId of predictorGoalIds) {
+      for (const goalId of scanIds) {
         if ((totals.get(`${goalId}|${dayKey}`) ?? 0) > 0) logged.add(`${goalId}|${day.getDay()}`);
       }
     }
@@ -280,14 +296,16 @@ export function computeHitSignals(
 
   const signals: HitSignal[] = [];
   for (const [combo, c] of counts) {
+    const sep = combo.lastIndexOf("|");
+    const goalId = combo.slice(0, sep);
+    if (!predictorSet.has(goalId)) continue;
     if (c.logged < MIN_SIGNAL_COMBO_WEEKS) continue;
     if (weeks.length - c.logged < MIN_SIGNAL_CONTRAST_WEEKS) continue;
     const hitRatePct = Math.round((c.hits / c.logged) * 100);
     const liftPct = hitRatePct - overallHitRatePct;
     if (Math.abs(liftPct) < MIN_SIGNAL_LIFT) continue;
-    const sep = combo.lastIndexOf("|");
     signals.push({
-      goalId: combo.slice(0, sep),
+      goalId,
       dow: Number(combo.slice(sep + 1)),
       loggedWeeks: c.logged,
       hitRatePct,
@@ -296,5 +314,17 @@ export function computeHitSignals(
   }
   signals.sort((a, b) => Math.abs(b.liftPct) - Math.abs(a.liftPct) || b.loggedWeeks - a.loggedWeeks);
 
-  return { weeks: weeks.length, overallHitRatePct, signals: signals.slice(0, MAX_SIGNALS) };
+  const firstDow = weekStart === "sunday" ? 0 : 1;
+  const days: HitSignalDay[] = Array.from({ length: 7 }, (_, i) => {
+    const dow = (firstDow + i) % 7;
+    const c = counts.get(`${target.id}|${dow}`);
+    return {
+      dow,
+      loggedWeeks: c?.logged ?? 0,
+      hitRatePct:
+        c && c.logged >= MIN_SIGNAL_COMBO_WEEKS ? Math.round((c.hits / c.logged) * 100) : null,
+    };
+  });
+
+  return { weeks: weeks.length, overallHitRatePct, days, signals: signals.slice(0, MAX_SIGNALS) };
 }

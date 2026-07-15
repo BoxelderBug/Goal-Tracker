@@ -131,9 +131,19 @@ describe("computeHitSignals", () => {
       { goalId: "g1", dow: 4, loggedWeeks: 4, hitRatePct: 0, liftPct: -50 });
   });
 
-  it("ignores predictor goals outside the given set", () => {
-    const data = computeHitSignals(goal, ["g1"], entries, "monday", now, "2026-05-18");
-    expect(data!.signals.some((s) => s.goalId === "g2")).toBe(false);
+  it("carries the target's own weekday grid, ordered from the week start", () => {
+    const data = computeHitSignals(goal, ["g1", "g2"], entries, "monday", now, "2026-05-18");
+    expect(data!.days).toHaveLength(7);
+    expect(data!.days[0]).toEqual({ dow: 1, loggedWeeks: 4, hitRatePct: 100 }); // Mondays
+    expect(data!.days[3]).toEqual({ dow: 4, loggedWeeks: 4, hitRatePct: 0 }); // Thursdays
+    expect(data!.days[1]).toEqual({ dow: 2, loggedWeeks: 0, hitRatePct: null }); // never logged
+  });
+
+  it("ignores predictor goals outside the given set but still fills the grid", () => {
+    const data = computeHitSignals(goal, ["g2"], entries, "monday", now, "2026-05-18");
+    expect(data!.signals.some((s) => s.goalId === "g1")).toBe(false);
+    expect(data!.signals.some((s) => s.goalId === "g2")).toBe(true);
+    expect(data!.days[0]).toEqual({ dow: 1, loggedWeeks: 4, hitRatePct: 100 });
   });
 
   it("withholds combos under 4 logged weeks", () => {

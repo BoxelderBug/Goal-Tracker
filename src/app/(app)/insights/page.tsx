@@ -135,6 +135,12 @@ function HitSignalsCard({
   if (!selected) return null;
 
   const goalName = (id: string) => active.find((g) => g.id === id)?.name ?? "?";
+  const crossSignals = data ? data.signals.filter((s) => s.goalId !== selected.id) : [];
+  const rated = data ? data.days.filter((d) => d.hitRatePct !== null) : [];
+  const best = rated.length
+    ? rated.reduce((a, b) => ((b.hitRatePct ?? 0) > (a.hitRatePct ?? 0) ? b : a))
+    : null;
+  const bestIsEdge = best !== null && data !== null && (best.hitRatePct ?? 0) > data.overallHitRatePct;
 
   return (
     <Card>
@@ -150,35 +156,63 @@ function HitSignalsCard({
         <p className="text-sm text-muted">
           Unlocks after 6 full weeks with a weekly target for {selected.name}.
         </p>
-      ) : data.signals.length === 0 ? (
-        <p className="text-sm text-muted">
-          No goal-and-day combo moves your {selected.name} odds by 10+ points yet
-          (last {data.weeks} full weeks · overall hit rate {data.overallHitRatePct}%).
-        </p>
       ) : (
         <>
-          <ul className="flex flex-col divide-y divide-border">
-            {data.signals.map((s) => (
-              <li key={`${s.goalId}|${s.dow}`} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span>
-                  Log <span className="font-medium">{goalName(s.goalId)}</span> on{" "}
-                  <span className="font-medium">{DOW_LABELS[s.dow]}</span>
-                </span>
-                <span className="flex items-center gap-2">
-                  <Badge tone={s.liftPct > 0 ? "hit" : "behind"}>
-                    {s.hitRatePct}% hit ({s.liftPct > 0 ? "+" : ""}{s.liftPct})
-                  </Badge>
-                  <span className="text-xs text-muted">{s.loggedWeeks} wks</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="grid grid-cols-7 gap-1.5">
+            {data.days.map((d) => {
+              const isBest = bestIsEdge && d.dow === best!.dow;
+              return (
+                <div
+                  key={d.dow}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-center",
+                    isBest ? "border-accent bg-accent-soft" : "border-border",
+                  )}
+                >
+                  <span className="text-xs text-muted">{DOW_LABELS[d.dow]}</span>
+                  <span className={cn("font-display text-lg", isBest ? "text-accent-strong" : "")}>
+                    {d.hitRatePct !== null ? `${d.hitRatePct}%` : "—"}
+                  </span>
+                  <span className="text-[10px] text-muted">
+                    {d.loggedWeeks} wk{d.loggedWeeks === 1 ? "" : "s"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
           <p className="mt-2 text-xs text-muted">
-            How often {selected.name}&apos;s weekly target was hit in weeks where you logged that goal
-            on that day, vs {data.overallHitRatePct}% overall (last {data.weeks} full weeks · shown when
-            the shift is 10+ points on 4+ weeks). Positive rows are worth protecting; negative rows
-            are your early-warning days.
+            Odds the week hit {selected.name}&apos;s target when you logged it (&gt;0) on that day
+            (last {data.weeks} full weeks · overall {data.overallHitRatePct}%
+            {" · "}&ldquo;—&rdquo; = fewer than 4 logged weeks).
+            {bestIsEdge
+              ? ` Showing up on ${DOW_LABELS[best!.dow]} predicts a win — protect it.`
+              : ""}
           </p>
+          {crossSignals.length > 0 ? (
+            <div className="mt-3 border-t border-border pt-2">
+              <ul className="flex flex-col divide-y divide-border">
+                {crossSignals.map((s) => (
+                  <li key={`${s.goalId}|${s.dow}`} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <span>
+                      Log <span className="font-medium">{goalName(s.goalId)}</span> on{" "}
+                      <span className="font-medium">{DOW_LABELS[s.dow]}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <Badge tone={s.liftPct > 0 ? "hit" : "behind"}>
+                        {s.hitRatePct}% hit ({s.liftPct > 0 ? "+" : ""}{s.liftPct})
+                      </Badge>
+                      <span className="text-xs text-muted">{s.loggedWeeks} wks</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-muted">
+                Other goals whose logging shifts {selected.name}&apos;s odds by 10+ points
+                (4+ logged weeks). Positive rows are worth protecting; negative rows are
+                early-warning days.
+              </p>
+            </div>
+          ) : null}
         </>
       )}
     </Card>
