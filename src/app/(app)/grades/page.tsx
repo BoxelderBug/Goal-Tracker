@@ -17,6 +17,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { EntryModeTabs } from "@/components/entries/EntryModeTabs";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/ui/Toaster";
+import { EChart, themeColor } from "@/components/charts/EChart";
+import { gradesTrendOption, type GradeTrendPoint } from "@/lib/charts/options/gradesTrend";
 
 const RECENT_DAYS = 30;
 
@@ -41,6 +43,8 @@ export default function GradesPage() {
   const [noteDraft, setNoteDraft] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [sortBy, setSortBy] = useState<"day" | "grade">("day");
+  const [chartCriterion, setChartCriterion] = useState("avg");
+  const [chartMode, setChartMode] = useState<"line" | "bar">("line");
 
   // Grades already stored for the selected date (drafts override them).
   const savedForDate = useMemo(() => {
@@ -136,6 +140,42 @@ export default function GradesPage() {
 
   const criterionName = (id: string) => criteria.data.find((c) => c.id === id)?.name ?? "Removed";
 
+  // One point per day of the recent window — daily average or one criterion.
+  const chartPoints = useMemo<GradeTrendPoint[]>(() => {
+    const byDate = new Map<string, number[]>();
+    for (const e of entries.data) {
+      if (!isGradeLetter(e.grade)) continue;
+      if (chartCriterion !== "avg" && e.criterionId !== chartCriterion) continue;
+      if (!byDate.has(e.date)) byDate.set(e.date, []);
+      byDate.get(e.date)!.push(gradeScore(e.grade));
+    }
+    const today = normalizeDate(new Date());
+    const points: GradeTrendPoint[] = [];
+    for (let d = RECENT_DAYS; d >= 0; d -= 1) {
+      const key = getDateKey(addDays(today, -d));
+      const scores = byDate.get(key);
+      points.push({
+        date: key,
+        score: scores ? scores.reduce((s, v) => s + v, 0) / scores.length : null,
+      });
+    }
+    return points;
+  }, [entries.data, chartCriterion]);
+  const hasChartData = chartPoints.some((p) => p.score !== null);
+
+  const chartOption = useMemo(
+    () =>
+      gradesTrendOption(chartPoints, chartMode, {
+        accent: themeColor("--accent", "#009f94"),
+        text: themeColor("--text", "#222"),
+        muted: themeColor("--muted", "#888"),
+        grid: themeColor("--border", "#ddd"),
+        surface: themeColor("--surface", "#fff"),
+        border: themeColor("--border", "#ddd"),
+      }),
+    [chartPoints, chartMode],
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <EntryModeTabs />
@@ -220,6 +260,40 @@ export default function GradesPage() {
               {saving ? "Saving…" : "Save grades"}
             </Button>
           </div>
+        </Card>
+      ) : null}
+
+      {criteria.data.length > 0 ? (
+        <Card>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Grade history</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                className="w-auto py-1"
+                value={chartCriterion}
+                onChange={(e) => setChartCriterion(e.target.value)}
+                aria-label="Charted criterion"
+              >
+                <option value="avg">Daily average</option>
+                {criteria.data.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant={chartMode === "line" ? "primary" : "default"} onClick={() => setChartMode("line")}>
+                  Line
+                </Button>
+                <Button size="sm" variant={chartMode === "bar" ? "primary" : "default"} onClick={() => setChartMode("bar")}>
+                  Bar
+                </Button>
+              </div>
+            </div>
+          </div>
+          {hasChartData ? (
+            <EChart option={chartOption} height={220} />
+          ) : (
+            <p className="text-sm text-muted">No grades in the last {RECENT_DAYS} days to chart yet.</p>
+          )}
         </Card>
       ) : null}
 

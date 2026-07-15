@@ -25,14 +25,12 @@ export function isGradeLetter(value: unknown): value is GradeLetter {
   return typeof value === "string" && (GRADE_OPTIONS as readonly string[]).includes(value);
 }
 
-/** Average a set of letters back to the nearest letter (ties round up). */
-export function averageGrade(letters: GradeLetter[]): GradeLetter | null {
-  if (letters.length === 0) return null;
-  const avg = letters.reduce((s, l) => s + SCORE[l], 0) / letters.length;
+/** Nearest letter for a numeric score (ties round up). */
+export function nearestGrade(score: number): GradeLetter {
   let best: GradeLetter = "F";
   let bestDiff = Infinity;
   for (const letter of GRADE_OPTIONS) {
-    const diff = Math.abs(SCORE[letter] - avg);
+    const diff = Math.abs(SCORE[letter] - score);
     // GRADE_OPTIONS runs high→low, so `<` keeps the higher letter on ties
     if (diff < bestDiff) {
       bestDiff = diff;
@@ -40,4 +38,10 @@ export function averageGrade(letters: GradeLetter[]): GradeLetter | null {
     }
   }
   return best;
+}
+
+/** Average a set of letters back to the nearest letter (ties round up). */
+export function averageGrade(letters: GradeLetter[]): GradeLetter | null {
+  if (letters.length === 0) return null;
+  return nearestGrade(letters.reduce((s, l) => s + SCORE[l], 0) / letters.length);
 }
