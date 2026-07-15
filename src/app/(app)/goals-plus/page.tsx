@@ -2,23 +2,29 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Entry, Goal } from "@/types/models";
+import type { Entry, Goal, GoalsPlusRunningEntry, RunningWorkout } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { formatAmount } from "@/lib/domain/format";
-import { GOLF_TYPE_LABELS, formatPace } from "@/lib/domain/goalsplus";
+import {
+  GOLF_TYPE_LABELS,
+  RUNNING_WORKOUT_LABELS,
+  computeRaceAttempts,
+  computeRunTypeBreakdown,
+  formatMinutes,
+  formatPace,
+} from "@/lib/domain/goalsplus";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { EChart, themeColor } from "@/components/charts/EChart";
 import { dateLineOption, type DatePoint } from "@/lib/charts/options/dateLine";
 
-type RunMetric = "pace" | "vo2" | "distance";
+type RunMetric = "pace" | "vo2" | "distance" | "incline";
 
 export default function GoalsPlusPage() {
   const { goals, entries } = useUserData();
   const gpGoals = useMemo(() => goals.filter((g) => g.goalsPlus.mode !== "standard"), [goals]);
   const [goalId, setGoalId] = useState("");
-  const [runMetric, setRunMetric] = useState<RunMetric>("pace");
 
   const goal = gpGoals.find((g) => g.id === goalId) ?? gpGoals[0];
 
@@ -59,7 +65,7 @@ export default function GoalsPlusPage() {
 
       {goal ? (
         goal.goalsPlus.mode === "goalsplus-running" ? (
-          <RunningStats goal={goal} entries={goalEntries} metric={runMetric} onMetric={setRunMetric} />
+          <RunningStats key={goal.id} goal={goal} entries={goalEntries} />
         ) : goal.goalsPlus.mode === "goalsplus-golf" ? (
           <GolfStats goal={goal} entries={goalEntries} />
         ) : (
@@ -90,48 +96,182 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RunningStats({
-  goal, entries, metric, onMetric,
-}: {
-  goal: Goal;
-  entries: Entry[];
-  metric: RunMetric;
-  onMetric: (m: RunMetric) => void;
-}) {
-  const runs = entries.filter((e) => e.goalsPlus?.mode === "goalsplus-running");
-  const points: DatePoint[] = runs.map((e) => {
-    const gp = e.goalsPlus as Extract<NonNullable<Entry["goalsPlus"]>, { mode: "goalsplus-running" }>;
-    const value = metric === "pace" ? gp.paceMinutesPerMile : metric === "vo2" ? gp.estimatedVo2 : gp.distance;
-    return { date: e.date, value: Math.round(value * 100) / 100 };
+const RUN_METRIC_LABELS: Record<RunMetric, { button: string; title: string; suffix: string }> = {
+  pace: { button: "Pace", title: "Pace (min/mi)", suffix: "" },
+  vo2: { button: "VO₂", title: "Est. VO₂", suffix: "" },
+  distance: { button: "Distance", title: "Distance (mi)", suffix: "" },
+  incline: { button: "Incline", title: "Avg incline (%)", suffix: "%" },
+};
+
+function RunningStats({ goal, entries }: { goal: Goal; entries: Entry[] }) {
+  const [metric, setMetric] = useState<RunMetric>("pace");
+  const [typeFilter, setTypeFilter] = useState<RunningWorkout | "all">("all");
+
+  const allRuns = useMemo(
+    () =>
+      entries
+        .filter((e) => e.goalsPlus?.mode === "goalsplus-running")
+        .map((e) => ({ date: e.date, run: e.goalsPlus as GoalsPlusRunningEntry })),
+    [entries],
+  );
+  const typesPresent = useMemo(
+    () => [...new Set(allRuns.map((r) => r.run.runningWorkout))],
+    [allRuns],
+  );
+  const runs = typeFilter === "all" ? allRuns : allRuns.filter((r) => r.run.runningWorkout === typeFilter);
+
+  const totalDistance = runs.reduce((s, r) => s + r.run.distance, 0);
+  const totalDuration = runs.reduce((s, r) => s + r.run.durationMinutes, 0);
+  const avgPace = totalDistance > 0 && totalDuration > 0 ? totalDuration / totalDistance : 0;
+  const bestPace = runs.reduce(
+    (b, r) => (r.run.paceMinutesPerMile > 0 && (b === 0 || r.run.paceMinutesPerMile < b) ? r.run.paceMinutesPerMile : b),
+    0,
+  );
+  const bestVo2 = runs.reduce((b, r) => Math.max(b, r.run.estimatedVo2), 0);
+  const inclines = runs.map((r) => r.run.avgInclinePct ?? 0).filter((v) => v > 0);
+  const avgIncline = inclines.length ? inclines.reduce((s, v) => s + v, 0) / inclines.length : 0;
+  const hasIncline = allRuns.some((r) => (r.run.avgInclinePct ?? 0) > 0);
+
+  const metrics = (["pace", "vo2", "distance", ...(hasIncline ? (["incline"] as RunMetric[]) : [])] as RunMetric[]);
+  const points: DatePoint[] = runs.map(({ date, run }) => {
+    const value =
+      metric === "pace" ? run.paceMinutesPerMile
+      : metric === "vo2" ? run.estimatedVo2
+      : metric === "incline" ? (run.avgInclinePct ?? 0)
+      : run.distance;
+    return { date, value: Math.round(value * 100) / 100 };
   });
 
-  const bestPace = runs.reduce((b, e) => {
-    const p = (e.goalsPlus as { paceMinutesPerMile: number }).paceMinutesPerMile;
-    return p > 0 && (b === 0 || p < b) ? p : b;
-  }, 0);
-  const totalDistance = runs.reduce((s, e) => s + (e.goalsPlus as { distance: number }).distance, 0);
-  const bestVo2 = runs.reduce((b, e) => Math.max(b, (e.goalsPlus as { estimatedVo2: number }).estimatedVo2), 0);
-  const suffix = metric === "vo2" ? "" : metric === "distance" ? "" : "";
+  const breakdown = useMemo(() => computeRunTypeBreakdown(allRuns.map((r) => r.run)), [allRuns]);
+
+  // Race goal (config-level): best equivalent time over runs ≥ the race distance.
+  const config = goal.goalsPlus.mode === "goalsplus-running" ? goal.goalsPlus : null;
+  const raceDistance = config?.raceDistance ?? 0;
+  const raceTarget = config?.raceTargetMinutes ?? 0;
+  const attempts = useMemo(
+    () => (raceDistance > 0 ? computeRaceAttempts(allRuns, raceDistance) : []),
+    [allRuns, raceDistance],
+  );
+  const bestAttempt = attempts.reduce((b, a) => (b === 0 || a.minutes < b ? a.minutes : b), 0);
 
   return (
     <>
+      <div className="flex flex-wrap gap-1">
+        <Button size="sm" variant={typeFilter === "all" ? "primary" : "default"} onClick={() => setTypeFilter("all")}>
+          All types
+        </Button>
+        {typesPresent.map((w) => (
+          <Button key={w} size="sm" variant={typeFilter === w ? "primary" : "default"} onClick={() => setTypeFilter(w)}>
+            {RUNNING_WORKOUT_LABELS[w]}
+          </Button>
+        ))}
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Runs" value={String(runs.length)} />
+        <Stat label="Total distance" value={`${formatAmount(Math.round(totalDistance * 100) / 100)} mi`} />
+        <Stat label="Avg pace" value={formatPace(avgPace)} />
         <Stat label="Best pace" value={formatPace(bestPace)} />
-        <Stat label="Total distance" value={`${formatAmount(totalDistance)} mi`} />
         <Stat label="Best VO₂" value={bestVo2 > 0 ? String(bestVo2) : "—"} />
+        <Stat label="Avg incline" value={avgIncline > 0 ? `${Math.round(avgIncline * 10) / 10}%` : "—"} />
       </div>
+
+      {raceDistance > 0 && raceTarget > 0 ? (
+        <Card>
+          <CardTitle>
+            Race goal · {formatAmount(raceDistance)} mi in {formatMinutes(raceTarget)}
+          </CardTitle>
+          <div className="mb-3 grid grid-cols-3 gap-3">
+            <div>
+              <span className="text-xs uppercase tracking-wide text-muted">Best attempt</span>
+              <div className="font-display text-2xl">{formatMinutes(bestAttempt)}</div>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wide text-muted">Gap to target</span>
+              <div className={`font-display text-2xl ${bestAttempt > 0 && bestAttempt <= raceTarget ? "text-success" : ""}`}>
+                {bestAttempt > 0
+                  ? bestAttempt <= raceTarget
+                    ? `−${formatMinutes(raceTarget - bestAttempt)} 🎉`
+                    : `+${formatMinutes(bestAttempt - raceTarget)}`
+                  : "—"}
+              </div>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wide text-muted">Attempts</span>
+              <div className="font-display text-2xl">{attempts.length}</div>
+            </div>
+          </div>
+          {attempts.length === 0 ? (
+            <p className="text-sm text-muted">
+              Runs of at least {formatAmount(raceDistance)} mi count as attempts, timed at that run&apos;s pace.
+            </p>
+          ) : (
+            <>
+              <EChart
+                option={dateLineOption(
+                  attempts.map((a) => ({ date: a.date, value: a.minutes })),
+                  { suffix: " min", targetLine: raceTarget },
+                  chartColors(),
+                )}
+                height={200}
+              />
+              <p className="mt-1 text-center text-xs text-muted">
+                Equivalent {formatAmount(raceDistance)}-mile time of each qualifying run · dashed line = target.
+              </p>
+            </>
+          )}
+        </Card>
+      ) : null}
+
       <div className="flex flex-wrap gap-1">
-        {(["pace", "vo2", "distance"] as RunMetric[]).map((m) => (
-          <Button key={m} size="sm" variant={metric === m ? "primary" : "default"} onClick={() => onMetric(m)}>
-            {m === "pace" ? "Pace" : m === "vo2" ? "VO₂" : "Distance"}
+        {metrics.map((m) => (
+          <Button key={m} size="sm" variant={metric === m ? "primary" : "default"} onClick={() => setMetric(m)}>
+            {RUN_METRIC_LABELS[m].button}
           </Button>
         ))}
       </div>
       <Card>
-        <CardTitle>{goal.name} · {metric === "pace" ? "Pace (min/mi)" : metric === "vo2" ? "Est. VO₂" : "Distance (mi)"}</CardTitle>
-        {points.length === 0 ? <EmptyState>No runs logged yet.</EmptyState> : <EChart option={dateLineOption(points, { suffix }, chartColors())} height={260} />}
+        <CardTitle>
+          {goal.name} · {RUN_METRIC_LABELS[metric].title}
+          {typeFilter !== "all" ? ` · ${RUNNING_WORKOUT_LABELS[typeFilter]}` : ""}
+        </CardTitle>
+        {points.length === 0 ? (
+          <EmptyState>No runs logged yet.</EmptyState>
+        ) : (
+          <EChart option={dateLineOption(points, { suffix: RUN_METRIC_LABELS[metric].suffix }, chartColors())} height={260} />
+        )}
       </Card>
+
+      {breakdown.length > 0 ? (
+        <Card>
+          <CardTitle>By run type</CardTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                  <th className="py-1.5 pr-3 font-medium">Type</th>
+                  <th className="py-1.5 pr-3 font-medium">Runs</th>
+                  <th className="py-1.5 pr-3 font-medium">Miles</th>
+                  <th className="py-1.5 pr-3 font-medium">Avg pace</th>
+                  <th className="py-1.5 pr-3 font-medium">Best pace</th>
+                  <th className="py-1.5 font-medium">Avg incline</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {breakdown.map((row) => (
+                  <tr key={row.workout}>
+                    <td className="py-1.5 pr-3 font-medium">{RUNNING_WORKOUT_LABELS[row.workout]}</td>
+                    <td className="py-1.5 pr-3">{row.runs}</td>
+                    <td className="py-1.5 pr-3">{formatAmount(row.totalDistance)}</td>
+                    <td className="py-1.5 pr-3">{formatPace(row.avgPace)}</td>
+                    <td className="py-1.5 pr-3">{formatPace(row.bestPace)}</td>
+                    <td className="py-1.5">{row.avgInclinePct !== null ? `${row.avgInclinePct}%` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
     </>
   );
 }

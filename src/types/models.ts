@@ -49,6 +49,9 @@ export type RunningWorkout =
 export type GolfType = "golf" | "disc-golf";
 export type WeightUnit = "lbs" | "kg";
 
+/** What a running goal's tracked amount measures. */
+export type RunningPrimaryMetric = "distance" | "runs" | "type-runs";
+
 export interface GoalsPlusStandardConfig {
   mode: "standard";
 }
@@ -56,6 +59,14 @@ export interface GoalsPlusStandardConfig {
 export interface GoalsPlusRunningConfig {
   mode: "goalsplus-running";
   runningWorkout: RunningWorkout;
+  /** what the tracked amount measures; absent on early goals = "distance" */
+  primaryMetric?: RunningPrimaryMetric;
+  /** run type counted when primaryMetric is "type-runs" */
+  primaryRunType?: RunningWorkout;
+  /** race goal: cover this distance (mi)… (0/absent = no race goal) */
+  raceDistance?: number;
+  /** …in this many minutes */
+  raceTargetMinutes?: number;
   /** mph, Norwegian 4x4 only */
   workSpeed: number;
   /** mph, Norwegian 4x4 only */
@@ -177,6 +188,8 @@ export interface GoalsPlusRunningEntry {
   durationMinutes: number;
   paceMinutesPerMile: number;
   estimatedVo2: number;
+  /** average incline %, 0 = flat or not recorded (absent on early entries) */
+  avgInclinePct?: number;
   splits: RunningSplit[];
   workSpeed: number;
   recoverySpeed: number;

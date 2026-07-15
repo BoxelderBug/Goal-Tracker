@@ -21,6 +21,7 @@ import {
   estimatedRunningVo2,
   formatPace,
   paceMinutesPerMile,
+  runningEntryAmount,
 } from "@/lib/domain/goalsplus";
 import { Button } from "@/components/ui/Button";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -69,6 +70,7 @@ export default function EntryPage() {
   // Goals+ per-entry fields
   const [distance, setDistance] = useState("");
   const [duration, setDuration] = useState("");
+  const [incline, setIncline] = useState("");
   const [workout, setWorkout] = useState<RunningWorkout | "">("");
   const [score, setScore] = useState("");
   const [weight, setWeight] = useState("");
@@ -98,7 +100,16 @@ export default function EntryPage() {
       const d = Number(distance);
       const t = Number(duration);
       if (!(d > 0) || !(t > 0)) return null;
-      return { amount: d, goalsPlus: buildRunningEntry({ runningWorkout: effectiveWorkout, distance: d, durationMinutes: t }) };
+      const run = buildRunningEntry({
+        runningWorkout: effectiveWorkout,
+        distance: d,
+        durationMinutes: t,
+        avgInclinePct: Number(incline) || 0,
+      });
+      // amount follows the goal's primary metric (miles, or 1/0 for run counts)
+      const amount =
+        selected?.goalsPlus.mode === "goalsplus-running" ? runningEntryAmount(selected.goalsPlus, run) : d;
+      return { amount, goalsPlus: run };
     }
     if (mode === "goalsplus-golf") {
       const s = Number(score);
@@ -160,7 +171,7 @@ export default function EntryPage() {
       );
       toast.success(`Logged ${selected.name}`);
       setAmount(""); setNotes(""); setNotApplicable(false);
-      setDistance(""); setDuration(""); setScore(""); setWeight("");
+      setDistance(""); setDuration(""); setIncline(""); setScore(""); setWeight("");
     } catch {
       toast.error("Could not save entry");
     } finally {
@@ -227,6 +238,10 @@ export default function EntryPage() {
                       <option key={w} value={w}>{RUNNING_WORKOUT_LABELS[w]}</option>
                     ))}
                   </Select>
+                </Field>
+                <Field label="Avg incline (%)" hint="Optional">
+                  <Input type="number" min={0} step="any" inputMode="decimal" value={incline}
+                    onChange={(e) => setIncline(e.target.value)} />
                 </Field>
                 <div className="flex flex-col justify-end text-sm text-muted">
                   <span>Pace {formatPace(runPace)}</span>

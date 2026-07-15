@@ -34,6 +34,7 @@ import type {
   Vacation,
 } from "@/types/models";
 import { isDateKey } from "@/lib/domain/dates";
+import { runningMetricUnit } from "@/lib/domain/goalsplus";
 import {
   normalizeGoalPoints,
   normalizeGoalPriority,
@@ -146,6 +147,11 @@ export function normalizeGoalsPlusConfig(value: unknown): GoalsPlusConfig {
     return {
       mode,
       runningWorkout,
+      primaryMetric:
+        raw.primaryMetric === "runs" || raw.primaryMetric === "type-runs" ? raw.primaryMetric : "distance",
+      primaryRunType: normalizeRunningWorkout(raw.primaryRunType ?? raw.runningWorkout),
+      raceDistance: normalizePositiveAmount(raw.raceDistance, 0),
+      raceTargetMinutes: normalizePositiveAmount(raw.raceTargetMinutes, 0),
       workSpeed: isNorwegian ? normalizeRunningSpeedMph(rawWork, NORWEGIAN_DEFAULT_WORK_SPEED_MPH) : 0,
       recoverySpeed: isNorwegian
         ? normalizeRunningSpeedMph(rawRecovery, NORWEGIAN_DEFAULT_RECOVERY_SPEED_MPH)
@@ -263,7 +269,9 @@ export function normalizeGoal(raw: unknown, ctx: NormalizeCtx): Goal | null {
     lockedUnitForGoalType(goalType) ||
     (goalType === "floating" && !str(raw.unit) ? "items" : normalizeGoalUnit(raw.unit));
   const goalsPlus = normalizeGoalsPlusConfig(raw.goalsPlus);
-  if (goalsPlus.mode === "goalsplus-running" && (!unit || unit === "units")) unit = "miles";
+  if (goalsPlus.mode === "goalsplus-running" && (!unit || unit === "units")) {
+    unit = runningMetricUnit(goalsPlus.primaryMetric ?? "distance");
+  }
   if (goalsPlus.mode === "goalsplus-golf" && (!unit || unit === "units")) unit = "strokes";
 
   const hasLegacyPoints = raw.goalPoints !== undefined && raw.goalPoints !== null && raw.goalPoints !== "";
@@ -362,6 +370,7 @@ export function normalizeGoalsPlusEntryData(entryRaw: Raw): GoalsPlusEntryData |
     durationMinutes,
     paceMinutesPerMile: paceMinutesPerMile(distance, durationMinutes),
     estimatedVo2: estimatedRunningVo2(distance, durationMinutes),
+    avgInclinePct: normalizePositiveAmount(raw.avgInclinePct, 0),
     splits: normalizeRunningSplits(raw.splits),
     workSpeed: isNorwegian ? normalizeRunningSpeedMph(rawWork, 0) : 0,
     recoverySpeed: isNorwegian ? normalizeRunningSpeedMph(rawRecovery, 0) : 0,

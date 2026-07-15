@@ -1,12 +1,21 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { Goal, GoalType, GoalsPlusConfig, GoalsPlusMode, ProgressMetric, RunningWorkout } from "@/types/models";
+import type {
+  Goal,
+  GoalType,
+  GoalsPlusConfig,
+  GoalsPlusMode,
+  ProgressMetric,
+  RunningPrimaryMetric,
+  RunningWorkout,
+} from "@/types/models";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input, Select } from "@/components/ui/Input";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { GOALS_PLUS_LABELS, GOAL_TYPE_OPTIONS, lockedUnitForGoalType } from "@/lib/domain/format";
+import { RUNNING_METRIC_LABELS, RUNNING_WORKOUT_LABELS, runningMetricUnit } from "@/lib/domain/goalsplus";
 import { createId } from "@/lib/id";
 
 const RUNNING_WORKOUTS: RunningWorkout[] = [
@@ -41,7 +50,16 @@ export function GoalForm({
   function setMode(nextMode: GoalsPlusMode) {
     let goalsPlus: GoalsPlusConfig;
     if (nextMode === "goalsplus-running") {
-      goalsPlus = { mode: nextMode, runningWorkout: "easy", workSpeed: 0, recoverySpeed: 0 };
+      goalsPlus = {
+        mode: nextMode,
+        runningWorkout: "easy",
+        primaryMetric: "distance",
+        primaryRunType: "easy",
+        raceDistance: 0,
+        raceTargetMinutes: 0,
+        workSpeed: 0,
+        recoverySpeed: 0,
+      };
     } else if (nextMode === "goalsplus-golf") {
       goalsPlus = { mode: nextMode, golfType: "golf" };
     } else if (nextMode === "goalsplus-weight") {
@@ -151,6 +169,40 @@ export function GoalForm({
 
         {goal.goalsPlus.mode === "goalsplus-running" ? (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field label="Main goal measures" hint="What the weekly/monthly/yearly targets count">
+              <Select
+                value={goal.goalsPlus.primaryMetric ?? "distance"}
+                onChange={(e) => {
+                  const primaryMetric = e.target.value as RunningPrimaryMetric;
+                  const patch: Partial<Goal> = {
+                    goalsPlus: { ...goal.goalsPlus, primaryMetric } as GoalsPlusConfig,
+                  };
+                  // swap the default unit along with the metric, but never a custom one
+                  if (!goal.unit || goal.unit === "units" || goal.unit === "miles" || goal.unit === "runs") {
+                    patch.unit = runningMetricUnit(primaryMetric);
+                  }
+                  set(patch);
+                }}
+              >
+                {(Object.keys(RUNNING_METRIC_LABELS) as RunningPrimaryMetric[]).map((m) => (
+                  <option key={m} value={m}>{RUNNING_METRIC_LABELS[m]}</option>
+                ))}
+              </Select>
+            </Field>
+            {(goal.goalsPlus.primaryMetric ?? "distance") === "type-runs" ? (
+              <Field label="Run type to count" hint="Only runs of this type advance the goal">
+                <Select
+                  value={goal.goalsPlus.primaryRunType ?? goal.goalsPlus.runningWorkout}
+                  onChange={(e) =>
+                    set({ goalsPlus: { ...goal.goalsPlus, primaryRunType: e.target.value as RunningWorkout } as GoalsPlusConfig })
+                  }
+                >
+                  {RUNNING_WORKOUTS.map((w) => (
+                    <option key={w} value={w}>{RUNNING_WORKOUT_LABELS[w]}</option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
             <Field label="Default workout">
               <Select
                 value={goal.goalsPlus.runningWorkout}
@@ -159,9 +211,23 @@ export function GoalForm({
                 }
               >
                 {RUNNING_WORKOUTS.map((w) => (
-                  <option key={w} value={w}>{w}</option>
+                  <option key={w} value={w}>{RUNNING_WORKOUT_LABELS[w]}</option>
                 ))}
               </Select>
+            </Field>
+            <Field label="Race distance (miles)" hint="Optional — a distance you want to beat a time for">
+              <Input
+                type="number" min={0} step="any" inputMode="decimal"
+                value={goal.goalsPlus.raceDistance ?? 0}
+                onChange={(e) => set({ goalsPlus: { ...goal.goalsPlus, raceDistance: num(e.target.value) } as GoalsPlusConfig })}
+              />
+            </Field>
+            <Field label="Race target time (minutes)" hint="e.g. 3.1 miles in 25 minutes">
+              <Input
+                type="number" min={0} step="any" inputMode="decimal"
+                value={goal.goalsPlus.raceTargetMinutes ?? 0}
+                onChange={(e) => set({ goalsPlus: { ...goal.goalsPlus, raceTargetMinutes: num(e.target.value) } as GoalsPlusConfig })}
+              />
             </Field>
             {goal.goalsPlus.runningWorkout === "norwegian4x4" ? (
               <>
