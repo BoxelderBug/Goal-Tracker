@@ -7,7 +7,7 @@ import type { Entry, Goal, ScheduleBlock, WeekStart } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
 import { schedulesRepo } from "@/lib/firebase/repos";
 import { computeLoggingWindow, computeScheduleInsights } from "@/lib/domain/insights";
-import { computeWeekdayFingerprint, computeWinningWeekFingerprint } from "@/lib/domain/fingerprint";
+import { computeShowUpOdds, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "@/lib/domain/fingerprint";
 import { formatAmount } from "@/lib/domain/format";
 import { Select } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
@@ -89,6 +89,88 @@ function FingerprintCard({
           <p className="mt-2 text-xs text-muted">
             Share of your {selected.name} volume by weekday over the last {fp.weeks} full weeks
             {" · "}avg per day includes zero days — lean on your strong days, shore up the empty ones.
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** P(week hit | logged anything on a given weekday) — the show-up effect. */
+function ShowUpOddsCard({
+  goals,
+  entries,
+  weekStart,
+  windowStartKey,
+  now,
+}: {
+  goals: Goal[];
+  entries: Entry[];
+  weekStart: WeekStart;
+  windowStartKey: string;
+  now: Date;
+}) {
+  const active = useMemo(() => goals.filter((g) => !g.archived), [goals]);
+  const [goalId, setGoalId] = useState("");
+  const selected = active.find((g) => g.id === goalId) ?? active[0];
+
+  const odds = useMemo(
+    () => (selected ? computeShowUpOdds(selected, entries, weekStart, now, windowStartKey) : null),
+    [selected, entries, weekStart, now, windowStartKey],
+  );
+  if (!selected) return null;
+
+  const rated = odds ? odds.days.filter((d) => d.hitRatePct !== null) : [];
+  const best = rated.length
+    ? rated.reduce((a, b) => ((b.hitRatePct ?? 0) > (a.hitRatePct ?? 0) ? b : a))
+    : null;
+  const bestIsEdge = best !== null && odds !== null && (best.hitRatePct ?? 0) > odds.overallHitRatePct;
+
+  return (
+    <Card>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <CardTitle>Show-up odds</CardTitle>
+        <Select className="w-auto py-1" value={selected.id} onChange={(e) => setGoalId(e.target.value)}>
+          {active.map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </Select>
+      </div>
+      {!odds ? (
+        <p className="text-sm text-muted">
+          Unlocks after 6 full weeks with a weekly target for {selected.name}.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-7 gap-1.5">
+            {odds.days.map((d) => {
+              const isBest = bestIsEdge && d.dow === best!.dow;
+              return (
+                <div
+                  key={d.dow}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-center",
+                    isBest ? "border-accent bg-accent-soft" : "border-border",
+                  )}
+                >
+                  <span className="text-xs text-muted">{DOW_LABELS[d.dow]}</span>
+                  <span className={cn("font-display text-lg", isBest ? "text-accent-strong" : "")}>
+                    {d.hitRatePct !== null ? `${d.hitRatePct}%` : "—"}
+                  </span>
+                  <span className="text-[10px] text-muted">
+                    {d.loggedWeeks} wk{d.loggedWeeks === 1 ? "" : "s"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            How often the week&apos;s target was hit when you logged anything on that day
+            (last {odds.weeks} full weeks · overall {odds.overallHitRatePct}%
+            {" · "}&ldquo;—&rdquo; = fewer than 4 logged weeks).
+            {bestIsEdge
+              ? ` Showing up on ${DOW_LABELS[best!.dow]} predicts a win — protect it.`
+              : ""}
           </p>
         </>
       )}
@@ -310,6 +392,14 @@ export default function InsightsPage() {
           />
 
           <FingerprintCard goals={goals} entries={entries} weekStart={settings.weekStart} now={now} />
+
+          <ShowUpOddsCard
+            goals={goals}
+            entries={entries}
+            weekStart={settings.weekStart}
+            windowStartKey={windowStartKey}
+            now={now}
+          />
 
           <Card>
             <CardTitle>This week</CardTitle>

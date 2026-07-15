@@ -6,6 +6,7 @@
 import type { Entry, WeekStart } from "@/types/models";
 import { addDays, getDateKey, normalizeDate, parseDateKey } from "./dates";
 import { getWeekRange } from "./periods";
+import { addAmount } from "./numbers";
 import { buildDailyTotals, sumRange } from "./progress";
 import { getTargetForPeriod, type TargetGoalLike } from "./targets";
 
@@ -124,5 +125,91 @@ export function computeWinningWeekFingerprint(
     missWeeks: missPcts.length,
     hitDay3Pct: avg(hitPcts),
     missDay3Pct: avg(missPcts),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Show-up odds: P(week hit | logged anything on a given weekday)
+// ---------------------------------------------------------------------------
+
+/** minimum full weeks with a target before the card shows at all */
+const MIN_ODDS_WEEKS = 6;
+/** minimum weeks a weekday was logged before its conditional rate is claimed */
+const MIN_ODDS_DAY_WEEKS = 4;
+
+export interface ShowUpDayOdds {
+  /** JS getDay() index 0–6 (Sun=0) */
+  dow: number;
+  /** weeks where this weekday had a >0 total for the goal */
+  loggedWeeks: number;
+  /** % of those weeks that hit the weekly target; null under the sample gate */
+  hitRatePct: number | null;
+}
+
+export interface ShowUpOdds {
+  /** ordered from the user's week start */
+  days: ShowUpDayOdds[];
+  /** full weeks considered (had a weekly target) */
+  weeks: number;
+  /** hit rate across all considered weeks, for the baseline */
+  overallHitRatePct: number;
+}
+
+/**
+ * For each weekday: of the trailing full weeks where the user logged anything
+ * (>0) on that day, how many ended with the weekly target hit. Days that beat
+ * the overall hit rate are the ones worth protecting. Same lookback guards as
+ * {@link computeWinningWeekFingerprint}; N/A entries carry amount 0 so they
+ * don't count as showing up.
+ */
+export function computeShowUpOdds(
+  goal: TargetGoalLike & { createdAt?: string },
+  entries: Entry[],
+  weekStart: WeekStart,
+  now: Date,
+  /** first dateKey of the loaded entries window; weeks before it read falsely as zero */
+  windowStartKey?: string,
+): ShowUpOdds | null {
+  const totals = buildDailyTotals(entries);
+  const currentWeek = getWeekRange(now, weekStart);
+  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+
+  const weeks: { hit: boolean; loggedDows: Set<number> }[] = [];
+  for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
+    const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
+    if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
+    if (createdKey && createdKey > getDateKey(week.end)) break;
+    const target = getTargetForPeriod(goal, "week", week, { weekStart });
+    if (target <= 0) continue;
+    const loggedDows = new Set<number>();
+    let total = 0;
+    for (let d = 0; d < 7; d += 1) {
+      const day = addDays(week.start, d);
+      const amount = totals.get(`${goal.id}|${getDateKey(day)}`) ?? 0;
+      total = addAmount(total, amount);
+      if (amount > 0) loggedDows.add(day.getDay());
+    }
+    weeks.push({ hit: total >= target, loggedDows });
+  }
+  if (weeks.length < MIN_ODDS_WEEKS) return null;
+
+  const firstDow = weekStart === "sunday" ? 0 : 1;
+  const days: ShowUpDayOdds[] = Array.from({ length: 7 }, (_, i) => {
+    const dow = (firstDow + i) % 7;
+    const logged = weeks.filter((w) => w.loggedDows.has(dow));
+    return {
+      dow,
+      loggedWeeks: logged.length,
+      hitRatePct:
+        logged.length >= MIN_ODDS_DAY_WEEKS
+          ? Math.round((logged.filter((w) => w.hit).length / logged.length) * 100)
+          : null,
+    };
+  });
+
+  return {
+    days,
+    weeks: weeks.length,
+    overallHitRatePct: Math.round((weeks.filter((w) => w.hit).length / weeks.length) * 100),
   };
 }

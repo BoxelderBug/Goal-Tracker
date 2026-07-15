@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "@/types/models";
 import { parseDateKey } from "./dates";
-import { computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
+import { computeShowUpOdds, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
 
 const entry = (date: string, amount: number, over: Partial<Entry> = {}): Entry => ({
   id: `g1-${date}-${amount}`, trackerId: "g1", date, amount,
@@ -94,5 +94,57 @@ describe("computeWinningWeekFingerprint", () => {
 
   it("returns null when the goal has no weekly target", () => {
     expect(computeWinningWeekFingerprint({ id: "g1" }, entries, "monday", now)).toBeNull();
+  });
+});
+
+describe("computeShowUpOdds", () => {
+  // 8 full monday-start weeks before Tue 2026-07-14 (Mon 05-18 .. Sun 07-12),
+  // weekly target 10. First 4 weeks log Monday 10 (hit); last 4 log only
+  // Thursday 2 (miss). So: logged-Monday weeks are 4/4 hits; logged-Thursday
+  // weeks are 4/4 misses; overall 50%.
+  const goal = { id: "g1", weeklyGoal: 10, createdAt: "2026-01-01T00:00:00.000Z" };
+  const weekStarts = ["2026-05-18", "2026-05-25", "2026-06-01", "2026-06-08",
+    "2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06"];
+  const shiftDay = (key: string, days: number) => {
+    const d = parseDateKey(key);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  const entries = weekStarts.map((ws, i) =>
+    i < 4 ? entry(ws, 10) : entry(shiftDay(ws, 3), 2),
+  );
+
+  it("computes per-weekday conditional hit rates against the baseline", () => {
+    const odds = computeShowUpOdds(goal, entries, "monday", now, "2026-05-18");
+    expect(odds).not.toBeNull();
+    expect(odds!.weeks).toBe(8);
+    expect(odds!.overallHitRatePct).toBe(50);
+    expect(odds!.days[0]).toEqual({ dow: 1, loggedWeeks: 4, hitRatePct: 100 }); // Mondays
+    expect(odds!.days[3]).toEqual({ dow: 4, loggedWeeks: 4, hitRatePct: 0 }); // Thursdays
+  });
+
+  it("withholds a day's rate under 4 logged weeks", () => {
+    // move one Monday log to Tuesday → only 3 logged Mondays
+    const moved = entries.map((e) =>
+      e.date === "2026-05-18" ? { ...e, date: "2026-05-19" } : e,
+    );
+    const odds = computeShowUpOdds(goal, moved, "monday", now, "2026-05-18");
+    expect(odds!.days[0].hitRatePct).toBeNull();
+    expect(odds!.days[0].loggedWeeks).toBe(3);
+    expect(odds!.days[1]).toEqual({ dow: 2, loggedWeeks: 1, hitRatePct: null });
+  });
+
+  it("returns null under 6 considered weeks or without a weekly target", () => {
+    expect(computeShowUpOdds(goal, entries, "monday", now, "2026-06-08")).toBeNull();
+    expect(computeShowUpOdds({ id: "g1" }, entries, "monday", now, "2026-05-18")).toBeNull();
+  });
+
+  it("does not count N/A or zero-amount entries as showing up", () => {
+    const withNa = [
+      ...entries,
+      { ...entry("2026-06-15", 0), notApplicable: true },
+    ];
+    const odds = computeShowUpOdds(goal, withNa, "monday", now, "2026-05-18");
+    expect(odds!.days[0].loggedWeeks).toBe(4); // still only the 4 real Mondays
   });
 });
