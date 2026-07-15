@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { orderBy } from "firebase/firestore";
-import type { Entry, Goal, PeriodSnapshot, ScheduleBlock, Vacation, WeekStart } from "@/types/models";
+import { orderBy, query, where } from "firebase/firestore";
+import type { Entry, Goal, GradeCriterion, GradeEntry, PeriodSnapshot, ScheduleBlock, Vacation, WeekStart } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
-import { schedulesRepo, snapshotsRepo, vacationsRepo } from "@/lib/firebase/repos";
+import { gradeCriteriaRepo, gradeEntriesRepo, schedulesRepo, snapshotsRepo, vacationsRepo } from "@/lib/firebase/repos";
 import { computeTargetReality } from "@/lib/domain/snapshot";
 import {
   computePriorityEffort,
@@ -16,11 +16,11 @@ import {
 } from "@/lib/domain/insights";
 import {
   computeComebackOdds,
-  computeShowUpOdds,
-  computeWeekCompletionCurve,
+  computeHitSignals,
   computeWeekdayFingerprint,
   computeWinningWeekFingerprint,
 } from "@/lib/domain/fingerprint";
+import { computeGradeOutputSignal } from "@/lib/domain/gradeInsights";
 import { formatAmount } from "@/lib/domain/format";
 import { Select } from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
@@ -109,8 +109,8 @@ function FingerprintCard({
   );
 }
 
-/** P(week hit | logged anything on a given weekday) — the show-up effect. */
-function ShowUpOddsCard({
+/** P(week hit | logged goal X on weekday Y) — same-goal and cross-goal signals. */
+function HitSignalsCard({
   goals,
   entries,
   weekStart,
@@ -126,64 +126,58 @@ function ShowUpOddsCard({
   const active = useMemo(() => goals.filter((g) => !g.archived), [goals]);
   const [goalId, setGoalId] = useState("");
   const selected = active.find((g) => g.id === goalId) ?? active[0];
+  const predictorIds = useMemo(() => active.map((g) => g.id), [active]);
 
-  const odds = useMemo(
-    () => (selected ? computeShowUpOdds(selected, entries, weekStart, now, windowStartKey) : null),
-    [selected, entries, weekStart, now, windowStartKey],
+  const data = useMemo(
+    () => (selected ? computeHitSignals(selected, predictorIds, entries, weekStart, now, windowStartKey) : null),
+    [selected, predictorIds, entries, weekStart, now, windowStartKey],
   );
   if (!selected) return null;
 
-  const rated = odds ? odds.days.filter((d) => d.hitRatePct !== null) : [];
-  const best = rated.length
-    ? rated.reduce((a, b) => ((b.hitRatePct ?? 0) > (a.hitRatePct ?? 0) ? b : a))
-    : null;
-  const bestIsEdge = best !== null && odds !== null && (best.hitRatePct ?? 0) > odds.overallHitRatePct;
+  const goalName = (id: string) => active.find((g) => g.id === id)?.name ?? "?";
 
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <CardTitle>Show-up odds</CardTitle>
+        <CardTitle>Hit signals</CardTitle>
         <Select className="w-auto py-1" value={selected.id} onChange={(e) => setGoalId(e.target.value)}>
           {active.map((g) => (
             <option key={g.id} value={g.id}>{g.name}</option>
           ))}
         </Select>
       </div>
-      {!odds ? (
+      {!data ? (
         <p className="text-sm text-muted">
           Unlocks after 6 full weeks with a weekly target for {selected.name}.
         </p>
+      ) : data.signals.length === 0 ? (
+        <p className="text-sm text-muted">
+          No goal-and-day combo moves your {selected.name} odds by 10+ points yet
+          (last {data.weeks} full weeks · overall hit rate {data.overallHitRatePct}%).
+        </p>
       ) : (
         <>
-          <div className="grid grid-cols-7 gap-1.5">
-            {odds.days.map((d) => {
-              const isBest = bestIsEdge && d.dow === best!.dow;
-              return (
-                <div
-                  key={d.dow}
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-center",
-                    isBest ? "border-accent bg-accent-soft" : "border-border",
-                  )}
-                >
-                  <span className="text-xs text-muted">{DOW_LABELS[d.dow]}</span>
-                  <span className={cn("font-display text-lg", isBest ? "text-accent-strong" : "")}>
-                    {d.hitRatePct !== null ? `${d.hitRatePct}%` : "—"}
-                  </span>
-                  <span className="text-[10px] text-muted">
-                    {d.loggedWeeks} wk{d.loggedWeeks === 1 ? "" : "s"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <ul className="flex flex-col divide-y divide-border">
+            {data.signals.map((s) => (
+              <li key={`${s.goalId}|${s.dow}`} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <span>
+                  Log <span className="font-medium">{goalName(s.goalId)}</span> on{" "}
+                  <span className="font-medium">{DOW_LABELS[s.dow]}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <Badge tone={s.liftPct > 0 ? "hit" : "behind"}>
+                    {s.hitRatePct}% hit ({s.liftPct > 0 ? "+" : ""}{s.liftPct})
+                  </Badge>
+                  <span className="text-xs text-muted">{s.loggedWeeks} wks</span>
+                </span>
+              </li>
+            ))}
+          </ul>
           <p className="mt-2 text-xs text-muted">
-            How often the week&apos;s target was hit when you logged anything on that day
-            (last {odds.weeks} full weeks · overall {odds.overallHitRatePct}%
-            {" · "}&ldquo;—&rdquo; = fewer than 4 logged weeks).
-            {bestIsEdge
-              ? ` Showing up on ${DOW_LABELS[best!.dow]} predicts a win — protect it.`
-              : ""}
+            How often {selected.name}&apos;s weekly target was hit in weeks where you logged that goal
+            on that day, vs {data.overallHitRatePct}% overall (last {data.weeks} full weeks · shown when
+            the shift is 10+ points on 4+ weeks). Positive rows are worth protecting; negative rows
+            are your early-warning days.
           </p>
         </>
       )}
@@ -191,75 +185,73 @@ function ShowUpOddsCard({
   );
 }
 
-/** The average shape of a week: cumulative % of target banked by each day's end. */
-function CompletionByDayCard({
-  goals,
-  entries,
-  weekStart,
-  windowStartKey,
-  now,
-}: {
-  goals: Goal[];
-  entries: Entry[];
-  weekStart: WeekStart;
-  windowStartKey: string;
-  now: Date;
-}) {
-  const active = useMemo(() => goals.filter((g) => !g.archived), [goals]);
-  const [goalId, setGoalId] = useState("");
-  const selected = active.find((g) => g.id === goalId) ?? active[0];
-
-  const curve = useMemo(
-    () => (selected ? computeWeekCompletionCurve(selected, entries, weekStart, now, windowStartKey) : null),
-    [selected, entries, weekStart, now, windowStartKey],
+/** Grade ↔ output: do high-grade days coincide with more logged volume? */
+function GradeOutputCard() {
+  const { uid, goals, entries, windowStartKey } = useUserData();
+  const now = useMemo(() => new Date(), []);
+  const criteria = useCollection<GradeCriterion>(
+    () => gradeCriteriaRepo.query(uid, orderBy("createdAt", "asc")),
+    [uid],
   );
-  if (!selected) return null;
+  const gradeEntries = useCollection<GradeEntry>(
+    () => query(gradeEntriesRepo.ref(uid), where("date", ">=", windowStartKey), orderBy("date", "asc")),
+    [uid, windowStartKey],
+  );
 
-  const stallDay = curve
-    ? curve.days.find((d, i) => i > 0 && d.avgPct - curve.days[i - 1].avgPct <= 2 && d.avgPct < 100)
-    : undefined;
+  const rows = useMemo(
+    () => computeGradeOutputSignal(criteria.data, gradeEntries.data, goals, entries, now, windowStartKey),
+    [criteria.data, gradeEntries.data, goals, entries, now, windowStartKey],
+  );
+  if (criteria.data.length === 0) return null;
+
+  const criterionName = (id: string) => criteria.data.find((c) => c.id === id)?.name ?? "Removed";
+  const liftPct = (high: number, low: number): number | null =>
+    low > 0 ? Math.round((high / low - 1) * 100) : null;
+  const lead = rows[0];
+  const leadLift = lead ? liftPct(lead.highIdx, lead.lowIdx) : null;
 
   return (
     <Card>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <CardTitle>Percent complete by day</CardTitle>
-        <Select className="w-auto py-1" value={selected.id} onChange={(e) => setGoalId(e.target.value)}>
-          {active.map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
-          ))}
-        </Select>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <CardTitle>Grades vs output</CardTitle>
+        <Link href="/grades"><Button size="sm" variant="ghost">Open grades</Button></Link>
       </div>
-      {!curve ? (
+      {rows.length === 0 ? (
         <p className="text-sm text-muted">
-          Unlocks after 4 full weeks with a weekly target for {selected.name}.
+          Unlocks once a criterion has 5+ higher-grade and 5+ lower-grade days — keep grading daily.
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-7 gap-1.5">
-            {curve.days.map((d) => {
-              const ahead = d.avgPct >= d.pacePct;
+          <ul className="flex flex-col divide-y divide-border">
+            {rows.map((r) => {
+              const sameDay = liftPct(r.highIdx, r.lowIdx);
+              const nextDay =
+                r.nextHighIdx !== null && r.nextLowIdx !== null ? liftPct(r.nextHighIdx, r.nextLowIdx) : null;
               return (
-                <div
-                  key={d.dow}
-                  className={cn(
-                    "flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-center",
-                    ahead ? "border-accent bg-accent-soft" : "border-border",
-                  )}
-                >
-                  <span className="text-xs text-muted">{DOW_LABELS[d.dow]}</span>
-                  <span className={cn("font-display text-lg", ahead ? "text-accent-strong" : "")}>
-                    {d.avgPct}%
+                <li key={r.criterionId} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="font-medium">
+                    {criterionName(r.criterionId)} <span className="font-normal text-muted">(≥ {r.threshold})</span>
                   </span>
-                  <span className="text-[10px] text-muted">pace {d.pacePct}%</span>
-                </div>
+                  <span className="flex items-center gap-2">
+                    <Badge tone={sameDay !== null && sameDay > 0 ? "hit" : "neutral"}>
+                      same day {r.highIdx}× vs {r.lowIdx}×
+                    </Badge>
+                    {nextDay !== null ? (
+                      <Badge tone={nextDay > 0 ? "accent" : "neutral"}>
+                        next day {r.nextHighIdx}× vs {r.nextLowIdx}×
+                      </Badge>
+                    ) : null}
+                    <span className="text-xs text-muted">{r.highDays + r.lowDays} days</span>
+                  </span>
+                </li>
               );
             })}
-          </div>
+          </ul>
           <p className="mt-2 text-xs text-muted">
-            Average share of the weekly target banked by the end of each day
-            (last {curve.weeks} full weeks · highlighted = at or ahead of an even split).
-            {stallDay
-              ? ` Your week stalls around ${DOW_LABELS[stallDay.dow]} — that's the day to defend.`
+            Logged volume relative to a typical graded day (1×), on days graded at or above the
+            criterion&apos;s median vs below it.
+            {lead && leadLift !== null && leadLift >= 15
+              ? ` ${criterionName(lead.criterionId)} looks like your lead indicator — on ${lead.threshold}-or-better days you log ${leadLift}% more.`
               : ""}
           </p>
         </>
@@ -553,13 +545,15 @@ export default function InsightsPage() {
 
           {priorityEffort ? <PriorityEffortCard data={priorityEffort} /> : null}
 
-          <CompletionByDayCard
+          <HitSignalsCard
             goals={goals}
             entries={entries}
             weekStart={settings.weekStart}
             windowStartKey={windowStartKey}
             now={now}
           />
+
+          <GradeOutputCard />
 
           <WinningWeeksCard
             goals={goals}
@@ -570,14 +564,6 @@ export default function InsightsPage() {
           />
 
           <FingerprintCard goals={goals} entries={entries} weekStart={settings.weekStart} now={now} />
-
-          <ShowUpOddsCard
-            goals={goals}
-            entries={entries}
-            weekStart={settings.weekStart}
-            windowStartKey={windowStartKey}
-            now={now}
-          />
 
           <Card>
             <CardTitle>This week</CardTitle>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "@/types/models";
 import { parseDateKey } from "./dates";
-import { computeComebackOdds, computeShowUpOdds, computeWeekCompletionCurve, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
+import { computeComebackOdds, computeHitSignals, computeWeekdayFingerprint, computeWinningWeekFingerprint } from "./fingerprint";
 
 const entry = (date: string, amount: number, over: Partial<Entry> = {}): Entry => ({
   id: `g1-${date}-${amount}`, trackerId: "g1", date, amount,
@@ -97,11 +97,12 @@ describe("computeWinningWeekFingerprint", () => {
   });
 });
 
-describe("computeShowUpOdds", () => {
+describe("computeHitSignals", () => {
   // 8 full monday-start weeks before Tue 2026-07-14 (Mon 05-18 .. Sun 07-12),
-  // weekly target 10. First 4 weeks log Monday 10 (hit); last 4 log only
-  // Thursday 2 (miss). So: logged-Monday weeks are 4/4 hits; logged-Thursday
-  // weeks are 4/4 misses; overall 50%.
+  // target goal g1 with weekly target 10. First 4 weeks: g1 logs 10 on Monday
+  // (hit) and g2 logs 1 on Wednesday. Last 4 weeks: g1 logs 2 on Thursday
+  // (miss). So overall 50%; g1×Mon and g2×Wed are 4/4 hits (+50), g1×Thu is
+  // 0/4 (−50).
   const goal = { id: "g1", weeklyGoal: 10, createdAt: "2026-01-01T00:00:00.000Z" };
   const weekStarts = ["2026-05-18", "2026-05-25", "2026-06-01", "2026-06-08",
     "2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06"];
@@ -110,69 +111,63 @@ describe("computeShowUpOdds", () => {
     d.setDate(d.getDate() + days);
     return d.toISOString().slice(0, 10);
   };
-  const entries = weekStarts.map((ws, i) =>
-    i < 4 ? entry(ws, 10) : entry(shiftDay(ws, 3), 2),
+  const entries = weekStarts.flatMap((ws, i) =>
+    i < 4
+      ? [entry(ws, 10), entry(shiftDay(ws, 2), 1, { trackerId: "g2" })]
+      : [entry(shiftDay(ws, 3), 2)],
   );
 
-  it("computes per-weekday conditional hit rates against the baseline", () => {
-    const odds = computeShowUpOdds(goal, entries, "monday", now, "2026-05-18");
-    expect(odds).not.toBeNull();
-    expect(odds!.weeks).toBe(8);
-    expect(odds!.overallHitRatePct).toBe(50);
-    expect(odds!.days[0]).toEqual({ dow: 1, loggedWeeks: 4, hitRatePct: 100 }); // Mondays
-    expect(odds!.days[3]).toEqual({ dow: 4, loggedWeeks: 4, hitRatePct: 0 }); // Thursdays
+  it("finds same-goal and cross-goal combos with their lift vs the baseline", () => {
+    const data = computeHitSignals(goal, ["g1", "g2"], entries, "monday", now, "2026-05-18");
+    expect(data).not.toBeNull();
+    expect(data!.weeks).toBe(8);
+    expect(data!.overallHitRatePct).toBe(50);
+    expect(data!.signals).toHaveLength(3);
+    expect(data!.signals).toContainEqual(
+      { goalId: "g1", dow: 1, loggedWeeks: 4, hitRatePct: 100, liftPct: 50 });
+    expect(data!.signals).toContainEqual(
+      { goalId: "g2", dow: 3, loggedWeeks: 4, hitRatePct: 100, liftPct: 50 });
+    expect(data!.signals).toContainEqual(
+      { goalId: "g1", dow: 4, loggedWeeks: 4, hitRatePct: 0, liftPct: -50 });
   });
 
-  it("withholds a day's rate under 4 logged weeks", () => {
-    // move one Monday log to Tuesday → only 3 logged Mondays
+  it("ignores predictor goals outside the given set", () => {
+    const data = computeHitSignals(goal, ["g1"], entries, "monday", now, "2026-05-18");
+    expect(data!.signals.some((s) => s.goalId === "g2")).toBe(false);
+  });
+
+  it("withholds combos under 4 logged weeks", () => {
+    // move one Monday log to Tuesday → 3 logged Mondays, 1 logged Tuesday
     const moved = entries.map((e) =>
-      e.date === "2026-05-18" ? { ...e, date: "2026-05-19" } : e,
+      e.date === "2026-05-18" && e.trackerId === "g1" ? { ...e, date: "2026-05-19" } : e,
     );
-    const odds = computeShowUpOdds(goal, moved, "monday", now, "2026-05-18");
-    expect(odds!.days[0].hitRatePct).toBeNull();
-    expect(odds!.days[0].loggedWeeks).toBe(3);
-    expect(odds!.days[1]).toEqual({ dow: 2, loggedWeeks: 1, hitRatePct: null });
+    const data = computeHitSignals(goal, ["g1", "g2"], moved, "monday", now, "2026-05-18");
+    expect(data!.signals.some((s) => s.goalId === "g1" && (s.dow === 1 || s.dow === 2))).toBe(false);
+  });
+
+  it("withholds combos that happen almost every week (no contrast group)", () => {
+    // g3 logs every Monday of all 8 weeks → 0 contrast weeks
+    const withG3 = [
+      ...entries,
+      ...weekStarts.map((ws) => entry(ws, 1, { trackerId: "g3" })),
+    ];
+    const data = computeHitSignals(goal, ["g3"], withG3, "monday", now, "2026-05-18");
+    expect(data!.signals).toHaveLength(0);
   });
 
   it("returns null under 6 considered weeks or without a weekly target", () => {
-    expect(computeShowUpOdds(goal, entries, "monday", now, "2026-06-08")).toBeNull();
-    expect(computeShowUpOdds({ id: "g1" }, entries, "monday", now, "2026-05-18")).toBeNull();
+    expect(computeHitSignals(goal, ["g1"], entries, "monday", now, "2026-06-08")).toBeNull();
+    expect(computeHitSignals({ id: "g1" }, ["g1"], entries, "monday", now, "2026-05-18")).toBeNull();
   });
 
   it("does not count N/A or zero-amount entries as showing up", () => {
+    // an N/A Friday every week would otherwise be an 8-week combo
     const withNa = [
       ...entries,
-      { ...entry("2026-06-15", 0), notApplicable: true },
+      ...weekStarts.map((ws) => ({ ...entry(shiftDay(ws, 4), 0, { trackerId: "g2" }), notApplicable: true })),
     ];
-    const odds = computeShowUpOdds(goal, withNa, "monday", now, "2026-05-18");
-    expect(odds!.days[0].loggedWeeks).toBe(4); // still only the 4 real Mondays
-  });
-});
-
-describe("computeWeekCompletionCurve", () => {
-  // 4 full monday-start weeks before Tue 2026-07-14, weekly target 10.
-  // Every week: 5 on Monday, 5 on Friday → 50% by Mon–Thu, 100% Fri–Sun.
-  const goal = { id: "g1", weeklyGoal: 10, createdAt: "2026-01-01T00:00:00.000Z" };
-  const weekStarts = ["2026-06-15", "2026-06-22", "2026-06-29", "2026-07-06"];
-  const shiftD = (key: string, days: number) => {
-    const d = parseDateKey(key);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
-  };
-  const entries = weekStarts.flatMap((ws) => [entry(ws, 5), entry(shiftD(ws, 4), 5)]);
-
-  it("averages the cumulative % of target by end of each day", () => {
-    const c = computeWeekCompletionCurve(goal, entries, "monday", now, "2026-06-15");
-    expect(c).not.toBeNull();
-    expect(c!.weeks).toBe(4);
-    expect(c!.days.map((d) => d.avgPct)).toEqual([50, 50, 50, 50, 100, 100, 100]);
-    expect(c!.days[0]).toMatchObject({ dow: 1, pacePct: 14 });
-    expect(c!.days[6]).toMatchObject({ dow: 0, pacePct: 100 });
-  });
-
-  it("returns null under 4 weeks or without a weekly target", () => {
-    expect(computeWeekCompletionCurve(goal, entries, "monday", now, "2026-06-22")).toBeNull();
-    expect(computeWeekCompletionCurve({ id: "g1" }, entries, "monday", now, "2026-06-15")).toBeNull();
+    const data = computeHitSignals(goal, ["g1", "g2"], withNa, "monday", now, "2026-05-18");
+    expect(data!.signals.some((s) => s.goalId === "g2" && s.dow === 5)).toBe(false);
   });
 });
 

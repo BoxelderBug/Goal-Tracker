@@ -186,156 +186,115 @@ export function computeComebackOdds(
 }
 
 // ---------------------------------------------------------------------------
-// Percent complete by day: the average shape of a week
+// Hit signals: P(week hit | logged a given goal on a given weekday)
 // ---------------------------------------------------------------------------
 
-/** minimum full weeks with a target before the curve is claimed */
-const MIN_CURVE_WEEKS = 4;
+/** minimum full weeks with a target before signals are computed at all */
+const MIN_SIGNAL_WEEKS = 6;
+/** minimum weeks a goal×day combo was logged before its rate is claimed */
+const MIN_SIGNAL_COMBO_WEEKS = 4;
+/** minimum weeks WITHOUT the combo, so the lift has a real comparison group */
+const MIN_SIGNAL_CONTRAST_WEEKS = 2;
+/** only combos at least this many points off the baseline are reported */
+const MIN_SIGNAL_LIFT = 10;
+const MAX_SIGNALS = 6;
 
-export interface DayCompletion {
+export interface HitSignal {
+  /** the predictor goal that was logged (>0) on this weekday */
+  goalId: string;
   /** JS getDay() index 0–6 (Sun=0) */
   dow: number;
-  /** average cumulative % of the weekly target banked by the END of this day */
-  avgPct: number;
-  /** the even-split benchmark for this position in the week (14, 29, … 100) */
-  pacePct: number;
-}
-
-export interface WeekCompletionCurve {
-  /** ordered from the user's week start */
-  days: DayCompletion[];
-  weeks: number;
-}
-
-/**
- * The average shape of a week: cumulative % of the weekly target reached by
- * the end of each weekday, averaged over the trailing full weeks (current
- * partial week excluded; same lookback guards as the other week stats).
- * Read it against the even-split pace to see where weeks stall.
- */
-export function computeWeekCompletionCurve(
-  goal: TargetGoalLike & { createdAt?: string },
-  entries: Entry[],
-  weekStart: WeekStart,
-  now: Date,
-  /** first dateKey of the loaded entries window; weeks before it read falsely as zero */
-  windowStartKey?: string,
-): WeekCompletionCurve | null {
-  const totals = buildDailyTotals(entries);
-  const currentWeek = getWeekRange(now, weekStart);
-  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
-
-  const sums = new Array<number>(7).fill(0);
-  let weeks = 0;
-  for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
-    const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
-    if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
-    if (createdKey && createdKey > getDateKey(week.end)) break;
-    const target = getTargetForPeriod(goal, "week", week, { weekStart });
-    if (target <= 0) continue;
-    let cumulative = 0;
-    for (let d = 0; d < 7; d += 1) {
-      const day = addDays(week.start, d);
-      cumulative = addAmount(cumulative, totals.get(`${goal.id}|${getDateKey(day)}`) ?? 0);
-      sums[d] += (cumulative / target) * 100;
-    }
-    weeks += 1;
-  }
-  if (weeks < MIN_CURVE_WEEKS) return null;
-
-  const firstDow = weekStart === "sunday" ? 0 : 1;
-  return {
-    days: Array.from({ length: 7 }, (_, d) => ({
-      dow: (firstDow + d) % 7,
-      avgPct: Math.round(sums[d] / weeks),
-      pacePct: Math.round(((d + 1) / 7) * 100),
-    })),
-    weeks,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Show-up odds: P(week hit | logged anything on a given weekday)
-// ---------------------------------------------------------------------------
-
-/** minimum full weeks with a target before the card shows at all */
-const MIN_ODDS_WEEKS = 6;
-/** minimum weeks a weekday was logged before its conditional rate is claimed */
-const MIN_ODDS_DAY_WEEKS = 4;
-
-export interface ShowUpDayOdds {
-  /** JS getDay() index 0–6 (Sun=0) */
-  dow: number;
-  /** weeks where this weekday had a >0 total for the goal */
+  /** weeks where the combo happened */
   loggedWeeks: number;
-  /** % of those weeks that hit the weekly target; null under the sample gate */
-  hitRatePct: number | null;
+  /** % of those weeks that hit the target goal's weekly target */
+  hitRatePct: number;
+  /** hitRatePct − overall hit rate, in percentage points */
+  liftPct: number;
 }
 
-export interface ShowUpOdds {
-  /** ordered from the user's week start */
-  days: ShowUpDayOdds[];
+export interface HitSignals {
   /** full weeks considered (had a weekly target) */
   weeks: number;
   /** hit rate across all considered weeks, for the baseline */
   overallHitRatePct: number;
+  /** gated goal×weekday combos, strongest |lift| first */
+  signals: HitSignal[];
 }
 
 /**
- * For each weekday: of the trailing full weeks where the user logged anything
- * (>0) on that day, how many ended with the weekly target hit. Days that beat
- * the overall hit rate are the ones worth protecting. Same lookback guards as
+ * For each (predictor goal, weekday) combo: of the trailing full weeks where
+ * that goal was logged (>0) on that weekday, how often did the TARGET goal's
+ * week end in a hit — versus its overall hit rate. The predictor set usually
+ * includes the target itself, so same-goal show-up effects surface alongside
+ * cross-goal ones. Same lookback guards as
  * {@link computeWinningWeekFingerprint}; N/A entries carry amount 0 so they
- * don't count as showing up.
+ * don't count as showing up. Combos are only claimed with
+ * ≥ MIN_SIGNAL_COMBO_WEEKS logged weeks, ≥ MIN_SIGNAL_CONTRAST_WEEKS weeks
+ * without the combo, and a lift of at least MIN_SIGNAL_LIFT points.
  */
-export function computeShowUpOdds(
-  goal: TargetGoalLike & { createdAt?: string },
+export function computeHitSignals(
+  target: TargetGoalLike & { createdAt?: string },
+  predictorGoalIds: string[],
   entries: Entry[],
   weekStart: WeekStart,
   now: Date,
   /** first dateKey of the loaded entries window; weeks before it read falsely as zero */
   windowStartKey?: string,
-): ShowUpOdds | null {
+): HitSignals | null {
   const totals = buildDailyTotals(entries);
   const currentWeek = getWeekRange(now, weekStart);
-  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+  const createdKey = target.createdAt ? getDateKey(normalizeDate(new Date(target.createdAt))) : null;
 
-  const weeks: { hit: boolean; loggedDows: Set<number> }[] = [];
+  const weeks: { hit: boolean; logged: Set<string> }[] = [];
   for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
     const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
     if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
     if (createdKey && createdKey > getDateKey(week.end)) break;
-    const target = getTargetForPeriod(goal, "week", week, { weekStart });
-    if (target <= 0) continue;
-    const loggedDows = new Set<number>();
+    const weekTarget = getTargetForPeriod(target, "week", week, { weekStart });
+    if (weekTarget <= 0) continue;
+    const logged = new Set<string>();
     let total = 0;
     for (let d = 0; d < 7; d += 1) {
       const day = addDays(week.start, d);
-      const amount = totals.get(`${goal.id}|${getDateKey(day)}`) ?? 0;
-      total = addAmount(total, amount);
-      if (amount > 0) loggedDows.add(day.getDay());
+      const dayKey = getDateKey(day);
+      total = addAmount(total, totals.get(`${target.id}|${dayKey}`) ?? 0);
+      for (const goalId of predictorGoalIds) {
+        if ((totals.get(`${goalId}|${dayKey}`) ?? 0) > 0) logged.add(`${goalId}|${day.getDay()}`);
+      }
     }
-    weeks.push({ hit: total >= target, loggedDows });
+    weeks.push({ hit: total >= weekTarget, logged });
   }
-  if (weeks.length < MIN_ODDS_WEEKS) return null;
+  if (weeks.length < MIN_SIGNAL_WEEKS) return null;
 
-  const firstDow = weekStart === "sunday" ? 0 : 1;
-  const days: ShowUpDayOdds[] = Array.from({ length: 7 }, (_, i) => {
-    const dow = (firstDow + i) % 7;
-    const logged = weeks.filter((w) => w.loggedDows.has(dow));
-    return {
-      dow,
-      loggedWeeks: logged.length,
-      hitRatePct:
-        logged.length >= MIN_ODDS_DAY_WEEKS
-          ? Math.round((logged.filter((w) => w.hit).length / logged.length) * 100)
-          : null,
-    };
-  });
+  const overallHitRatePct = Math.round((weeks.filter((w) => w.hit).length / weeks.length) * 100);
 
-  return {
-    days,
-    weeks: weeks.length,
-    overallHitRatePct: Math.round((weeks.filter((w) => w.hit).length / weeks.length) * 100),
-  };
+  const counts = new Map<string, { logged: number; hits: number }>();
+  for (const week of weeks) {
+    for (const combo of week.logged) {
+      const c = counts.get(combo) ?? { logged: 0, hits: 0 };
+      c.logged += 1;
+      if (week.hit) c.hits += 1;
+      counts.set(combo, c);
+    }
+  }
+
+  const signals: HitSignal[] = [];
+  for (const [combo, c] of counts) {
+    if (c.logged < MIN_SIGNAL_COMBO_WEEKS) continue;
+    if (weeks.length - c.logged < MIN_SIGNAL_CONTRAST_WEEKS) continue;
+    const hitRatePct = Math.round((c.hits / c.logged) * 100);
+    const liftPct = hitRatePct - overallHitRatePct;
+    if (Math.abs(liftPct) < MIN_SIGNAL_LIFT) continue;
+    const sep = combo.lastIndexOf("|");
+    signals.push({
+      goalId: combo.slice(0, sep),
+      dow: Number(combo.slice(sep + 1)),
+      loggedWeeks: c.logged,
+      hitRatePct,
+      liftPct,
+    });
+  }
+  signals.sort((a, b) => Math.abs(b.liftPct) - Math.abs(a.liftPct) || b.loggedWeeks - a.loggedWeeks);
+
+  return { weeks: weeks.length, overallHitRatePct, signals: signals.slice(0, MAX_SIGNALS) };
 }
