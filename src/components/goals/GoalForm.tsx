@@ -64,6 +64,8 @@ export function GoalForm({
       goalsPlus = { mode: nextMode, golfType: "golf" };
     } else if (nextMode === "goalsplus-weight") {
       goalsPlus = { mode: nextMode, startingWeight: 0, targetWeight: 0, weightUnit: "lbs" };
+    } else if (nextMode === "goalsplus-reading") {
+      goalsPlus = { mode: nextMode };
     } else {
       goalsPlus = { mode: "standard" };
     }
@@ -71,6 +73,7 @@ export function GoalForm({
     if (nextMode === "goalsplus-running" && (!goal.unit || goal.unit === "units")) patch.unit = "miles";
     if (nextMode === "goalsplus-golf" && (!goal.unit || goal.unit === "units")) patch.unit = "strokes";
     if (nextMode === "goalsplus-weight" && (!goal.unit || goal.unit === "units")) patch.unit = "lbs";
+    if (nextMode === "goalsplus-reading" && (!goal.unit || goal.unit === "units")) patch.unit = "books";
     set(patch);
   }
 

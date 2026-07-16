@@ -172,6 +172,7 @@ export function normalizeGoalsPlusConfig(value: unknown): GoalsPlusConfig {
       weightUnit: raw.weightUnit === "kg" ? "kg" : "lbs",
     };
   }
+  if (mode === "goalsplus-reading") return { mode };
   return { mode: "standard" };
 }
 
@@ -273,6 +274,7 @@ export function normalizeGoal(raw: unknown, ctx: NormalizeCtx): Goal | null {
     unit = runningMetricUnit(goalsPlus.primaryMetric ?? "distance");
   }
   if (goalsPlus.mode === "goalsplus-golf" && (!unit || unit === "units")) unit = "strokes";
+  if (goalsPlus.mode === "goalsplus-reading" && (!unit || unit === "units")) unit = "books";
 
   const hasLegacyPoints = raw.goalPoints !== undefined && raw.goalPoints !== null && raw.goalPoints !== "";
   const legacyPoints = hasLegacyPoints ? normalizeGoalPoints(raw.goalPoints, 1) : null;
@@ -353,6 +355,16 @@ export function normalizeGoalsPlusEntryData(entryRaw: Raw): GoalsPlusEntryData |
       mode: "goalsplus-golf",
       golfType: raw.golfType === "disc-golf" ? "disc-golf" : "golf",
       score: normalizeGolfScore(raw.score, 0),
+    };
+  }
+  if (raw.mode === "goalsplus-reading") {
+    return {
+      mode: "goalsplus-reading",
+      bookTitle: str(raw.bookTitle).replace(/\s+/g, " ").slice(0, 200),
+      author: str(raw.author).replace(/\s+/g, " ").slice(0, 120),
+      pages: Math.max(Math.floor(normalizePositiveAmount(raw.pages, 0)), 0),
+      rating: Math.min(Math.max(Math.floor(normalizePositiveAmount(raw.rating, 0)), 0), 5),
+      dateResolution: raw.dateResolution === "year" ? "year" : "day",
     };
   }
   if (raw.mode !== "goalsplus-running") return null;

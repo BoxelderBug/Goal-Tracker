@@ -31,7 +31,8 @@ export type GoalsPlusMode =
   | "standard"
   | "goalsplus-running"
   | "goalsplus-golf"
-  | "goalsplus-weight";
+  | "goalsplus-weight"
+  | "goalsplus-reading";
 
 export type RunningWorkout =
   | "easy"
@@ -85,11 +86,16 @@ export interface GoalsPlusWeightConfig {
   weightUnit: WeightUnit;
 }
 
+export interface GoalsPlusReadingConfig {
+  mode: "goalsplus-reading";
+}
+
 export type GoalsPlusConfig =
   | GoalsPlusStandardConfig
   | GoalsPlusRunningConfig
   | GoalsPlusGolfConfig
-  | GoalsPlusWeightConfig;
+  | GoalsPlusWeightConfig
+  | GoalsPlusReadingConfig;
 
 export interface ProgressMetric {
   id: string;
@@ -204,7 +210,20 @@ export interface GoalsPlusGolfEntry {
   score: number;
 }
 
-export type GoalsPlusEntryData = GoalsPlusRunningEntry | GoalsPlusGolfEntry;
+/** One completed book. Amount is always 1 (the goal counts books). */
+export interface GoalsPlusReadingEntry {
+  mode: "goalsplus-reading";
+  bookTitle: string;
+  author: string;
+  /** 0 = unknown */
+  pages: number;
+  /** 1–5 stars, 0 = unrated */
+  rating: number;
+  /** "year": finished sometime this year — entry sits on Jan 1, shown year-only */
+  dateResolution: "day" | "year";
+}
+
+export type GoalsPlusEntryData = GoalsPlusRunningEntry | GoalsPlusGolfEntry | GoalsPlusReadingEntry;
 
 export interface Entry {
   id: string;

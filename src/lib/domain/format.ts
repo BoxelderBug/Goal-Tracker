@@ -23,6 +23,7 @@ export const GOALS_PLUS_LABELS: Record<GoalsPlusMode, string> = {
   "goalsplus-running": "Running",
   "goalsplus-golf": "Golf",
   "goalsplus-weight": "Weight (Health)",
+  "goalsplus-reading": "Reading (Books)",
 };
 
 export const GOAL_TYPE_OPTIONS = (Object.keys(GOAL_TYPE_LABELS) as GoalType[]).map((value) => ({

@@ -3,9 +3,9 @@ import type { TrendColors } from "./activityTrend";
 import { nearestGrade } from "@/lib/domain/grades";
 
 export interface GradeTrendPoint {
-  /** dateKey */
-  date: string;
-  /** GPA-style score for the day (average or single criterion), null = ungraded */
+  /** dateKey when xKind is "date", criterion name when "category" */
+  label: string;
+  /** GPA-style score, null = no grades behind this label */
   score: number | null;
 }
 
@@ -13,13 +13,15 @@ export interface GradeTrendPoint {
 const TICK_LETTERS: Record<number, string> = { 0: "F", 1: "D", 2: "C", 3: "B", 4: "A" };
 
 /**
- * Daily grades across the recent window as a line or bar, one series at a
- * time (the selector above the chart names it). Ungraded days stay on the
- * axis: the line bridges them, bars leave them empty.
+ * Grades as a line or bar, one series at a time (the selectors above the
+ * chart name it). X axis is either a day-by-day date range (ungraded days
+ * stay on the axis: the line bridges them, bars leave them empty) or one
+ * slot per criterion.
  */
 export function gradesTrendOption(
   points: GradeTrendPoint[],
   mode: "line" | "bar",
+  xKind: "date" | "category",
   colors: TrendColors,
 ): EChartsOption {
   const values = points.map((p) => p.score);
@@ -40,13 +42,16 @@ export function gradesTrendOption(
     },
     xAxis: {
       type: "category",
-      data: points.map((p) => p.date),
+      data: points.map((p) => p.label),
       axisLine: { lineStyle: { color: colors.border } },
-      axisLabel: {
-        color: colors.muted,
-        interval: Math.max(Math.floor(points.length / 6) - 1, 0),
-        formatter: (v: string) => String(v).slice(5),
-      },
+      axisLabel:
+        xKind === "date"
+          ? {
+              color: colors.muted,
+              interval: Math.max(Math.floor(points.length / 6) - 1, 0),
+              formatter: (v: string) => String(v).slice(5),
+            }
+          : { color: colors.muted, interval: 0, width: 90, overflow: "truncate" as const },
     },
     yAxis: {
       type: "value",
@@ -69,7 +74,7 @@ export function gradesTrendOption(
             type: "line",
             data: values,
             connectNulls: true,
-            showSymbol: true,
+            showSymbol: points.length <= 60,
             symbolSize: 8,
             lineStyle: { color: colors.accent, width: 2 },
             itemStyle: { color: colors.accent },

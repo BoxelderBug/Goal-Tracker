@@ -8,6 +8,8 @@ export interface ScrubColors {
   /** area fill under the dashed projection segment (transparent white) */
   projectedFill: string;
   target: string;
+  /** previous-period overlay line — must contrast with projected AND accent */
+  overlay: string;
   text: string;
   muted: string;
   grid: string;
@@ -140,8 +142,8 @@ export function cumulativeScrubOption(
               smooth: false,
               showSymbol: false,
               emphasis: { disabled: true },
-              lineStyle: { width: 1.5, color: colors.muted, opacity: 0.6 },
-              itemStyle: { color: colors.muted },
+              lineStyle: { width: 1.5, color: colors.overlay, opacity: 0.75 },
+              itemStyle: { color: colors.overlay },
               z: 1,
             },
           ]

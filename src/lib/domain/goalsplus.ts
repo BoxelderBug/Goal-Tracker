@@ -6,6 +6,7 @@
 import type {
   GolfType,
   GoalsPlusGolfEntry,
+  GoalsPlusReadingEntry,
   GoalsPlusRunningConfig,
   GoalsPlusRunningEntry,
   RunningPrimaryMetric,
@@ -194,5 +195,23 @@ export function buildGolfEntry(params: { golfType: GolfType; score: number }): G
     mode: "goalsplus-golf",
     golfType: params.golfType,
     score: Math.max(Math.floor(params.score) || 0, 0),
+  };
+}
+
+/** Build a reading entry: one completed book. Rating clamps to 0–5 stars. */
+export function buildReadingEntry(params: {
+  bookTitle: string;
+  author?: string;
+  pages?: number;
+  rating?: number;
+  yearOnly?: boolean;
+}): GoalsPlusReadingEntry {
+  return {
+    mode: "goalsplus-reading",
+    bookTitle: params.bookTitle.trim().replace(/\s+/g, " ").slice(0, 200),
+    author: (params.author ?? "").trim().replace(/\s+/g, " ").slice(0, 120),
+    pages: Math.max(Math.floor(params.pages ?? 0) || 0, 0),
+    rating: Math.min(Math.max(Math.floor(params.rating ?? 0) || 0, 0), 5),
+    dateResolution: params.yearOnly ? "year" : "day",
   };
 }

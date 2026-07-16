@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GoalsPlusRunningConfig } from "@/types/models";
 import {
   buildGolfEntry,
+  buildReadingEntry,
   buildRunningEntry,
   computeRaceAttempts,
   computeRunTypeBreakdown,
@@ -56,6 +57,23 @@ describe("buildGolfEntry", () => {
   it("floors and clamps the score", () => {
     expect(buildGolfEntry({ golfType: "golf", score: 84.6 })).toEqual({ mode: "goalsplus-golf", golfType: "golf", score: 84 });
     expect(buildGolfEntry({ golfType: "disc-golf", score: -3 }).score).toBe(0);
+  });
+});
+
+describe("buildReadingEntry", () => {
+  it("trims fields, clamps rating, and tracks year-only completion", () => {
+    const e = buildReadingEntry({
+      bookTitle: "  Dune   Messiah ", author: " Frank  Herbert ", pages: 412.7, rating: 9, yearOnly: true,
+    });
+    expect(e).toEqual({
+      mode: "goalsplus-reading", bookTitle: "Dune Messiah", author: "Frank Herbert",
+      pages: 412, rating: 5, dateResolution: "year",
+    });
+  });
+
+  it("defaults to a day-resolution, unrated entry", () => {
+    const e = buildReadingEntry({ bookTitle: "X" });
+    expect(e).toMatchObject({ author: "", pages: 0, rating: 0, dateResolution: "day" });
   });
 });
 

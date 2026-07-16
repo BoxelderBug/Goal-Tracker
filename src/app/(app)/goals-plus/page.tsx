@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Entry, Goal, GoalsPlusRunningEntry, RunningWorkout } from "@/types/models";
+import type { Entry, Goal, GoalsPlusReadingEntry, GoalsPlusRunningEntry, RunningWorkout } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { formatAmount } from "@/lib/domain/format";
 import {
@@ -39,7 +39,7 @@ export default function GoalsPlusPage() {
   if (gpGoals.length === 0) {
     return (
       <EmptyState>
-        No Goals+ goals yet. Create one with a running, golf, or weight mode under{" "}
+        No Goals+ goals yet. Create one with a running, golf, weight, or reading mode under{" "}
         <Link href="/settings/goals/new" className="text-accent-strong underline">Goals</Link>.
       </EmptyState>
     );
@@ -68,6 +68,8 @@ export default function GoalsPlusPage() {
           <RunningStats key={goal.id} goal={goal} entries={goalEntries} />
         ) : goal.goalsPlus.mode === "goalsplus-golf" ? (
           <GolfStats goal={goal} entries={goalEntries} />
+        ) : goal.goalsPlus.mode === "goalsplus-reading" ? (
+          <ReadingStats goal={goal} entries={goalEntries} />
         ) : (
           <WeightStats goal={goal} entries={goalEntries} />
         )
@@ -295,6 +297,64 @@ function GolfStats({ goal, entries }: { goal: Goal; entries: Entry[] }) {
         <CardTitle>{goal.name} · {GOLF_TYPE_LABELS[golfType]} scores</CardTitle>
         {points.length === 0 ? <EmptyState>No rounds logged yet.</EmptyState> : <EChart option={dateLineOption(points, {}, chartColors())} height={260} />}
       </Card>
+    </>
+  );
+}
+
+function ReadingStats({ goal, entries }: { goal: Goal; entries: Entry[] }) {
+  const books = entries
+    .filter((e) => e.goalsPlus?.mode === "goalsplus-reading")
+    .map((e) => ({ id: e.id, date: e.date, book: e.goalsPlus as GoalsPlusReadingEntry }));
+  const pages = books.reduce((s, b) => s + b.book.pages, 0);
+  const rated = books.filter((b) => b.book.rating > 0);
+  const avgRating = rated.length ? rated.reduce((s, b) => s + b.book.rating, 0) / rated.length : 0;
+
+  // entries arrive date-ascending → running count is the reading curve
+  let running = 0;
+  const points: DatePoint[] = books.map((b) => ({ date: b.date, value: ++running }));
+
+  const displayDate = (b: { date: string; book: GoalsPlusReadingEntry }) =>
+    b.book.dateResolution === "year" ? b.date.slice(0, 4) : b.date;
+
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-3">
+        <Stat label="Books" value={String(books.length)} />
+        <Stat label="Pages logged" value={pages > 0 ? formatAmount(pages) : "—"} />
+        <Stat label="Avg rating" value={avgRating > 0 ? `${Math.round(avgRating * 10) / 10} ★` : "—"} />
+      </div>
+      <Card>
+        <CardTitle>{goal.name} · books over time</CardTitle>
+        {points.length === 0 ? (
+          <EmptyState>No books logged yet.</EmptyState>
+        ) : (
+          <EChart option={dateLineOption(points, {}, chartColors())} height={220} />
+        )}
+      </Card>
+      {books.length > 0 ? (
+        <Card>
+          <CardTitle>Book log</CardTitle>
+          <ul className="flex flex-col divide-y divide-border">
+            {[...books].reverse().map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <span>
+                  <span className="font-medium">{b.book.bookTitle || "Untitled"}</span>
+                  {b.book.author ? <span className="text-muted"> — {b.book.author}</span> : null}
+                </span>
+                <span className="flex items-center gap-3 text-xs text-muted">
+                  {b.book.rating > 0 ? (
+                    <span aria-label={`${b.book.rating} of 5 stars`}>
+                      {"★".repeat(b.book.rating)}{"☆".repeat(5 - b.book.rating)}
+                    </span>
+                  ) : null}
+                  {b.book.pages > 0 ? <span>{formatAmount(b.book.pages)} pages</span> : null}
+                  <span className="w-20 text-right">{displayDate(b)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </>
   );
 }

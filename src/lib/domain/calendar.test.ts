@@ -27,6 +27,7 @@ describe("scheduleToIcs", () => {
     expect(ics).toContain("BEGIN:VCALENDAR\r\n");
     expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
     expect(ics).toContain("UID:b1@goal-tracker");
+    expect(ics).toContain("DTSTAMP:20260713T000000Z");
     expect(ics).toContain("DTSTART:20260714T093000");
     expect(ics).toContain("SUMMARY:Yoga\\; morning");
     expect(ics).toContain("DESCRIPTION:bring: mat\\, towel");

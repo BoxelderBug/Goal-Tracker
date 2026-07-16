@@ -17,6 +17,7 @@ import {
   GOLF_TYPE_LABELS,
   RUNNING_WORKOUT_LABELS,
   buildGolfEntry,
+  buildReadingEntry,
   buildRunningEntry,
   estimatedRunningVo2,
   formatPace,
@@ -74,6 +75,11 @@ export default function EntryPage() {
   const [workout, setWorkout] = useState<RunningWorkout | "">("");
   const [score, setScore] = useState("");
   const [weight, setWeight] = useState("");
+  const [bookTitle, setBookTitle] = useState("");
+  const [bookAuthor, setBookAuthor] = useState("");
+  const [bookPages, setBookPages] = useState("");
+  const [bookRating, setBookRating] = useState("0");
+  const [bookYearOnly, setBookYearOnly] = useState(false);
 
   const selected = active.find((g) => g.id === trackerId) ?? active[0];
   const selectedId = selected?.id ?? "";
@@ -121,6 +127,19 @@ export default function EntryPage() {
       if (!(w > 0)) return null;
       return { amount: w, goalsPlus: null };
     }
+    if (mode === "goalsplus-reading") {
+      if (!bookTitle.trim()) return null;
+      return {
+        amount: 1,
+        goalsPlus: buildReadingEntry({
+          bookTitle,
+          author: bookAuthor,
+          pages: Number(bookPages) || 0,
+          rating: Number(bookRating) || 0,
+          yearOnly: bookYearOnly,
+        }),
+      };
+    }
     // standard
     if (notApplicable) return { amount: 0, goalsPlus: null };
     const value = isYesNo ? Number(yesNo) : Number(amount);
@@ -158,11 +177,15 @@ export default function EntryPage() {
     }
     setSaving(true);
     try {
+      // Year-only books land on Jan 1 so they count toward the year without
+      // claiming a real day.
+      const effectiveDate =
+        mode === "goalsplus-reading" && bookYearOnly ? `${date.slice(0, 4)}-01-01` : date;
       await entriesRepo.set(
         uid,
         newEntry({
           trackerId: selected.id,
-          date,
+          date: effectiveDate,
           amount: built.amount,
           notApplicable: mode === "standard" ? notApplicable : false,
           goalsPlus: built.goalsPlus,
@@ -172,6 +195,7 @@ export default function EntryPage() {
       toast.success(`Logged ${selected.name}`);
       setAmount(""); setNotes(""); setNotApplicable(false);
       setDistance(""); setDuration(""); setIncline(""); setScore(""); setWeight("");
+      setBookTitle(""); setBookAuthor(""); setBookPages(""); setBookRating("0"); setBookYearOnly(false);
     } catch {
       toast.error("Could not save entry");
     } finally {
@@ -258,6 +282,31 @@ export default function EntryPage() {
                 <Input type="number" min={0} step="any" inputMode="decimal" value={weight}
                   onChange={(e) => setWeight(e.target.value)} required />
               </Field>
+            ) : mode === "goalsplus-reading" ? (
+              <>
+                <Field label="Book title">
+                  <Input value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} maxLength={200} required />
+                </Field>
+                <Field label="Author" hint="Optional">
+                  <Input value={bookAuthor} onChange={(e) => setBookAuthor(e.target.value)} maxLength={120} />
+                </Field>
+                <Field label="Pages" hint="Optional">
+                  <Input type="number" min={0} step={1} inputMode="numeric" value={bookPages}
+                    onChange={(e) => setBookPages(e.target.value)} />
+                </Field>
+                <Field label="Rating" hint="Optional">
+                  <Select value={bookRating} onChange={(e) => setBookRating(e.target.value)}>
+                    <option value="0">—</option>
+                    {[1, 2, 3, 4, 5].map((r) => (
+                      <option key={r} value={r}>{"★".repeat(r)}{"☆".repeat(5 - r)}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <label className="flex items-center gap-2 text-sm text-muted sm:col-span-2">
+                  <input type="checkbox" checked={bookYearOnly} onChange={(e) => setBookYearOnly(e.target.checked)} />
+                  Finished earlier this year — count it for {date.slice(0, 4)} without a specific date
+                </label>
+              </>
             ) : isYesNo ? (
               <Field label="Done?">
                 <Select value={yesNo} onChange={(e) => setYesNo(e.target.value)} disabled={notApplicable}>

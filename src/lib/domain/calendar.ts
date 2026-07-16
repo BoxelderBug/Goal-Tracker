@@ -28,6 +28,13 @@ function icsEscape(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
+/** RFC 5545 DTSTAMP (UTC) from the block's createdAt, deterministic per block. */
+function dtstamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "19700101T000000Z";
+  return `${d.toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`;
+}
+
 /**
  * Serialize blocks to an .ics file Google Calendar (and others) can import.
  * One VEVENT per block; UID reuses the block id so re-imports update rather
@@ -43,6 +50,7 @@ export function scheduleToIcs(blocks: ScheduleBlock[], goalNameById: (id: string
     lines.push(
       "BEGIN:VEVENT",
       `UID:${b.id}@goal-tracker`,
+      `DTSTAMP:${dtstamp(b.createdAt)}`,
       `DTSTART:${stamp(b.date, b.startTime)}`,
       `DTEND:${stamp(b.date, b.endTime)}`,
       `SUMMARY:${icsEscape(goalNameById(b.trackerId))}`,

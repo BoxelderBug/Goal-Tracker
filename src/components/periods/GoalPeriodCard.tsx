@@ -164,6 +164,7 @@ export function GoalPeriodCard({
         projected: themeColor("--muted", "#888"),
         projectedFill: "#ffffff",
         target: themeColor("--tone-behind", "#be7f24"),
+        overlay: themeColor("--chart-5", "#4a3aa7"),
         text: themeColor("--text", "#222"),
         muted: themeColor("--muted", "#888"),
         grid: themeColor("--border", "#ddd"),
