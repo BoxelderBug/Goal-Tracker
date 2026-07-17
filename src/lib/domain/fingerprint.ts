@@ -29,6 +29,28 @@ export interface WeekdayFingerprint {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * The earliest date a goal's history can honestly start: its createdAt, or
+ * its first logged entry when that's OLDER — migrated goals carry a createdAt
+ * equal to the migration date while their entries go back much further, and
+ * gating on createdAt alone silently truncated every week stat to one week.
+ */
+function historyStartKey(
+  goal: { id: string; createdAt?: string },
+  entries: Entry[],
+): string | null {
+  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+  let firstEntryKey: string | null = null;
+  for (const e of entries) {
+    if (e.trackerId !== goal.id || !e.date) continue;
+    if (firstEntryKey === null || e.date < firstEntryKey) firstEntryKey = e.date;
+  }
+  if (createdKey !== null && firstEntryKey !== null) {
+    return firstEntryKey < createdKey ? firstEntryKey : createdKey;
+  }
+  return createdKey ?? firstEntryKey;
+}
+
 export function computeWeekdayFingerprint(
   goalId: string,
   entries: Entry[],
@@ -101,7 +123,7 @@ export function computeWinningWeekFingerprint(
 ): WinningWeekFingerprint | null {
   const totals = buildDailyTotals(entries);
   const currentWeek = getWeekRange(now, weekStart);
-  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+  const startKey = historyStartKey(goal, entries);
 
   const hitPcts: number[] = [];
   const missPcts: number[] = [];
@@ -109,7 +131,7 @@ export function computeWinningWeekFingerprint(
     const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
     const weekStartKey = getDateKey(week.start);
     if (windowStartKey && weekStartKey < windowStartKey) break;
-    if (createdKey && createdKey > getDateKey(week.end)) break;
+    if (startKey && startKey > getDateKey(week.end)) break;
     const target = getTargetForPeriod(goal, "week", week, { weekStart });
     if (target <= 0) continue;
     const total = sumRange(totals, goal.id, week);
@@ -161,14 +183,14 @@ export function computeComebackOdds(
 ): ComebackOdds | null {
   const totals = buildDailyTotals(entries);
   const currentWeek = getWeekRange(now, weekStart);
-  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
+  const startKey = historyStartKey(goal, entries);
 
   let behindWeeks = 0;
   let rescuedWeeks = 0;
   for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
     const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
     if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
-    if (createdKey && createdKey > getDateKey(week.end)) break;
+    if (startKey && startKey > getDateKey(week.end)) break;
     const target = getTargetForPeriod(goal, "week", week, { weekStart });
     if (target <= 0) continue;
     const day4 = sumRange(totals, goal.id, { start: week.start, end: addDays(week.start, 3) });
@@ -254,7 +276,7 @@ export function computeHitSignals(
 ): HitSignals | null {
   const totals = buildDailyTotals(entries);
   const currentWeek = getWeekRange(now, weekStart);
-  const createdKey = target.createdAt ? getDateKey(normalizeDate(new Date(target.createdAt))) : null;
+  const startKey = historyStartKey(target, entries);
 
   // The target is always scanned so `days` fills in, but only requested
   // predictors may surface in `signals`.
@@ -265,7 +287,7 @@ export function computeHitSignals(
   for (let i = 1; i <= MAX_LOOKBACK_WEEKS; i += 1) {
     const week = getWeekRange(addDays(currentWeek.start, -7 * i), weekStart);
     if (windowStartKey && getDateKey(week.start) < windowStartKey) break;
-    if (createdKey && createdKey > getDateKey(week.end)) break;
+    if (startKey && startKey > getDateKey(week.end)) break;
     const weekTarget = getTargetForPeriod(target, "week", week, { weekStart });
     if (weekTarget <= 0) continue;
     const logged = new Set<string>();

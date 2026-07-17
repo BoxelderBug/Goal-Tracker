@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GradeHistoryCard } from "@/components/grades/GradeHistoryCard";
 
 type GradePeriod = "week" | "month" | "year";
 
@@ -103,6 +104,8 @@ export default function GradesReviewPage() {
           </>
         ) : null}
       </p>
+
+      <GradeHistoryCard />
 
       {criteria.data.length === 0 ? (
         <EmptyState

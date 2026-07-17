@@ -85,11 +85,26 @@ describe("computeWinningWeekFingerprint", () => {
     expect(computeWinningWeekFingerprint(goal, fewer, "monday", now)).toBeNull();
   });
 
-  it("ignores weeks before the entries window or before the goal existed", () => {
+  it("ignores weeks before the entries window", () => {
     // window starts 06-01 → only 6 full weeks visible → 2 hit weeks → null
     expect(computeWinningWeekFingerprint(goal, entries, "monday", now, "2026-06-01")).toBeNull();
-    const younger = { ...goal, createdAt: "2026-06-20T12:00:00.000Z" };
-    expect(computeWinningWeekFingerprint(younger, entries, "monday", now)).toBeNull();
+  });
+
+  it("trusts entries that predate createdAt (migrated goals keep full history)", () => {
+    // createdAt is long after the first entry — history starts at the entry
+    const migrated = { ...goal, createdAt: "2026-06-20T12:00:00.000Z" };
+    expect(computeWinningWeekFingerprint(migrated, entries, "monday", now, "2026-05-18"))
+      .toEqual({ hitWeeks: 4, missWeeks: 4, hitDay3Pct: 80, missDay3Pct: 20 });
+  });
+
+  it("still truncates at createdAt when no entries predate it", () => {
+    // goal created 06-20, entries only from 06-22 on → weeks before 06-20 cut
+    const late = { ...goal, createdAt: "2026-06-20T12:00:00.000Z" };
+    const lateEntries = weekStarts.slice(5).flatMap((ws, i) =>
+      i < 2 ? [entry(ws, 8), entry(shift(ws, 4), 4)] : [entry(ws, 2)],
+    );
+    // only 3 candidate weeks → under the 4+4 gate → null
+    expect(computeWinningWeekFingerprint(late, lateEntries, "monday", now, "2026-05-18")).toBeNull();
   });
 
   it("returns null when the goal has no weekly target", () => {
@@ -168,6 +183,14 @@ describe("computeHitSignals", () => {
   it("returns null under 6 considered weeks or without a weekly target", () => {
     expect(computeHitSignals(goal, ["g1"], entries, "monday", now, "2026-06-08")).toBeNull();
     expect(computeHitSignals({ id: "g1" }, ["g1"], entries, "monday", now, "2026-05-18")).toBeNull();
+  });
+
+  it("keeps full lookback when createdAt is newer than the entries (migrated goals)", () => {
+    // migration stamped createdAt = 2026-07-10 even though entries go back to May
+    const migrated = { ...goal, createdAt: "2026-07-10T00:00:00.000Z" };
+    const data = computeHitSignals(migrated, ["g1", "g2"], entries, "monday", now, "2026-05-18");
+    expect(data).not.toBeNull();
+    expect(data!.weeks).toBe(8);
   });
 
   it("does not count N/A or zero-amount entries as showing up", () => {
