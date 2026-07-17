@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { KeyedValueMapDoc, PeriodKind, TempPeriodGoal, Vacation } from "@/types/models";
+import { useEffect, useMemo, useState } from "react";
+import { orderBy, where } from "firebase/firestore";
+import type { Entry, KeyedValueMapDoc, PeriodKind, TempPeriodGoal, Vacation } from "@/types/models";
 import { useSettings, useUserData } from "@/components/data/UserDataProvider";
-import { addDays, addMonths, addYears, getDateKey, normalizeDate } from "@/lib/domain/dates";
+import { addDays, addMonths, addYears, getDateKey, normalizeDate, parseDateKey } from "@/lib/domain/dates";
 import { getPeriodKey, getPeriodRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange } from "@/lib/domain/progress";
 import { computeStreaks } from "@/lib/domain/streaks";
 import { getTargetForPeriod, overrideKey, overridesFromFlatMap } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { closeOutPeriod } from "@/lib/firebase/actions/snapshot";
-import { tempPeriodGoalsRepo, vacationsRepo } from "@/lib/firebase/repos";
+import { entriesRepo, tempPeriodGoalsRepo, vacationsRepo } from "@/lib/firebase/repos";
 import { PERIOD_GOAL_OVERRIDES, STRETCH_GOALS, metaRef } from "@/lib/firebase/repos/meta";
 import { useCollection } from "@/hooks/useCollection";
 import { useDoc } from "@/hooks/useDoc";
@@ -70,7 +71,50 @@ export function PeriodView({ period }: { period: PeriodKind }) {
     () => getPeriodRange(period, anchor, settings.weekStart),
     [period, anchor, settings.weekStart],
   );
-  const totals = useMemo(() => buildDailyTotals(entries), [entries]);
+
+  // Entries live in a rolling subscription window; when the viewed period
+  // starts before it (e.g. a backfilled previous year), fetch the older slice
+  // once per range so past periods show real totals instead of zeros.
+  const rangeStartKey = getDateKey(range.start);
+  const rangeEndKey = getDateKey(range.end);
+  const needsOlder = rangeStartKey < windowStartKey;
+  const olderKey = `${rangeStartKey}|${rangeEndKey}`;
+  // Fetched slice is keyed by its range; a mismatched key is simply ignored,
+  // so no synchronous state reset is needed when navigating.
+  const [older, setOlder] = useState<{ key: string; entries: Entry[] } | null>(null);
+  useEffect(() => {
+    if (!needsOlder) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const upperKey =
+          rangeEndKey < windowStartKey
+            ? getDateKey(addDays(parseDateKey(rangeEndKey), 1))
+            : windowStartKey;
+        const fetched = await entriesRepo.list(
+          uid,
+          where("date", ">=", rangeStartKey),
+          where("date", "<", upperKey),
+          orderBy("date", "asc"),
+        );
+        if (!cancelled) setOlder({ key: olderKey, entries: fetched });
+      } catch {
+        if (!cancelled) setOlder({ key: olderKey, entries: [] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, needsOlder, olderKey, rangeStartKey, rangeEndKey, windowStartKey]);
+
+  const allEntries = useMemo(
+    () =>
+      needsOlder && older?.key === olderKey && older.entries.length
+        ? [...older.entries, ...entries]
+        : entries,
+    [needsOlder, older, olderKey, entries],
+  );
+  const totals = useMemo(() => buildDailyTotals(allEntries), [allEntries]);
 
   // quarter has no per-period key in legacy (no overrides / temp goals).
   const periodKey = period === "quarter" ? null : getPeriodKey(period, range);
