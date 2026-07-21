@@ -178,6 +178,30 @@ export interface Goal {
 }
 
 // ---------------------------------------------------------------------------
+// Challenges
+// ---------------------------------------------------------------------------
+
+/**
+ * A time-boxed push on one goal, sitting alongside that goal's own weekly /
+ * monthly / yearly targets: reach `target` (in the goal's unit) between
+ * startDate and dueDate. `kind` is the extension point — "amount" is the only
+ * type today, so every stored challenge carries it.
+ */
+export interface Challenge {
+  id: string;
+  /** the goal whose entries count toward this challenge */
+  goalId: string;
+  name: string;
+  description: string;
+  kind: "amount";
+  /** amount to reach over the window, in the goal's unit */
+  target: number;
+  startDate: DateKey;
+  dueDate: DateKey;
+  createdAt: IsoTimestamp;
+}
+
+// ---------------------------------------------------------------------------
 // Entries
 // ---------------------------------------------------------------------------
 

@@ -10,6 +10,7 @@ import { getTargetForPeriod } from "@/lib/domain/targets";
 import { computeStreaks } from "@/lib/domain/streaks";
 import { computeGoalRecords } from "@/lib/domain/records";
 import { formatAmount, GOAL_TYPE_LABELS } from "@/lib/domain/format";
+import { ChallengeManager } from "@/components/challenges/ChallengeManager";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -129,6 +130,8 @@ export default function GoalDetailPage() {
           )}
         </Card>
       </div>
+
+      <ChallengeManager goalId={goal.id} />
 
       <Card>
         <div className="mb-1 flex items-center justify-between">

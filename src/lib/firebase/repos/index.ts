@@ -1,4 +1,5 @@
 import type {
+  Challenge,
   CheckIn,
   CheckInEntry,
   Entry,
@@ -26,6 +27,7 @@ import { CollectionRepo } from "./collection";
  */
 export const goalsRepo = new CollectionRepo<Goal>("goals");
 export const entriesRepo = new CollectionRepo<Entry>("entries");
+export const challengesRepo = new CollectionRepo<Challenge>("challenges");
 export const checkInsRepo = new CollectionRepo<CheckIn>("checkIns");
 export const checkInEntriesRepo = new CollectionRepo<CheckInEntry>("checkInEntries");
 export const journalRepo = new CollectionRepo<JournalEntry>("journal");

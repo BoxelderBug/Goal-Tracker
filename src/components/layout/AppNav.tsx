@@ -38,6 +38,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
           { href: "/month", label: "Month", hint: "M" },
           { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
           { href: "/year", label: "Year", hint: "Y" },
+          { href: "/challenges", label: "Challenges" },
           { href: "/grades/review", label: "Grades" },
         ],
       },

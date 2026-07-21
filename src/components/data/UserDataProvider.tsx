@@ -2,10 +2,10 @@
 
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { orderBy, query, where } from "firebase/firestore";
-import type { Entry, Goal, Settings } from "@/types/models";
+import type { Challenge, Entry, Goal, Settings } from "@/types/models";
 import { addDays, getDateKey } from "@/lib/domain/dates";
 import { ensureProfileEmailKey } from "@/lib/firebase/actions/profile";
-import { entriesRepo, goalsRepo } from "@/lib/firebase/repos";
+import { challengesRepo, entriesRepo, goalsRepo } from "@/lib/firebase/repos";
 import { userDocRef, type UserDocData } from "@/lib/firebase/repos/userDoc";
 import { normalizeSettings } from "@/lib/migration/normalize";
 import { useCollection } from "@/hooks/useCollection";
@@ -15,6 +15,7 @@ interface UserData {
   uid: string;
   settings: Settings;
   goals: Goal[];
+  challenges: Challenge[];
   /** entries within the live rolling window (see windowStartKey) */
   entries: Entry[];
   windowStartKey: string;
@@ -42,6 +43,7 @@ export function UserDataProvider({ uid, children }: { uid: string; children: Rea
 
   const userDoc = useDoc<UserDocData>(() => userDocRef(uid), [uid]);
   const goals = useCollection<Goal>(() => goalsRepo.query(uid, orderBy("priority", "desc")), [uid]);
+  const challenges = useCollection<Challenge>(() => challengesRepo.query(uid, orderBy("dueDate", "asc")), [uid]);
   const entries = useCollection<Entry>(
     () => query(entriesRepo.ref(uid), where("date", ">=", windowStartKey), orderBy("date", "asc")),
     [uid, windowStartKey],
@@ -57,11 +59,23 @@ export function UserDataProvider({ uid, children }: { uid: string; children: Rea
       uid,
       settings,
       goals: goals.data,
+      challenges: challenges.data,
       entries: entries.data,
       windowStartKey,
-      loading: userDoc.loading || goals.loading || entries.loading,
+      loading: userDoc.loading || goals.loading || challenges.loading || entries.loading,
     }),
-    [uid, settings, userDoc.loading, goals.data, goals.loading, entries.data, entries.loading, windowStartKey],
+    [
+      uid,
+      settings,
+      userDoc.loading,
+      goals.data,
+      goals.loading,
+      challenges.data,
+      challenges.loading,
+      entries.data,
+      entries.loading,
+      windowStartKey,
+    ],
   );
 
   return <UserDataContext.Provider value={value}>{children}</UserDataContext.Provider>;

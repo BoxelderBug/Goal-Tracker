@@ -1,7 +1,8 @@
 # Goal Tracker
 
 Personal goal-tracking PWA: goals with weekly/monthly/yearly targets, daily entries,
-period reviews, dashboards, check-ins, points, and accountability sharing.
+time-boxed challenges, period reviews, dashboards, check-ins, points, and
+accountability sharing.
 
 **Stack:** Next.js (App Router) + TypeScript + Tailwind v4, Firebase (Auth + Firestore
 with offline persistence), ECharts. Deployed on Vercel.
