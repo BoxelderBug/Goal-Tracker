@@ -336,7 +336,19 @@ export interface Settings {
   /** set once the first-run welcome tour has been finished or dismissed */
   onboardingCompleted: boolean;
   performanceMode: PerformanceMode;
+  /** capture surfaces — each can be switched off to hide it everywhere */
+  questionsEnabled: boolean;
+  questionsWeeklyGoal: number;
+  questionsMonthlyGoal: number;
+  questionsYearlyGoal: number;
+  ideasEnabled: boolean;
   ideasWeeklyGoal: number;
+  ideasMonthlyGoal: number;
+  ideasYearlyGoal: number;
+  experimentsEnabled: boolean;
+  experimentsWeeklyGoal: number;
+  experimentsMonthlyGoal: number;
+  experimentsYearlyGoal: number;
   theme: string;
 }
 
@@ -387,6 +399,26 @@ export interface IdeaEntry {
   title?: string;
   /** answer / details body; may contain "- " bullet lines */
   content: string;
+  createdAt: IsoTimestamp;
+}
+
+export type ExperimentStatus = "running" | "concluded";
+
+/**
+ * A thing you're deliberately trying, recorded like a question or an idea:
+ * what you're doing (`content`) and, once it's over, what happened (`result`).
+ * Counted against the experiment capture targets in the period views.
+ */
+export interface ExperimentEntry {
+  id: string;
+  /** the day the experiment was started */
+  date: DateKey;
+  title: string;
+  /** what you're doing */
+  content: string;
+  status: ExperimentStatus;
+  /** what came of it; filled in when concluded */
+  result: string;
   createdAt: IsoTimestamp;
 }
 

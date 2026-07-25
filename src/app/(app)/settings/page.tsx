@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
 import type { MilestoneStep, Settings } from "@/types/models";
+import { CAPTURE_KINDS } from "@/lib/domain/capture";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { updateSettings } from "@/lib/firebase/repos/userDoc";
 import { getFirebaseAuth } from "@/lib/firebase/client";
@@ -119,6 +120,48 @@ export default function SettingsPage() {
           <Link href="/?tour=1">
             <Button size="sm">Replay welcome tour</Button>
           </Link>
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>Capture</CardTitle>
+        <p className="mb-3 text-sm text-muted">
+          Switch a kind off to keep it out of the menus and views. Targets of 0 mean no target.
+        </p>
+        <div className="flex flex-col gap-4">
+          {CAPTURE_KINDS.map((meta) => {
+            const on = draft[meta.enabledKey] !== false;
+            return (
+              <div key={meta.kind} className="flex flex-col gap-2 border-t border-border pt-3 first:border-0 first:pt-0">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(e) => set({ [meta.enabledKey]: e.target.checked } as Partial<Settings>)}
+                  />
+                  {meta.label}
+                </label>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {([
+                    ["Weekly target", meta.weeklyKey],
+                    ["Monthly target", meta.monthlyKey],
+                    ["Yearly target", meta.yearlyKey],
+                  ] as const).map(([label, key]) => (
+                    <Field key={key} label={label}>
+                      <Input
+                        type="number" min={0} step={1}
+                        disabled={!on}
+                        value={String(draft[key] ?? 0)}
+                        onChange={(e) =>
+                          set({ [key]: Math.max(0, Number(e.target.value) || 0) } as Partial<Settings>)
+                        }
+                      />
+                    </Field>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Card>
 

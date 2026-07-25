@@ -63,6 +63,7 @@ export function GoalPeriodCard({
   stretchKey,
   stretchTarget,
   streak = 0,
+  midYearStart = null,
   now,
 }: {
   goal: Goal;
@@ -78,6 +79,8 @@ export function GoalPeriodCard({
   stretchTarget?: number;
   /** current consecutive-day logging streak for this goal (badge when ≥ 2) */
   streak?: number;
+  /** start date when the goal began after the start of the viewed year (red footer) */
+  midYearStart?: string | null;
   now: Date;
 }) {
   const [open, setOpen] = useState(false);
@@ -385,6 +388,16 @@ export function GoalPeriodCard({
           ) : (
             <p className="text-center text-xs text-muted">Click the graph to freeze a point and export it.</p>
           )}
+        </div>
+      ) : null}
+
+      {midYearStart ? (
+        <div
+          className="-mx-5 -mb-5 mt-1 flex items-center gap-2 rounded-b-2xl border-t-2 border-danger bg-danger-soft px-5 py-1.5 text-xs text-danger"
+          title={`This goal started on ${midYearStart}, partway through ${midYearStart.slice(0, 4)} — its yearly numbers cover a partial year.`}
+        >
+          <span className="h-2 w-2 shrink-0 rounded-full bg-danger" aria-hidden />
+          <span>Started {midYearStart} — partial year</span>
         </div>
       ) : null}
     </Card>

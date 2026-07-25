@@ -673,7 +673,19 @@ export function normalizeSettings(raw: unknown): Settings {
     onboardingEnabled: asBool(value.onboardingEnabled, true),
     onboardingCompleted: asBool(value.onboardingCompleted, false),
     performanceMode: value.performanceMode === "light" ? "light" : "standard",
+    // capture surfaces default ON; targets default 0 (= no target set)
+    questionsEnabled: asBool(value.questionsEnabled, true),
+    questionsWeeklyGoal: normalizeGoalTargetInt(value.questionsWeeklyGoal, 0),
+    questionsMonthlyGoal: normalizeGoalTargetInt(value.questionsMonthlyGoal, 0),
+    questionsYearlyGoal: normalizeGoalTargetInt(value.questionsYearlyGoal, 0),
+    ideasEnabled: asBool(value.ideasEnabled, true),
     ideasWeeklyGoal: normalizeGoalTargetInt(value.ideasWeeklyGoal, 0),
+    ideasMonthlyGoal: normalizeGoalTargetInt(value.ideasMonthlyGoal, 0),
+    ideasYearlyGoal: normalizeGoalTargetInt(value.ideasYearlyGoal, 0),
+    experimentsEnabled: asBool(value.experimentsEnabled, true),
+    experimentsWeeklyGoal: normalizeGoalTargetInt(value.experimentsWeeklyGoal, 0),
+    experimentsMonthlyGoal: normalizeGoalTargetInt(value.experimentsMonthlyGoal, 0),
+    experimentsYearlyGoal: normalizeGoalTargetInt(value.experimentsYearlyGoal, 0),
     theme: themes.includes(String(value.theme)) ? String(value.theme) : "teal",
   };
 }

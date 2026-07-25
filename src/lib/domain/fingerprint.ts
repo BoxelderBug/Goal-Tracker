@@ -5,6 +5,7 @@
  */
 import type { Entry, WeekStart } from "@/types/models";
 import { addDays, getDateKey, normalizeDate, parseDateKey } from "./dates";
+import { effectiveStartKey } from "./goalStart";
 import { getWeekRange } from "./periods";
 import { addAmount } from "./numbers";
 import { buildDailyTotals, sumRange } from "./progress";
@@ -35,21 +36,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * equal to the migration date while their entries go back much further, and
  * gating on createdAt alone silently truncated every week stat to one week.
  */
-function historyStartKey(
-  goal: { id: string; createdAt?: string },
-  entries: Entry[],
-): string | null {
-  const createdKey = goal.createdAt ? getDateKey(normalizeDate(new Date(goal.createdAt))) : null;
-  let firstEntryKey: string | null = null;
-  for (const e of entries) {
-    if (e.trackerId !== goal.id || !e.date) continue;
-    if (firstEntryKey === null || e.date < firstEntryKey) firstEntryKey = e.date;
-  }
-  if (createdKey !== null && firstEntryKey !== null) {
-    return firstEntryKey < createdKey ? firstEntryKey : createdKey;
-  }
-  return createdKey ?? firstEntryKey;
-}
+const historyStartKey = effectiveStartKey;
 
 export function computeWeekdayFingerprint(
   goalId: string,

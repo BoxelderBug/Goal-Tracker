@@ -95,7 +95,7 @@ describe("computeTargetReality", () => {
     rangeStart,
     rangeEnd: rangeStart, // unused here
     closedAt,
-    filters: { friendGroup: "", scope: "all" } as PeriodSnapshot["filters"],
+    filters: { type: "all", status: "active", tag: "all" },
     summary: {} as PeriodSnapshot["summary"],
     goals: rows.map((r) => ({
       trackerId: r.id, name: r.id, unit: "u",

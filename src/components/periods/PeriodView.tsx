@@ -8,6 +8,7 @@ import { addDays, addMonths, addYears, getDateKey, normalizeDate, parseDateKey }
 import { getPeriodKey, getPeriodRange } from "@/lib/domain/periods";
 import { buildDailyTotals, computePace, sumRange } from "@/lib/domain/progress";
 import { computeStreaks } from "@/lib/domain/streaks";
+import { midYearStartKey } from "@/lib/domain/goalStart";
 import { getTargetForPeriod, overrideKey, overridesFromFlatMap } from "@/lib/domain/targets";
 import { formatAmount } from "@/lib/domain/format";
 import { closeOutPeriod } from "@/lib/firebase/actions/snapshot";
@@ -21,6 +22,7 @@ import { Select } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/ui/Toaster";
+import { CapturePeriodSection } from "@/components/capture/CapturePeriodSection";
 import { GoalPeriodCard } from "./GoalPeriodCard";
 import { ViewSettingsModal } from "./ViewSettingsModal";
 
@@ -199,6 +201,18 @@ export function PeriodView({ period }: { period: PeriodKind }) {
     return map;
   }, [visibleGoals, entries, now]);
 
+  // Goals whose history starts after the first week of the viewed year — their
+  // cards get a red footer so a partial year isn't read as a full one.
+  const midYearStartByGoal = useMemo(() => {
+    const year = range.start.getFullYear();
+    const map = new Map<string, string>();
+    for (const goal of visibleGoals) {
+      const started = midYearStartKey(goal, allEntries, year);
+      if (started) map.set(goal.id, started);
+    }
+    return map;
+  }, [visibleGoals, allEntries, range.start]);
+
   const rangeLabel = `${getDateKey(range.start)} → ${getDateKey(range.end)}`;
 
   async function handleCloseOut() {
@@ -316,11 +330,14 @@ export function PeriodView({ period }: { period: PeriodKind }) {
               stretchKey={periodKey ? overrideKey(periodKey, goal.id) : null}
               stretchTarget={periodKey ? stretchFlat[overrideKey(periodKey, goal.id)] : undefined}
               streak={streakByGoal.get(goal.id) ?? 0}
+              midYearStart={midYearStartByGoal.get(goal.id) ?? null}
               now={now}
             />
           ))}
         </div>
       )}
+
+      <CapturePeriodSection period={period} range={range} now={now} />
 
       {periodTempGoals.length > 0 ? (
         <div className="flex flex-col gap-2">

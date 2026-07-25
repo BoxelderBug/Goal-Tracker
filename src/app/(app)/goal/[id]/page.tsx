@@ -9,6 +9,7 @@ import { buildDailyTotals, computePace, neededPerDay, paceTone, sumRange } from 
 import { getTargetForPeriod } from "@/lib/domain/targets";
 import { computeStreaks } from "@/lib/domain/streaks";
 import { computeGoalRecords } from "@/lib/domain/records";
+import { midYearStartKey } from "@/lib/domain/goalStart";
 import { formatAmount, GOAL_TYPE_LABELS } from "@/lib/domain/format";
 import { ChallengeManager } from "@/components/challenges/ChallengeManager";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -51,6 +52,11 @@ export default function GoalDetailPage() {
     () => (goal ? computeGoalRecords([goal], entries, settings.weekStart)[0] : null),
     [goal, entries, settings.weekStart],
   );
+  // Red flag when this year's numbers only cover part of the year.
+  const midYearStart = useMemo(
+    () => (goal ? midYearStartKey(goal, entries, now.getFullYear()) : null),
+    [goal, entries, now],
+  );
   const recent = useMemo(
     () =>
       goal
@@ -75,6 +81,15 @@ export default function GoalDetailPage() {
           {goal.archived ? <Badge tone="missed">Archived</Badge> : null}
           {streak && streak.current >= 2 ? (
             <Badge tone="accent"><span aria-hidden>🔥</span>{streak.current}</Badge>
+          ) : null}
+          {midYearStart ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-0.5 text-xs font-medium text-danger"
+              title={`This goal started on ${midYearStart}, partway through the year.`}
+            >
+              <span className="h-2 w-2 rounded-full bg-danger" aria-hidden />
+              Started {midYearStart}
+            </span>
           ) : null}
         </div>
         <div className="flex gap-2">

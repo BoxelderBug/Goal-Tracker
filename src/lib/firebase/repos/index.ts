@@ -3,6 +3,7 @@ import type {
   CheckIn,
   CheckInEntry,
   Entry,
+  ExperimentEntry,
   Friend,
   Goal,
   GradeCriterion,
@@ -32,6 +33,7 @@ export const checkInsRepo = new CollectionRepo<CheckIn>("checkIns");
 export const checkInEntriesRepo = new CollectionRepo<CheckInEntry>("checkInEntries");
 export const journalRepo = new CollectionRepo<JournalEntry>("journal");
 export const ideasRepo = new CollectionRepo<IdeaEntry>("ideas");
+export const experimentsRepo = new CollectionRepo<ExperimentEntry>("experiments");
 export const schedulesRepo = new CollectionRepo<ScheduleBlock>("schedules");
 export const snapshotsRepo = new CollectionRepo<PeriodSnapshot>("snapshots");
 export const friendsRepo = new CollectionRepo<Friend>("friends");
