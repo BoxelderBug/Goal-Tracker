@@ -38,8 +38,19 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
           { href: "/month", label: "Month", hint: "M" },
           { href: "/quarter", label: "Quarter", show: (s) => s.quartersEnabled, hint: "Q" },
           { href: "/year", label: "Year", hint: "Y" },
+        ],
+      },
+      // the non-goal things you track and look back on — siblings of Views,
+      // still inside Review
+      {
+        href: "#logs",
+        label: "Logs",
+        children: [
           { href: "/challenges", label: "Challenges" },
           { href: "/grades/review", label: "Grades" },
+          { href: "/questions", label: "Questions", show: (s) => s.questionsEnabled !== false },
+          { href: "/ideas", label: "Ideas", show: (s) => s.ideasEnabled !== false },
+          { href: "/experiments", label: "Experiments", show: (s) => s.experimentsEnabled !== false },
         ],
       },
       { href: "/trends", label: "Trends" },
@@ -57,9 +68,6 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
   {
     heading: "More",
     items: [
-      { href: "/questions", label: "Questions", show: (s) => s.questionsEnabled !== false },
-      { href: "/ideas", label: "Ideas", show: (s) => s.ideasEnabled !== false },
-      { href: "/experiments", label: "Experiments", show: (s) => s.experimentsEnabled !== false },
       { href: "/points", label: "Points", show: (s) => s.rewardPointsEnabled },
       { href: "/bucket-list", label: "Bucket List", show: (s) => s.bucketListEnabled },
       { href: "/data", label: "Data" },
