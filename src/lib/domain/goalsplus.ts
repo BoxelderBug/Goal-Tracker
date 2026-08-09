@@ -5,6 +5,7 @@
  */
 import type {
   GolfType,
+  GoalsPlusEntryData,
   GoalsPlusGolfEntry,
   GoalsPlusReadingEntry,
   GoalsPlusRunningConfig,
@@ -188,6 +189,58 @@ export function buildRunningEntry(params: {
     customReps: 0,
     customWeight: 0,
   };
+}
+
+/**
+ * Rebuild a running entry from edited fields, carrying over the parts no form
+ * exposes — splits, the custom-exercise fields, and the Norwegian work/recovery
+ * speeds — so editing a distance never silently drops them.
+ */
+export function editRunningEntry(
+  previous: GoalsPlusRunningEntry | null,
+  params: {
+    runningWorkout: RunningWorkout;
+    distance: number;
+    durationMinutes: number;
+    avgInclinePct?: number;
+  },
+): GoalsPlusRunningEntry {
+  const rebuilt = buildRunningEntry({
+    ...params,
+    workSpeed: previous?.workSpeed,
+    recoverySpeed: previous?.recoverySpeed,
+  });
+  if (!previous) return rebuilt;
+  return {
+    ...rebuilt,
+    splits: previous.splits,
+    customExerciseName: previous.customExerciseName,
+    customReps: previous.customReps,
+    customWeight: previous.customWeight,
+  };
+}
+
+/**
+ * One-line summary of a Goals+ payload for entry lists, where the bare amount
+ * ("1") says nothing about which book or what kind of run it stands for.
+ * Empty string for a plain entry.
+ */
+export function describeGoalsPlusEntry(data: GoalsPlusEntryData | null): string {
+  if (!data) return "";
+  if (data.mode === "goalsplus-golf") {
+    return `${GOLF_TYPE_LABELS[data.golfType]} ${data.score}`;
+  }
+  if (data.mode === "goalsplus-reading") {
+    return [data.bookTitle, data.author].filter(Boolean).join(" — ");
+  }
+  const parts = [`${round2(data.distance)} mi`, RUNNING_WORKOUT_LABELS[data.runningWorkout]];
+  if (data.paceMinutesPerMile > 0) parts.splice(1, 0, formatPace(data.paceMinutesPerMile));
+  return parts.join(" · ");
+}
+
+/** Where a reading entry lands: a year-only book sits on Jan 1 of its year. */
+export function resolveReadingDate(date: string, yearOnly: boolean): string {
+  return yearOnly ? `${date.slice(0, 4)}-01-01` : date;
 }
 
 export function buildGolfEntry(params: { golfType: GolfType; score: number }): GoalsPlusGolfEntry {

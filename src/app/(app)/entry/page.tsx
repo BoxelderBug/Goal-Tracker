@@ -19,9 +19,11 @@ import {
   buildGolfEntry,
   buildReadingEntry,
   buildRunningEntry,
+  describeGoalsPlusEntry,
   estimatedRunningVo2,
   formatPace,
   paceMinutesPerMile,
+  resolveReadingDate,
   runningEntryAmount,
 } from "@/lib/domain/goalsplus";
 import { Button } from "@/components/ui/Button";
@@ -179,8 +181,7 @@ export default function EntryPage() {
     try {
       // Year-only books land on Jan 1 so they count toward the year without
       // claiming a real day.
-      const effectiveDate =
-        mode === "goalsplus-reading" && bookYearOnly ? `${date.slice(0, 4)}-01-01` : date;
+      const effectiveDate = resolveReadingDate(date, mode === "goalsplus-reading" && bookYearOnly);
       await entriesRepo.set(
         uid,
         newEntry({
@@ -366,7 +367,7 @@ export default function EntryPage() {
                 <span className="text-sm">
                   <span className="font-medium">{goalName(e.trackerId)}</span>{" "}
                   <span className="text-muted">
-                    {e.notApplicable ? "N/A" : formatAmount(e.amount)}
+                    {e.notApplicable ? "N/A" : describeGoalsPlusEntry(e.goalsPlus) || formatAmount(e.amount)}
                     {e.notes ? ` — ${e.notes}` : ""}
                   </span>
                 </span>

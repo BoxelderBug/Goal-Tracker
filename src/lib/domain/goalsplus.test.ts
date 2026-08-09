@@ -6,10 +6,13 @@ import {
   buildRunningEntry,
   computeRaceAttempts,
   computeRunTypeBreakdown,
+  describeGoalsPlusEntry,
+  editRunningEntry,
   estimatedRunningVo2,
   formatMinutes,
   formatPace,
   paceMinutesPerMile,
+  resolveReadingDate,
   runningEntryAmount,
 } from "./goalsplus";
 
@@ -153,5 +156,87 @@ describe("computeRaceAttempts", () => {
 
   it("returns nothing without a race distance", () => {
     expect(computeRaceAttempts([dated("2026-07-01", 5, 40)], 0)).toEqual([]);
+  });
+});
+
+describe("editRunningEntry", () => {
+  const previous = {
+    ...buildRunningEntry({ runningWorkout: "norwegian4x4", distance: 4, durationMinutes: 36, workSpeed: 9, recoverySpeed: 5 }),
+    splits: [{ distance: 1, durationMinutes: 9, paceMinutesPerMile: 9 }],
+    customExerciseName: "Hill sprints",
+    customReps: 6,
+    customWeight: 20,
+  };
+
+  it("recomputes pace and VO2 from the edited distance and duration", () => {
+    const edited = editRunningEntry(previous, {
+      runningWorkout: "norwegian4x4", distance: 5, durationMinutes: 40, avgInclinePct: 2,
+    });
+    expect(edited.distance).toBe(5);
+    expect(edited.paceMinutesPerMile).toBe(8);
+    expect(edited.estimatedVo2).toBe(estimatedRunningVo2(5, 40));
+    expect(edited.avgInclinePct).toBe(2);
+  });
+
+  it("carries over splits, custom fields and Norwegian speeds the form never shows", () => {
+    const edited = editRunningEntry(previous, {
+      runningWorkout: "norwegian4x4", distance: 5, durationMinutes: 40,
+    });
+    expect(edited.splits).toEqual(previous.splits);
+    expect(edited.customExerciseName).toBe("Hill sprints");
+    expect(edited.customReps).toBe(6);
+    expect(edited.customWeight).toBe(20);
+    expect(edited.workSpeed).toBe(9);
+    expect(edited.recoverySpeed).toBe(5);
+  });
+
+  it("drops the work/recovery speeds when the workout is no longer Norwegian", () => {
+    const edited = editRunningEntry(previous, {
+      runningWorkout: "easy", distance: 5, durationMinutes: 40,
+    });
+    expect(edited.workSpeed).toBe(0);
+    expect(edited.recoverySpeed).toBe(0);
+  });
+
+  it("builds a fresh entry when there is nothing to carry over", () => {
+    const edited = editRunningEntry(null, { runningWorkout: "easy", distance: 3, durationMinutes: 24 });
+    expect(edited).toEqual(buildRunningEntry({ runningWorkout: "easy", distance: 3, durationMinutes: 24 }));
+  });
+});
+
+describe("resolveReadingDate", () => {
+  it("moves a year-only book to Jan 1 of its year", () => {
+    expect(resolveReadingDate("2026-07-14", true)).toBe("2026-01-01");
+  });
+
+  it("leaves a dated book alone", () => {
+    expect(resolveReadingDate("2026-07-14", false)).toBe("2026-07-14");
+  });
+});
+
+describe("describeGoalsPlusEntry", () => {
+  it("summarizes a run as distance, pace and workout", () => {
+    const run = buildRunningEntry({ runningWorkout: "tempo", distance: 5, durationMinutes: 40 });
+    expect(describeGoalsPlusEntry(run)).toBe("5 mi · 8:00/mi · Tempo");
+  });
+
+  it("drops the pace when it is unknown", () => {
+    const run = buildRunningEntry({ runningWorkout: "easy", distance: 3, durationMinutes: 0 });
+    expect(describeGoalsPlusEntry(run)).toBe("3 mi · Easy");
+  });
+
+  it("names the book and author, and the book alone when unattributed", () => {
+    expect(describeGoalsPlusEntry(buildReadingEntry({ bookTitle: "Dune", author: "Herbert" })))
+      .toBe("Dune — Herbert");
+    expect(describeGoalsPlusEntry(buildReadingEntry({ bookTitle: "Dune" }))).toBe("Dune");
+  });
+
+  it("labels a golf score by type", () => {
+    expect(describeGoalsPlusEntry(buildGolfEntry({ golfType: "disc-golf", score: 54 })))
+      .toBe("Disc golf 54");
+  });
+
+  it("says nothing for a plain entry", () => {
+    expect(describeGoalsPlusEntry(null)).toBe("");
   });
 });

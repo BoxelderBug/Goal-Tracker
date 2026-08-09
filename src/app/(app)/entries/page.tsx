@@ -7,6 +7,7 @@ import { useUserData } from "@/components/data/UserDataProvider";
 import { entriesRepo } from "@/lib/firebase/repos";
 import { moveEntryToTrash } from "@/lib/firebase/actions/trash";
 import { formatAmount } from "@/lib/domain/format";
+import { describeGoalsPlusEntry } from "@/lib/domain/goalsplus";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
@@ -116,7 +117,9 @@ export default function EntriesPage() {
                     <span className="text-xs text-muted">{entry.date}</span>
                   </div>
                   <div className="truncate text-sm text-muted">
-                    {entry.notApplicable ? "N/A" : formatAmount(entry.amount)}
+                    {entry.notApplicable
+                      ? "N/A"
+                      : describeGoalsPlusEntry(entry.goalsPlus) || formatAmount(entry.amount)}
                     {entry.notes ? ` — ${entry.notes}` : ""}
                   </div>
                 </div>
