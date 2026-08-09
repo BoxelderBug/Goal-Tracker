@@ -42,6 +42,7 @@ import {
   normalizePositiveAmount,
 } from "@/lib/domain/numbers";
 import { normalizeCustomTargetList } from "@/lib/domain/targets";
+import { normalizeTags } from "@/lib/domain/tags";
 import { MONTH_TEMPLATE_COUNT, WEEK_TEMPLATE_COUNT } from "@/lib/domain/periods";
 
 type Raw = Record<string, unknown>;
@@ -409,6 +410,7 @@ export function normalizeEntry(raw: unknown, ctx: NormalizeCtx): Entry | null {
   if (!isRaw(raw) || typeof raw.id !== "string") return null;
   const trackerId = typeof raw.trackerId === "string" ? raw.trackerId : "";
   if (!trackerId) return null;
+  const tags = normalizeTags(raw.tags);
   return {
     id: raw.id,
     trackerId,
@@ -419,6 +421,7 @@ export function normalizeEntry(raw: unknown, ctx: NormalizeCtx): Entry | null {
     metricValues: normalizeEntryMetricValues(raw.metricValues),
     notes: str(raw.notes),
     createdAt: isoOr(raw.createdAt, ctx.nowIso),
+    ...(tags.length ? { tags } : {}),
   };
 }
 

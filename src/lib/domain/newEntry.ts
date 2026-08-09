@@ -1,5 +1,6 @@
 import type { Entry, GoalsPlusEntryData } from "@/types/models";
 import { createId } from "@/lib/id";
+import { normalizeTags } from "./tags";
 
 export function newEntry(params: {
   trackerId: string;
@@ -9,8 +10,10 @@ export function newEntry(params: {
   notes?: string;
   goalsPlus?: GoalsPlusEntryData | null;
   metricValues?: Record<string, number>;
+  tags?: string[];
   createdBy?: string;
 }): Entry {
+  const tags = normalizeTags(params.tags ?? []);
   return {
     id: createId(),
     trackerId: params.trackerId,
@@ -21,6 +24,8 @@ export function newEntry(params: {
     metricValues: params.metricValues ?? {},
     notes: params.notes ?? "",
     createdAt: new Date().toISOString(),
+    // omitted rather than stored empty, so untagged entries stay as they were
+    ...(tags.length ? { tags } : {}),
     ...(params.createdBy ? { createdBy: params.createdBy } : {}),
   };
 }

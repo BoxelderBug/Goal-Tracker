@@ -54,6 +54,7 @@ const GROUPS: { heading: string; items: NavItem[] }[] = [
         ],
       },
       { href: "/trends", label: "Trends" },
+      { href: "/tags", label: "Tags" },
       { href: "/goals-plus", label: "Goals+" },
       { href: "/insights", label: "Insights" },
     ],

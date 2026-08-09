@@ -13,6 +13,9 @@ import { buildDailyTotals, sumRange } from "@/lib/domain/progress";
 import { getTargetForPeriod } from "@/lib/domain/targets";
 import { isYesNoGoal, formatAmount } from "@/lib/domain/format";
 import { EditEntryModal } from "@/components/entries/EditEntryModal";
+import { TagInput } from "@/components/entries/TagInput";
+import { EntryTags } from "@/components/entries/EntryTags";
+import { collectTagSuggestions } from "@/lib/domain/tags";
 import {
   GOLF_TYPE_LABELS,
   RUNNING_WORKOUT_LABELS,
@@ -69,6 +72,7 @@ export default function EntryPage() {
   const [yesNo, setYesNo] = useState("1");
   const [notApplicable, setNotApplicable] = useState(false);
   const [notes, setNotes] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   // Goals+ per-entry fields
   const [distance, setDistance] = useState("");
@@ -149,6 +153,8 @@ export default function EntryPage() {
     return { amount: value, goalsPlus: null };
   }
 
+  const tagSuggestions = useMemo(() => collectTagSuggestions(entries, goals), [entries, goals]);
+
   const todaysEntries = useMemo(() => {
     const key = todayKey();
     return entries
@@ -190,11 +196,12 @@ export default function EntryPage() {
           amount: built.amount,
           notApplicable: mode === "standard" ? notApplicable : false,
           goalsPlus: built.goalsPlus,
+          tags,
           notes: notes.trim(),
         }),
       );
       toast.success(`Logged ${selected.name}`);
-      setAmount(""); setNotes(""); setNotApplicable(false);
+      setAmount(""); setNotes(""); setNotApplicable(false); setTags([]);
       setDistance(""); setDuration(""); setIncline(""); setScore(""); setWeight("");
       setBookTitle(""); setBookAuthor(""); setBookPages(""); setBookRating("0"); setBookYearOnly(false);
     } catch {
@@ -342,6 +349,9 @@ export default function EntryPage() {
               Not applicable this day
             </label>
           ) : null}
+          <Field label="Tags" hint="Optional — grouped across goals on the Tags page">
+            <TagInput value={tags} onChange={setTags} suggestions={tagSuggestions} />
+          </Field>
           <Field label="Notes">
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </Field>
@@ -370,6 +380,7 @@ export default function EntryPage() {
                     {e.notApplicable ? "N/A" : describeGoalsPlusEntry(e.goalsPlus) || formatAmount(e.amount)}
                     {e.notes ? ` — ${e.notes}` : ""}
                   </span>
+                  <EntryTags entry={e} />
                 </span>
                 <div className="flex items-center gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(e)}>Edit</Button>
@@ -385,6 +396,7 @@ export default function EntryPage() {
         <EditEntryModal
           entry={editing}
           goal={goals.find((g) => g.id === editing.trackerId)}
+          suggestions={tagSuggestions}
           onClose={() => setEditing(null)}
           onSave={async (patch) => {
             try {

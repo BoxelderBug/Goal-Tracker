@@ -258,6 +258,8 @@ export interface Entry {
   goalsPlus: GoalsPlusEntryData | null;
   /** progressMetric id -> value */
   metricValues: Record<string, number>;
+  /** free-form labels for cross-goal stats; absent on pre-tagging entries */
+  tags?: string[];
   notes: string;
   createdAt: IsoTimestamp;
   /** uid of the writer; differs from the owner for accountability-partner writes */

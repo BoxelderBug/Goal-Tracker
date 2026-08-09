@@ -15,6 +15,8 @@ import {
   resolveReadingDate,
   runningEntryAmount,
 } from "@/lib/domain/goalsplus";
+import { entryTags, normalizeTags } from "@/lib/domain/tags";
+import { TagInput } from "@/components/entries/TagInput";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -23,16 +25,19 @@ import { toast } from "@/components/ui/Toaster";
 
 const RUNNING_WORKOUTS = Object.keys(RUNNING_WORKOUT_LABELS) as RunningWorkout[];
 
-export type EntryPatch = Pick<Entry, "date" | "amount" | "notApplicable" | "notes" | "goalsPlus">;
+export type EntryPatch = Pick<Entry, "date" | "amount" | "notApplicable" | "notes" | "goalsPlus" | "tags">;
 
 export function EditEntryModal({
   entry,
   goal,
+  suggestions = [],
   onClose,
   onSave,
 }: {
   entry: Entry;
   goal: Goal | undefined;
+  /** known tag names for the tag input's datalist */
+  suggestions?: string[];
   onClose: () => void;
   onSave: (patch: EntryPatch) => Promise<void>;
 }) {
@@ -49,6 +54,7 @@ export function EditEntryModal({
   const [yesNo, setYesNo] = useState(entry.amount ? "1" : "0");
   const [notApplicable, setNotApplicable] = useState(entry.notApplicable);
   const [notes, setNotes] = useState(entry.notes);
+  const [tags, setTags] = useState<string[]>(entryTags(entry));
   const [saving, setSaving] = useState(false);
 
   const [distance, setDistance] = useState(run ? String(run.distance) : "");
@@ -119,7 +125,8 @@ export function EditEntryModal({
       return;
     }
     setSaving(true);
-    await onSave({ ...built, notApplicable: naActive, notes: notes.trim() });
+    // always sent, so clearing the last tag actually clears it on the doc
+    await onSave({ ...built, notApplicable: naActive, notes: notes.trim(), tags: normalizeTags(tags) });
     setSaving(false);
   }
 
@@ -213,6 +220,9 @@ export function EditEntryModal({
             Not applicable this day
           </label>
         ) : null}
+        <Field label="Tags" hint="Optional">
+          <TagInput value={tags} onChange={setTags} suggestions={suggestions} />
+        </Field>
         <Field label="Notes">
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </Field>

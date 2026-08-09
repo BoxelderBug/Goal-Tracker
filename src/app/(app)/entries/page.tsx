@@ -8,6 +8,8 @@ import { entriesRepo } from "@/lib/firebase/repos";
 import { moveEntryToTrash } from "@/lib/firebase/actions/trash";
 import { formatAmount } from "@/lib/domain/format";
 import { describeGoalsPlusEntry } from "@/lib/domain/goalsplus";
+import { collectTagSuggestions, entryHasTag, tagKey } from "@/lib/domain/tags";
+import { EntryTags } from "@/components/entries/EntryTags";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
@@ -22,6 +24,13 @@ export default function EntriesPage() {
 
   const [goalFilter, setGoalFilter] = useState("all");
   const [search, setSearch] = useState("");
+  // Tag chips deep-link here as /entries?tag=<name>; read once on mount. Held
+  // as a match key so a link's casing still selects the option.
+  const [tagFilter, setTagFilter] = useState(() => {
+    if (typeof window === "undefined") return "all";
+    const raw = new URLSearchParams(window.location.search).get("tag");
+    return raw ? tagKey(raw) : "all";
+  });
   const [visibleCount, setVisibleCount] = useState(200);
   const [older, setOlder] = useState<Entry[] | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -30,14 +39,17 @@ export default function EntriesPage() {
   const goalById = useMemo(() => new Map(goals.map((g) => [g.id, g] as const)), [goals]);
   const goalName = (id: string) => goalById.get(id)?.name ?? "Deleted goal";
 
+  const merged = useMemo(() => (older ? [...entries, ...older] : entries), [entries, older]);
+  const knownTags = useMemo(() => collectTagSuggestions(merged, goals), [merged, goals]);
+
   const rows = useMemo(() => {
-    const merged = older ? [...entries, ...older] : entries;
     const q = search.trim().toLowerCase();
     return merged
       .filter((e) => goalFilter === "all" || e.trackerId === goalFilter)
+      .filter((e) => tagFilter === "all" || entryHasTag(e, tagFilter))
       .filter((e) => !q || (e.notes ?? "").toLowerCase().includes(q) || e.date.includes(q))
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  }, [entries, older, goalFilter, search]);
+  }, [merged, goalFilter, tagFilter, search]);
 
   async function loadOlder() {
     setLoadingOlder(true);
@@ -99,12 +111,29 @@ export default function EntriesPage() {
               ))}
             </Select>
           </label>
+          {knownTags.length ? (
+            <label className="flex items-center gap-2 text-sm text-muted">
+              Tag
+              <Select
+                className="w-auto py-1"
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                {knownTags.map((t) => (
+                  <option key={tagKey(t)} value={tagKey(t)}>{t}</option>
+                ))}
+              </Select>
+            </label>
+          ) : null}
         </div>
       </div>
 
       {rows.length === 0 ? (
         <EmptyState>
-          {search.trim() || goalFilter !== "all" ? "No entries match these filters." : "No entries logged yet."}
+          {search.trim() || goalFilter !== "all" || tagFilter !== "all"
+            ? "No entries match these filters."
+            : "No entries logged yet."}
         </EmptyState>
       ) : (
         <Card className="p-0">
@@ -122,6 +151,8 @@ export default function EntriesPage() {
                       : describeGoalsPlusEntry(entry.goalsPlus) || formatAmount(entry.amount)}
                     {entry.notes ? ` — ${entry.notes}` : ""}
                   </div>
+                  {/* own line: chips would be clipped inside the truncated row */}
+                  <EntryTags entry={entry} />
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setEditing(entry)}>Edit</Button>
@@ -153,6 +184,7 @@ export default function EntriesPage() {
         <EditEntryModal
           entry={editing}
           goal={goalById.get(editing.trackerId)}
+          suggestions={knownTags}
           onClose={() => setEditing(null)}
           onSave={async (patch) => {
             try {
