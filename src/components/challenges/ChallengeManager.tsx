@@ -5,8 +5,11 @@ import Link from "next/link";
 import type { Challenge, Goal } from "@/types/models";
 import { useUserData } from "@/components/data/UserDataProvider";
 import { challengesRepo } from "@/lib/firebase/repos";
-import { addDays, getDateKey } from "@/lib/domain/dates";
+import { addDays, getDateKey, parseDateKey } from "@/lib/domain/dates";
 import { formatAmount } from "@/lib/domain/format";
+import { buildDailyTotals, getCumulativeSeries, type DailyTotals } from "@/lib/domain/progress";
+import { cumulativeScrubOption } from "@/lib/charts/options/cumulativeScrub";
+import { EChart, themeColor } from "@/components/charts/EChart";
 import {
   compareChallenges,
   computeChallengeProgress,
@@ -52,6 +55,7 @@ export function ChallengeManager({ goalId }: { goalId?: string }) {
   const [saving, setSaving] = useState(false);
 
   const goalsById = useMemo(() => new Map(goals.map((g) => [g.id, g])), [goals]);
+  const totals = useMemo(() => buildDailyTotals(entries), [entries]);
   const activeGoals = useMemo(() => goals.filter((g) => !g.archived), [goals]);
 
   // scoped mode pins the goal; otherwise the picker above the list narrows it
@@ -169,6 +173,7 @@ export function ChallengeManager({ goalId }: { goalId?: string }) {
               challenge={challenge}
               goal={goalsById.get(challenge.goalId)}
               progress={progress}
+              totals={totals}
               showGoalName={!goalId}
               onEdit={() => setEditing({ id: challenge.id, draft: { ...challenge } })}
               onDelete={() => void remove(challenge)}
@@ -273,6 +278,7 @@ function ChallengeCard({
   challenge,
   goal,
   progress,
+  totals,
   showGoalName,
   onEdit,
   onDelete,
@@ -280,12 +286,39 @@ function ChallengeCard({
   challenge: Challenge;
   goal: Goal | undefined;
   progress: ChallengeProgress;
+  totals: DailyTotals;
   showGoalName: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const unit = goal?.unit ?? "";
   const done = progress.status === "complete" || progress.status === "expired";
+  const [open, setOpen] = useState(false);
+
+  // The challenge window is just a date range for one goal, so the period
+  // views' cumulative+projection series works here unchanged: solid actual up
+  // to today, dashed projection across the days left, target as a markLine.
+  const points = useMemo(() => {
+    if (!open) return [];
+    const range = { start: parseDateKey(challenge.startDate), end: parseDateKey(challenge.dueDate) };
+    return getCumulativeSeries(totals, challenge.goalId, range, new Date());
+  }, [open, totals, challenge.goalId, challenge.startDate, challenge.dueDate]);
+
+  const chartOption = useMemo(() => {
+    if (!open || points.length === 0) return null;
+    return cumulativeScrubOption(points, challenge.target, unit, {
+      accent: themeColor("--accent", "#009f94"),
+      projected: themeColor("--muted", "#888"),
+      projectedFill: "#ffffff",
+      target: themeColor("--tone-behind", "#be7f24"),
+      overlay: themeColor("--chart-5", "#4a3aa7"),
+      text: themeColor("--text", "#222"),
+      muted: themeColor("--muted", "#888"),
+      grid: themeColor("--border", "#ddd"),
+      surface: themeColor("--surface", "#fff"),
+      border: themeColor("--border", "#ddd"),
+    });
+  }, [open, points, challenge.target, unit]);
 
   return (
     <Card className={done ? "opacity-80" : undefined}>
@@ -330,10 +363,31 @@ function ChallengeCard({
           </span>
           <span className="flex gap-3">
             <span>{challenge.startDate} → {challenge.dueDate}</span>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className="underline hover:text-text"
+            >
+              {open ? "Hide graph" : "Graph"}
+            </button>
             <button type="button" onClick={onEdit} className="underline hover:text-text">Edit</button>
             <button type="button" onClick={onDelete} className="underline hover:text-text">Delete</button>
           </span>
         </div>
+
+        {open && chartOption ? (
+          <div className="flex flex-col gap-1">
+            <EChart option={chartOption} height={240} />
+            <p className="text-xs text-muted">
+              Solid to today, dashed at your current pace
+              {challenge.target > 0
+                ? ` — projecting ${formatAmount(progress.projected)}${unit ? ` ${unit}` : ""} against a ${formatAmount(challenge.target)}${unit ? ` ${unit}` : ""} target`
+                : ""}
+              .
+            </p>
+          </div>
+        ) : null}
       </div>
     </Card>
   );
