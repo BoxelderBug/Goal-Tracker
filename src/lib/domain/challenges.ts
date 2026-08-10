@@ -22,6 +22,12 @@ export interface ChallengeProgress {
   tone: "hit" | "onpace" | "behind" | "missed";
   /** per-day amount needed over the days left (today counts); 0 when done or past due */
   requiredPerDay: number;
+  /** amount logged per elapsed day so far (today counts); 0 before the window opens */
+  avgPerDay: number;
+  /** where the current average lands by the due date */
+  projected: number;
+  /** projected as a % of target, one decimal; 0 without a target */
+  projectedPercent: number;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -67,10 +73,14 @@ export function computeChallengeProgress(
   const daysLeftInclusive = pastDue ? 0 : due - today + 1;
   const remaining = complete ? 0 : Math.max(round2(target - amount), 0);
 
-  // even-split expectation as of today, for the on-pace/behind call
+  // Daily average so far and where it lands by the due date. Elapsed days are
+  // clamped to [1, totalDays] exactly as getElapsedDays does for periods, so a
+  // challenge reads the same way a week/month/year goal does.
   const totalDays = Math.max(due - start + 1, 1);
-  const elapsedDays = Math.min(Math.max(today - start + 1, 0), totalDays);
-  const expected = (target * elapsedDays) / totalDays;
+  const elapsedDays = Math.min(Math.max(today - start + 1, 1), totalDays);
+  const started = today >= start;
+  const avgPerDay = started ? round2(amount / elapsedDays) : 0;
+  const projected = round2(avgPerDay * totalDays);
 
   return {
     amount,
@@ -78,9 +88,29 @@ export function computeChallengeProgress(
     percent: target > 0 ? Math.round((amount / target) * 1000) / 10 : 0,
     daysRemaining: Math.max(due - today, 0),
     status,
-    tone: complete ? "hit" : pastDue ? "missed" : amount >= expected ? "onpace" : "behind",
+    tone: challengeTone(status, projected, target),
     requiredPerDay: daysLeftInclusive > 0 && remaining > 0 ? round2(remaining / daysLeftInclusive) : 0,
+    avgPerDay,
+    projected,
+    projectedPercent: target > 0 ? Math.round((projected / target) * 1000) / 10 : 0,
   };
+}
+
+/**
+ * Same tiers as progress.ts `paceTone`, so a challenge bar means what a
+ * week/month/year bar means: on pace to finish, short of it, or badly short.
+ * An upcoming challenge reads neutral — there is no pace to judge yet.
+ */
+function challengeTone(
+  status: ChallengeStatus,
+  projected: number,
+  target: number,
+): ChallengeProgress["tone"] {
+  if (status === "complete") return "hit";
+  if (status === "expired") return "missed";
+  if (status === "upcoming" || target <= 0) return "onpace";
+  if (projected >= target) return "onpace";
+  return projected >= target * 0.75 ? "behind" : "missed";
 }
 
 /** Live challenges first (soonest due leading), finished and lapsed ones after. */

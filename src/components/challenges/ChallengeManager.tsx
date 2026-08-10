@@ -307,11 +307,21 @@ function ChallengeCard({
           <p className="text-sm text-muted">{challenge.description}</p>
         ) : null}
 
-        <ProgressBar percent={progress.percent} tone={progress.tone} />
+        <ProgressBar
+          percent={progress.percent}
+          tone={progress.tone}
+          projectedPercent={challenge.target > 0 ? progress.projectedPercent : undefined}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted">
           <span>
             {daysLabel(progress)}
+            {progress.status !== "upcoming"
+              ? ` · averaging ${formatAmount(progress.avgPerDay)}${unit ? ` ${unit}` : ""}/day`
+              : ""}
+            {progress.status === "active" && challenge.target > 0
+              ? ` · on pace for ${formatAmount(progress.projected)}${unit ? ` ${unit}` : ""}`
+              : ""}
             {progress.requiredPerDay > 0
               ? ` · ${formatAmount(progress.requiredPerDay)}${unit ? ` ${unit}` : ""}/day to finish`
               : progress.status === "expired"

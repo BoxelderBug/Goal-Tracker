@@ -47,10 +47,44 @@ describe("computeChallengeProgress", () => {
     expect(p.status).toBe("active");
   });
 
-  it("is on pace when at or past an even split, behind otherwise", () => {
-    // day 11 of 31 -> even split expects 35.48
-    expect(computeChallengeProgress(challenge(), [entry("2026-07-02", 40)], "2026-07-11").tone).toBe("onpace");
-    expect(computeChallengeProgress(challenge(), [entry("2026-07-02", 20)], "2026-07-11").tone).toBe("behind");
+  it("tones by where the current pace lands, in the same tiers as period goals", () => {
+    // day 11 of 31: projected = (amount / 11) * 31
+    const toneAt = (amount: number) =>
+      computeChallengeProgress(challenge(), [entry("2026-07-02", amount)], "2026-07-11").tone;
+    expect(toneAt(40)).toBe("onpace"); // projects 112.7 — clears the target
+    expect(toneAt(30)).toBe("behind"); // projects 84.5 — short, but within 75%
+    expect(toneAt(20)).toBe("missed"); // projects 56.4 — badly short
+  });
+
+  it("reports the daily average and where it projects to", () => {
+    // 22 logged over 11 elapsed days of a 31-day window
+    const p = computeChallengeProgress(challenge(), [entry("2026-07-02", 22)], "2026-07-11");
+    expect(p.avgPerDay).toBe(2);
+    expect(p.projected).toBe(62);
+    expect(p.projectedPercent).toBe(62);
+  });
+
+  it("counts today as an elapsed day, so a same-day log is not divided away", () => {
+    const p = computeChallengeProgress(challenge(), [entry("2026-07-01", 5)], "2026-07-01");
+    expect(p.avgPerDay).toBe(5);
+    expect(p.projected).toBe(155);
+  });
+
+  it("stays neutral before the window opens instead of projecting a miss", () => {
+    const p = computeChallengeProgress(challenge(), [], "2026-06-20");
+    expect(p).toMatchObject({ status: "upcoming", tone: "onpace", avgPerDay: 0, projected: 0 });
+  });
+
+  it("projects the final amount once the window is over", () => {
+    const p = computeChallengeProgress(challenge(), [entry("2026-07-30", 62)], "2026-08-05");
+    expect(p.avgPerDay).toBe(2);
+    expect(p.projected).toBe(62);
+  });
+
+  it("leaves projectedPercent at 0 without a target", () => {
+    const p = computeChallengeProgress(challenge({ target: 0 }), [entry("2026-07-02", 5)], "2026-07-11");
+    expect(p.projectedPercent).toBe(0);
+    expect(p.tone).toBe("onpace");
   });
 
   it("spreads what is left over the days remaining, today included", () => {
