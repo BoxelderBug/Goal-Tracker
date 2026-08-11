@@ -48,23 +48,34 @@ describe("computeChallengeProgress", () => {
   });
 
   it("tones by where the current pace lands, in the same tiers as period goals", () => {
-    // day 11 of 31: projected = (amount / 11) * 31
+    // day 11 of 31, so 10 finished days: projected = (amount / 10) * 31
     const toneAt = (amount: number) =>
       computeChallengeProgress(challenge(), [entry("2026-07-02", amount)], "2026-07-11").tone;
-    expect(toneAt(40)).toBe("onpace"); // projects 112.7 — clears the target
-    expect(toneAt(30)).toBe("behind"); // projects 84.5 — short, but within 75%
-    expect(toneAt(20)).toBe("missed"); // projects 56.4 — badly short
+    expect(toneAt(40)).toBe("onpace"); // projects 124 — clears the target
+    expect(toneAt(30)).toBe("behind"); // projects 93 — short, but within 75%
+    expect(toneAt(20)).toBe("missed"); // projects 62 — badly short
   });
 
   it("reports the daily average and where it projects to", () => {
-    // 22 logged over 11 elapsed days of a 31-day window
+    // 22 logged over the 10 FINISHED days of a 31-day window (day 11 is today,
+    // still in progress, so it is not part of the divisor)
     const p = computeChallengeProgress(challenge(), [entry("2026-07-02", 22)], "2026-07-11");
-    expect(p.avgPerDay).toBe(2);
-    expect(p.projected).toBe(62);
-    expect(p.projectedPercent).toBe(62);
+    expect(p.avgPerDay).toBe(2.2);
+    expect(p.projected).toBe(68.2);
+    expect(p.projectedPercent).toBe(68.2);
   });
 
-  it("counts today as an elapsed day, so a same-day log is not divided away", () => {
+  it("does not let a day still in progress drag the average down", () => {
+    // same 22 logged; yesterday the divisor was 9 finished days, today it is 10
+    const yesterday = computeChallengeProgress(challenge(), [entry("2026-07-02", 22)], "2026-07-10");
+    expect(yesterday.avgPerDay).toBeCloseTo(2.44, 2);
+    // logging nothing today moves the rate by one day's worth, not by a
+    // whole day of credit vanishing
+    const today = computeChallengeProgress(challenge(), [entry("2026-07-02", 22)], "2026-07-11");
+    expect(today.avgPerDay).toBe(2.2);
+  });
+
+  it("divides the first day by itself, having no finished day to go on", () => {
     const p = computeChallengeProgress(challenge(), [entry("2026-07-01", 5)], "2026-07-01");
     expect(p.avgPerDay).toBe(5);
     expect(p.projected).toBe(155);

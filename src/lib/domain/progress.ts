@@ -74,7 +74,7 @@ export interface CumulativePoint {
 
 /**
  * Cumulative series for the scrub chart: actual running total up to `now`,
- * then a straight-line projection (avg/day × elapsed) continuing to range end.
+ * then a straight-line projection (avg over finished days) to the range end.
  * The point at `now` carries both the actual value and the projection start so
  * the scrub readout transitions seamlessly into the projection segment.
  */
@@ -85,7 +85,7 @@ export function getCumulativeSeries(
   now: Date,
 ): CumulativePoint[] {
   const daily = getDailySeries(totals, trackerId, range);
-  const elapsedDays = getElapsedDays(range, now);
+  const projectionDays = getProjectionDays(range, now);
   const nowKey = getDateKey(now);
 
   let running = 0;
@@ -107,8 +107,8 @@ export function getCumulativeSeries(
   }
 
   // Fill the projection segment: from the last actual value, extend by the
-  // average daily rate over elapsed days.
-  const avgPerDay = safeDivide(elapsedRunning, elapsedDays);
+  // average daily rate over the days that have actually finished.
+  const avgPerDay = safeDivide(elapsedRunning, projectionDays);
   let dayOffset = 0;
   const startProjectionFrom = elapsedRunning;
   for (let i = 0; i < points.length; i += 1) {
@@ -123,10 +123,27 @@ export interface PaceResult {
   progress: number;
   target: number;
   completion: number;
+  /** amount per FINISHED day — today is excluded while it is in progress */
   avgPerDay: number;
   projected: number;
   onPace: boolean;
   goalHit: boolean;
+}
+
+/**
+ * Days to divide by when working out a daily rate. Today is still in progress
+ * — you can log more before midnight — so counting it as a finished day drags
+ * every projection down all day and only recovers at the moment you log.
+ * Whatever IS logged today still counts in the numerator; the day just is not
+ * treated as spent yet.
+ *
+ * Floored at 1 so the first day of a period divides by itself, and a range
+ * that has already ended counts every day, since none of them is in progress.
+ */
+export function getProjectionDays(range: DateRange, now: Date): number {
+  const elapsedDays = getElapsedDays(range, now);
+  if (normalizeDate(now) > range.end) return elapsedDays;
+  return Math.max(elapsedDays - 1, 1);
 }
 
 export function computePace(
@@ -136,8 +153,7 @@ export function computePace(
   now: Date,
 ): PaceResult {
   const totalDays = getRangeDays(range);
-  const elapsedDays = getElapsedDays(range, now);
-  const avgPerDay = safeDivide(progress, elapsedDays);
+  const avgPerDay = safeDivide(progress, getProjectionDays(range, now));
   const projected = avgPerDay * totalDays;
   return {
     progress,

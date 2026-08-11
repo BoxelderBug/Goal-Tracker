@@ -8,6 +8,7 @@ import {
   buildDailyTotals,
   computePace,
   getCumulativeSeries,
+  getProjectionDays,
   neededPerDay,
   paceTone,
   sumRange,
@@ -41,10 +42,32 @@ describe("buildDailyTotals + sumRange", () => {
   });
 });
 
+describe("getProjectionDays", () => {
+  it("leaves out the day in progress", () => {
+    // week is Mon 07-06 .. Sun 07-12; Wed is day 3, so 2 days have finished
+    expect(getProjectionDays(week, parseDateKey("2026-07-08"))).toBe(2);
+  });
+
+  it("divides the first day by itself rather than by zero", () => {
+    expect(getProjectionDays(week, parseDateKey("2026-07-06"))).toBe(1);
+  });
+
+  it("counts every day of a range that has already ended", () => {
+    expect(getProjectionDays(week, parseDateKey("2026-07-20"))).toBe(7);
+  });
+
+  it("counts the last day fully only once it is past", () => {
+    expect(getProjectionDays(week, parseDateKey("2026-07-12"))).toBe(6);
+    expect(getProjectionDays(week, parseDateKey("2026-07-13"))).toBe(7);
+  });
+});
+
 describe("computePace", () => {
   it("flags on-pace when projected meets target", () => {
-    // 3 of 7 days elapsed, 6 done -> avg 2/day -> projected 14 >= 10
+    // Wed: 6 done over the 2 finished days -> avg 3/day -> projected 21 >= 10
     const pace = computePace(6, 10, week, parseDateKey("2026-07-08"));
+    expect(pace.avgPerDay).toBe(3);
+    expect(pace.projected).toBe(21);
     expect(pace.completion).toBe(60);
     expect(pace.onPace).toBe(true);
     expect(pace.goalHit).toBe(false);
@@ -72,13 +95,35 @@ describe("getCumulativeSeries", () => {
     expect(series[0]).toMatchObject({ date: "2026-07-06", cumulative: 2, projected: false });
     expect(series[2]).toMatchObject({ date: "2026-07-08", cumulative: 6, projected: false });
 
-    // projection region: avg 2/day over 3 elapsed days, extends from 6
+    // projection region: 6 logged over the 2 FINISHED days (Wed is still in
+    // progress) = 3/day, extending from the current total of 6
     const thu = series[3];
     expect(thu.projected).toBe(true);
     expect(thu.cumulative).toBe(6); // actual stays flat
-    expect(thu.projectedCumulative).toBe(8);
+    expect(thu.projectedCumulative).toBe(9);
     const sun = series[6];
-    expect(sun.projectedCumulative).toBe(14); // 6 + 2*4
+    expect(sun.projectedCumulative).toBe(18); // 6 + 3*4
+  });
+
+  it("keeps today's own logging out of the divisor but inside the total", () => {
+    const totals = buildDailyTotals([
+      entry("a", "g1", "2026-07-06", 2),
+      entry("b", "g1", "2026-07-07", 2),
+    ]);
+    // Wed with nothing logged yet: the rate stays 2/day off the two finished
+    // days rather than being dragged to 1.33 by a day still in progress
+    const series = getCumulativeSeries(totals, "g1", week, parseDateKey("2026-07-08"));
+    expect(series[2]).toMatchObject({ date: "2026-07-08", cumulative: 4, projected: false });
+    expect(series[3].projectedCumulative).toBe(6);
+    expect(series[6].projectedCumulative).toBe(12); // 4 + 2*4
+  });
+
+  it("counts every day once the range is over, since none is in progress", () => {
+    const totals = buildDailyTotals([entry("a", "g1", "2026-07-06", 7)]);
+    const series = getCumulativeSeries(totals, "g1", week, parseDateKey("2026-07-20"));
+    // no projected points at all — the week is done
+    expect(series.every((p) => !p.projected)).toBe(true);
+    expect(series[6].cumulative).toBe(7);
   });
 });
 

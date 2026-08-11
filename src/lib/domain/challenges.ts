@@ -22,7 +22,7 @@ export interface ChallengeProgress {
   tone: "hit" | "onpace" | "behind" | "missed";
   /** per-day amount needed over the days left (today counts); 0 when done or past due */
   requiredPerDay: number;
-  /** amount logged per elapsed day so far (today counts); 0 before the window opens */
+  /** amount logged per FINISHED day so far; 0 before the window opens */
   avgPerDay: number;
   /** where the current average lands by the due date */
   projected: number;
@@ -73,13 +73,15 @@ export function computeChallengeProgress(
   const daysLeftInclusive = pastDue ? 0 : due - today + 1;
   const remaining = complete ? 0 : Math.max(round2(target - amount), 0);
 
-  // Daily average so far and where it lands by the due date. Elapsed days are
-  // clamped to [1, totalDays] exactly as getElapsedDays does for periods, so a
-  // challenge reads the same way a week/month/year goal does.
+  // Daily average so far and where it lands by the due date, using the same
+  // divisor rule as progress.ts getProjectionDays: today is still in progress,
+  // so it is not counted as a finished day. What is logged today still counts
+  // toward the amount — the day just is not treated as spent.
   const totalDays = Math.max(due - start + 1, 1);
   const elapsedDays = Math.min(Math.max(today - start + 1, 1), totalDays);
+  const projectionDays = pastDue ? elapsedDays : Math.max(elapsedDays - 1, 1);
   const started = today >= start;
-  const avgPerDay = started ? round2(amount / elapsedDays) : 0;
+  const avgPerDay = started ? round2(amount / projectionDays) : 0;
   const projected = round2(avgPerDay * totalDays);
 
   return {

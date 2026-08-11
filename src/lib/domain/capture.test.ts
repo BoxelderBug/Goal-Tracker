@@ -96,7 +96,7 @@ describe("computeCapturePeriod", () => {
   it("projects the rest of the period when behind", () => {
     const s = settings({ questionsWeeklyGoal: 7 });
     const week = range("2026-07-20", "2026-07-26");
-    // 1 logged over the first 5 days → projects to ~1.4, well under 7
+    // 1 logged over the 4 finished days (day 5 is in progress) → 1.75, under 7
     const result = computeCapturePeriod(
       s,
       "question",
@@ -106,7 +106,7 @@ describe("computeCapturePeriod", () => {
       parseDateKey("2026-07-24"),
     );
     expect(result.count).toBe(1);
-    expect(result.pace.projected).toBeCloseTo(1.4, 5);
+    expect(result.pace.projected).toBeCloseTo(1.75, 5);
     expect(result.tone).toBe("missed");
   });
 
